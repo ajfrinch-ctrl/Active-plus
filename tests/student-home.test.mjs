@@ -349,3 +349,26 @@ test('More includes a Settings panel with real app state', async () => {
   click(doc, '#more-content [data-act="settings"]');
   assert.equal(doc.getElementById('view-more').hidden, false, 'settings tile routes to More');
 });
+
+test('today summary rows open their own section', async () => {
+  const { doc } = await bootHome();
+  const rows = [...doc.querySelectorAll('#home-content [role="button"][data-act]')]
+    .filter((r) => ['routine', 'assignments', 'exam'].includes(r.dataset.act));
+  assert.ok(rows.length >= 3, 'today rows are actionable');
+  click(doc, '#home-content .info-row[data-act="exam"]');
+  assert.equal(doc.getElementById('view-exam').hidden, false, 'exam row opens exams');
+});
+
+test('latest result card shows the class position when leaderboard is on', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
+  data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+  data.setHomeCards({ leaderboard: true });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  assert.ok(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), 'position shown');
+  data.setHomeCards({ leaderboard: false });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  assert.equal(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), false, 'hidden with the leaderboard');
+});

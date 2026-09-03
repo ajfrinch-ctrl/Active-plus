@@ -171,9 +171,9 @@ export function initStudentHome() {
 
       <div class="hcard">
         <div class="h-title">আজ</div>
-        <div class="info-row"><span class="l">📚 ক্লাস</span><span class="v">${bn(progress.classes)}</span></div>
-        <div class="info-row"><span class="l">📋 অ্যাসাইনমেন্ট</span><span class="v">${bn(progress.assignments)}</span></div>
-        <div class="info-row"><span class="l">📝 পরীক্ষা</span><span class="v">${bn(exam ? 1 : 0)}</span></div>
+        <div class="info-row" role="button" tabindex="0" data-act="routine" style="cursor:pointer"><span class="l">📚 ক্লাস</span><span class="v">${bn(progress.classes)}</span></div>
+        <div class="info-row" role="button" tabindex="0" data-act="assignments" style="cursor:pointer"><span class="l">📋 অ্যাসাইনমেন্ট</span><span class="v">${bn(progress.assignments)}</span></div>
+        <div class="info-row" role="button" tabindex="0" data-act="exam" style="cursor:pointer"><span class="l">📝 পরীক্ষা</span><span class="v">${bn(exam ? 1 : 0)}</span></div>
       </div>`);
     }
 
@@ -398,6 +398,7 @@ export function initStudentHome() {
     return `<div class="hcard"><div class="h-title">🏆 সাম্প্রতিক ফলাফল</div>
       <div class="big">${escapeHtml(exam?.title || 'পরীক্ষা')}</div>
       <div class="info-row"><span class="l">স্কোর</span><span class="v">${bn(mine.score)}/${bn(mine.total)} (${bn(pct)}%)</span></div>
+      ${homeCards().leaderboard && performanceFor(student) ? `<div class="info-row"><span class="l">অবস্থান</span><span class="v">#${bn(performanceFor(student).rank)}</span></div>` : ''}
       <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">ফলাফল দেখুন</button></div>`;
   }
 
