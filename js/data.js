@@ -34,6 +34,7 @@ const SEED = {
     admissionFee: 500,
     defaultExamDuration: 30,
     passMark: 40,
+    studentEditableFields: ['phone'],
     negativeMarking: 0,
     leaderboardEnabled: true,
     autoPublishResult: false,
@@ -45,10 +46,10 @@ const SEED = {
     }
   },
   students: [
-    { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', roll: '০১', phone: '০১৭১১-০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়' },
-    { id: '2026-09-002', name: 'সুমাইয়া ইসলাম', className: 'নবম', roll: '০২', phone: '০১৭১১-০০০০২', school: 'ভিকারুননিসা নূন স্কুল অ্যান্ড কলেজ', status: 'সক্রিয়' },
-    { id: '2026-10-014', name: 'নাফিস ইকবাল', className: 'দশম', roll: '১৪', phone: '০১৭১১-০০০০১৪', school: 'মতিঝিল সরকারি বালক উচ্চ বিদ্যালয়', status: 'বকেয়া' },
-    { id: '2026-08-007', name: 'তাসনিম জাহান', className: 'অষ্টম', roll: '০৭', phone: '০১৭১১-০০০০৭', school: 'লালমাটিয়া বালিকা বিদ্যালয়', status: 'সক্রিয়' }
+    { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', section: 'A', batch: 'A', roll: '০১', phone: '০১৭১১-০০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়', guardian: 'করিম হাসান', guardianPhone: '০১৮১১-০০০০০১', admissionDate: '২০২৬-০১-০৫', photo: '' },
+    { id: '2026-09-002', name: 'সুমাইয়া ইসলাম', className: 'নবম', section: 'A', batch: 'A', roll: '০২', phone: '০১৭১১-০০০০০২', school: 'ভিকারুননিসা নূন স্কুল অ্যান্ড কলেজ', status: 'সক্রিয়', guardian: 'জাহিদ ইসলাম', guardianPhone: '০১৮১১-০০০০০২', admissionDate: '২০২৬-০১-০৫', photo: '' },
+    { id: '2026-10-014', name: 'নাফিস ইকবাল', className: 'দশম', section: 'B', batch: 'B', roll: '১৪', phone: '০১৭১১-০০০০১৪', school: 'মতিঝিল সরকারি বালক উচ্চ বিদ্যালয়', status: 'বকেয়া', guardian: 'ইকবাল হোসেন', guardianPhone: '০১৮১১-০০০০১৪', admissionDate: '২০২৬-০১-০৮', photo: '' },
+    { id: '2026-08-007', name: 'তাসনিম জাহান', className: 'অষ্টম', section: 'A', batch: 'A', roll: '০৭', phone: '০১৭১১-০০০০০৭', school: 'লালমাটিয়া বালিকা বিদ্যালয়', status: 'সক্রিয়', guardian: 'জাহান আলম', guardianPhone: '০১৮১১-০০০০০৭', admissionDate: '২০২৬-০১-১০', photo: '' }
   ],
   teachers: [
     { name: 'রাহেলা আক্তার', subject: 'পদার্থবিজ্ঞান', phone: '০১৮১১-১১১১১১', classes: 6 },
@@ -109,7 +110,8 @@ const SEED = {
   exams: [
     {
       id: 'exam-1', title: 'গণিত MCQ মডেল টেস্ট-১', className: 'নবম', subject: 'গণিত',
-      author: 'কামরুল ইসলাম', date: '২০২৬-০৯-০২',
+      author: 'কামরুল ইসলাম', date: '২০২৬-০৯-০২', time: '১৭:০০',
+      duration: 30, startDate: '২০২৬-০৯-০১', endDate: '২০২৬-০৯-৩০',
       questions: [
         { q: '৫ + ৩ × ২ = ?', options: ['১০', '১১', '১৬', ''], answer: 1 },
         { q: 'একটি ত্রিভুজের তিন কোণের সমষ্টি কত?', options: ['৯০°', '১৮০°', '২৭০°', '৩৬০°'], answer: 1 },
@@ -657,6 +659,58 @@ export function latestTip() {
 }
 export function activeBanners() {
   return db.banners.list().filter((b) => b.active);
+}
+
+/* ---------------- Home: exam window + assignment status ---------------- */
+
+function bnToIso(text) {
+  const ascii = String(text || '').replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6));
+  const m = ascii.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+/** Is an exam open right now? Drives View Exam vs Start Exam (never both). */
+export function examWindow(exam) {
+  if (!exam) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = bnToIso(exam.startDate);
+  const end = bnToIso(exam.endDate);
+  if (start && today < start) return { state: 'upcoming', label: exam.date || '', canStart: false };
+  if (end && today > end) return { state: 'closed', label: 'সময় শেষ', canStart: false };
+  return { state: 'active', label: exam.date || 'চলমান', canStart: true };
+}
+
+/** Pending / submitted / checked / overdue + human due label. */
+export function assignmentStatus(assignment, student) {
+  const sub = db.submissions.list().find((s) => s.assignmentId === assignment.id && s.studentId === student?.id);
+  const due = bnToIso(assignment.deadline);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const daysLeft = due ? Math.round((due - today) / 86400000) : null;
+  if (sub) return { status: sub.status === 'চেক হয়েছে' ? 'checked' : 'submitted', daysLeft, sub };
+  if (daysLeft !== null && daysLeft < 0) return { status: 'overdue', daysLeft, sub: null };
+  return { status: 'pending', daysLeft, sub: null };
+}
+
+export function dueLabel(assignment) {
+  const { status, daysLeft } = assignmentStatus(assignment, arguments[1]);
+  if (status === 'submitted' || status === 'checked') return assignment.deadline;
+  if (daysLeft === null) return assignment.deadline;
+  if (daysLeft < 0) return 'সময় পার হয়েছে';
+  if (daysLeft === 0) return 'আজই জমা দিন';
+  if (daysLeft === 1) return 'আগামীকাল শেষ';
+  return `${daysLeft} দিন বাকি`;
+}
+
+/** Newest notifications/announcements for the home preview strip. */
+export function latestNotifications(student, limit = 2) {
+  const all = [
+    ...db.notifications.list().filter((n) => n.target === 'সবাই' || n.target === 'শিক্ষার্থী')
+      .map((n) => ({ id: n.id, title: n.title, body: n.type || 'নোটিফিকেশন', date: n.date, read: !!n.read })),
+    ...noticesFor(student).filter((n) => n.forStudent === student?.id)
+      .map((n) => ({ id: n.id, title: n.title, body: n.type || 'ঘোষণা', date: n.date, read: !!n.read }))
+  ];
+  return all.slice(-limit).reverse();
 }
 
 /* ---------------- Home card visibility (admin controlled) ---------------- */

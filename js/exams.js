@@ -158,11 +158,19 @@ export function mountExamAuthoring() {
     const title = String(d.get('title') || '').trim();
     if (!title) { showToast('পরীক্ষার শিরোনাম দিন।', 'error'); return; }
     if (!staged.length) { showToast('কমপক্ষে একটি প্রশ্ন যোগ করুন।', 'error'); return; }
+    const startDate = String(d.get('startDate') || '').trim();
+    const endDate = String(d.get('endDate') || '').trim();
+    const toBnDate = (iso) => (iso ? iso.replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[Number(x)]) : '');
     db.exams.add({
       id: newId('exam'), title,
       className: String(d.get('className')),
       subject: String(d.get('subject') || '').trim(),
-      author: window.__examAuthor || '', date: todayBn(),
+      author: window.__examAuthor || '',
+      date: String(d.get('date') || '').trim() || todayBn(),
+      time: String(d.get('time') || '').trim(),
+      duration: Number(d.get('duration')) || 30,
+      startDate: toBnDate(startDate),
+      endDate: toBnDate(endDate),
       questions: staged
     });
     closeModal('exam-modal');

@@ -11,9 +11,27 @@ import {
   greetingByHour, studyStreak, todayProgress, nextClass, upcomingExam,
   challengeState, addChallengeProgress, performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
-  recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial
+  recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial,
+  examWindow, assignmentStatus, dueLabel, latestNotifications
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
+
+/** Secondary features revealed by "See More" — configurable, nothing dead. */
+const MORE_FEATURES = [
+  { act: 'questionbank', ico: '🧩', label: 'প্রশ্ন ব্যাংক' },
+  { act: 'progress', ico: '📈', label: 'আমার প্রগ্রেস' },
+  { act: 'achievements', ico: '🏅', label: 'অর্জন' },
+  { act: 'certificates', ico: '🎓', label: 'সনদ' },
+  { act: 'downloads', ico: '⬇️', label: 'ডাউনলোড' },
+  { act: 'query', ico: '✉️', label: 'শিক্ষক প্রশ্ন' },
+  { act: 'streak', ico: '🔥', label: 'স্ট্রিক' },
+  { act: 'profile', ico: '👤', label: 'প্রোফাইল' },
+  { act: 'help', ico: '❓', label: 'সহায়তা' }
+];
+
+const FIELD_BN = { phone: 'মোবাইল', guardianPhone: 'অভিভাবকের মোবাইল' };
+
+const STATUS_BN = { pending: 'বাকি', submitted: 'জমা হয়েছে', checked: 'চেক হয়েছে', overdue: 'সময় পার' };
 
 const BN = '০১২৩৪৫৬৭৮৯';
 const bn = (n) => String(n).replace(/\d/g, (d) => BN[Number(d)]);
@@ -28,8 +46,15 @@ export function initStudentHome() {
   /* Header */
   document.getElementById('greet').textContent = `${greetingByHour()} 👋`;
   document.getElementById('student-name').textContent = session.name;
-  document.getElementById('student-meta').textContent = me ? `${me.className} · রোল ${me.roll}` : session.detail || '';
-  document.getElementById('avatar').textContent = (session.name || 'A').charAt(0);
+  const batch = me?.batch ? ` · ব্যাচ ${me.batch}` : '';
+  document.getElementById('student-meta').textContent = me ? `${me.className}${batch} · রোল ${me.roll}` : session.detail || '';
+  const avatar = document.getElementById('avatar');
+  if (me?.photo) {
+    avatar.innerHTML = `<img src="${escapeHtml(me.photo)}" alt="${escapeHtml(session.name)}">`;
+  } else {
+    avatar.textContent = (session.name || 'A').charAt(0);
+  }
+  document.getElementById('profile-btn')?.addEventListener('click', () => openMore('profile'));
 
   const bellCount = document.getElementById('bell-count');
   const unread = unreadNotifications(student);
@@ -105,18 +130,25 @@ export function initStudentHome() {
     const allMaterials = cards.materials ? suggestionsMaterials() : [];
     const resume = cards.materials ? (lastAccessedMaterial() || allMaterials[0] || null) : null;
     const materials = allMaterials;
+    const previewNotes = cards.notices ? latestNotifications(student, 2) : [];
     const assignments = cards.assignments
       ? db.assignments.list().filter((a) => a.className === student.className) : [];
 
     const sections = [];
 
     if (banners.length) {
-      sections.push(banners.map((b) => `
-      <div class="banner">
-        <h3>📢 ${escapeHtml(b.title)}</h3>
-        <p>${escapeHtml(b.desc)}</p>
-        <button type="button" class="btn btn-small" data-act="banner" data-id="${escapeHtml(b.id)}">${escapeHtml(b.cta || 'দেখুন')}</button>
-      </div>`).join(''));
+      sections.push(`
+      <div class="carousel">
+        <div class="carousel-track" id="banner-track">
+          ${banners.map((b) => `
+          <div class="banner">
+            <h3>📢 ${escapeHtml(b.title)}</h3>
+            <p>${escapeHtml(b.desc)}</p>
+            <button type="button" class="btn btn-small" data-act="banner" data-id="${escapeHtml(b.id)}">${escapeHtml(b.cta || 'দেখুন')}</button>
+          </div>`).join('')}
+        </div>
+        ${banners.length > 1 ? `<div class="carousel-dots" id="banner-dots">${banners.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+      </div>`);
     }
 
     if (cards.progress) {
@@ -151,7 +183,10 @@ export function initStudentHome() {
           ${tile('fees', '💰', 'ফি', fee.due ? 'বকেয়া' : '')}
           ${tile('notices', '📢', 'নোটিশ')}
         </div>
-        <button type="button" class="see-more" data-act="seemore">আরও দেখুন ↓</button>
+        <button type="button" class="see-more" data-act="seemore" aria-expanded="false" aria-controls="more-features">আরও দেখুন ↓</button>
+        <div class="feature-grid more-grid" id="more-features" hidden style="margin-top:.625rem">
+          ${MORE_FEATURES.map((f) => tile(f.act, f.ico, f.label)).join('')}
+        </div>
       </div>`);
 
     if (cards.nextClass) {
@@ -171,13 +206,19 @@ export function initStudentHome() {
     }
 
     if (cards.exam) {
+      const win = examWindow(exam);
       sections.push(exam ? `
       <div class="hcard">
         <div class="h-title">আসন্ন পরীক্ষা</div>
         <div class="big">${escapeHtml(exam.title)}</div>
         <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(exam.subject)}</span></div>
+        <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(exam.date || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
+        <div class="info-row"><span class="l">সময়</span><span class="v">${bn(exam.duration || 0)} মিনিট</span></div>
         <div class="info-row"><span class="l">প্রশ্ন</span><span class="v">${bn(exam.questions.length)}</span></div>
-        <button type="button" class="btn btn-block" data-act="startexam" style="margin-top:.5rem">পরীক্ষা দিন</button>
+        ${win.canStart
+          ? `<button type="button" class="btn btn-block" data-act="startexam" style="margin-top:.5rem">পরীক্ষা শুরু করুন</button>`
+          : `<button type="button" class="btn btn-secondary btn-block" data-act="exam" style="margin-top:.5rem">পরীক্ষা দেখুন</button>
+             <p class="meta" style="margin-top:.5rem">${escapeHtml(win.state === 'closed' ? 'এই পরীক্ষার সময় শেষ।' : 'পরীক্ষা শুরুর সময় হয়নি।')}</p>`}
       </div>` : `
       <div class="hcard">
         <div class="h-title">আসন্ন পরীক্ষা</div>
@@ -207,11 +248,18 @@ export function initStudentHome() {
     }
 
     if (cards.assignments) {
+      const asgRows = assignments.map((a) => {
+        const st = assignmentStatus(a, student);
+        return `<div class="info-row" role="button" tabindex="0" data-act="assignment" data-id="${escapeHtml(a.id)}" style="cursor:pointer">
+          <span class="l">📋 ${escapeHtml(a.title)}<br><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
+          <span class="v">${escapeHtml(dueLabel(a, student))}</span>
+        </div>`;
+      }).join('');
       sections.push(assignments.length ? `
       <div class="hcard">
-        <div class="h-title">ঝুলন্ত অ্যাসাইনমেন্ট</div>
-        ${assignments.map((a) => `<div class="info-row"><span class="l">📋 ${escapeHtml(a.title)}</span><span class="v">${escapeHtml(a.deadline)}</span></div>`).join('')}
-        <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">দেখুন</button>
+        <div class="h-title">অ্যাসাইনমেন্ট</div>
+        ${asgRows}
+        <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">সব দেখুন</button>
       </div>` : `
       <div class="hcard">
         <div class="h-title">অ্যাসাইনমেন্ট</div>
@@ -230,6 +278,7 @@ export function initStudentHome() {
           <div class="tile"><span class="ico">#${bn(perf.rank)}</span>র‍্যাঙ্ক</div>
         </div>
         <div class="mini-chart">${perf.series.map((v) => `<div class="bar" style="height:${v}%"></div>`).join('')}</div>
+        <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">পুরো প্রগ্রেস দেখুন</button>
       </div>`);
     }
 
@@ -240,6 +289,7 @@ export function initStudentHome() {
       <div class="hcard">
         <div class="h-title">অর্জন</div>
         <div class="quick-row">${badges.map((b) => `<div class="tile"><span class="ico">${b.icon}</span>${escapeHtml(b.name)}</div>`).join('')}</div>
+        <button type="button" class="btn btn-secondary btn-block" data-act="achievements" style="margin-top:.5rem">সব অর্জন দেখুন</button>
       </div>`);
     }
 
@@ -251,8 +301,25 @@ export function initStudentHome() {
           ? `<div class="info-row"><span class="l">মোট</span><span class="v">৳${bn(fee.total)}</span></div>
              <div class="info-row"><span class="l">পরিশোধিত</span><span class="v">৳${bn(fee.paid)}</span></div>
              <div class="info-row"><span class="l">বকেয়া</span><span class="v" style="color:var(--warning)">৳${bn(fee.due)}</span></div>
+             ${fee.nextDue ? `<div class="info-row"><span class="l">পরবর্তী পেমেন্ট</span><span class="v">${escapeHtml(fee.nextDue.month)}</span></div>` : ''}
              <button type="button" class="btn btn-secondary btn-block" data-act="fees" style="margin-top:.5rem">বিস্তারিত</button>`
           : `<p>সব ফি পরিশোধিত ✓</p>`}
+      </div>`);
+    }
+
+    if (cards.notices && previewNotes.length) {
+      sections.push(`
+      <div class="hcard">
+        <div class="h-title">🔔 নোটিফিকেশন</div>
+        ${previewNotes.map((n) => `
+        <div class="notif-preview">
+          <span class="dot"></span>
+          <div style="flex:1">
+            <div style="font-weight:600">${escapeHtml(n.title)}</div>
+            <div class="meta">${escapeHtml(n.body)} · ${escapeHtml(n.date)}</div>
+          </div>
+        </div>`).join('')}
+        <button type="button" class="btn btn-secondary btn-block" data-act="notif" style="margin-top:.5rem">সব দেখুন</button>
       </div>`);
     }
 
@@ -321,13 +388,42 @@ export function initStudentHome() {
       }
       switchView('exam');
     }
-    else if (act === 'result') switchView('result');
-    else if (act === 'study') switchView('study');
-    else if (act === 'seemore' || act === 'classes' || act === 'routine' || act === 'fees' || act === 'notices' || act === 'assignments') { openMore(act === 'seemore' ? null : act); }
+    else if (act === 'result' || act === 'progress') switchView('result');
+    else if (act === 'study' || act === 'questionbank' || act === 'downloads') switchView('study');
+    else if (act === 'seemore') {
+      const box = host.querySelector('#more-features');
+      const open = box && !box.hidden;
+      if (box) box.hidden = open;
+      el.setAttribute('aria-expanded', String(!open));
+      el.textContent = open ? 'আরও দেখুন ↓' : 'কম দেখুন ↑';
+    }
+    else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'help'].includes(act)) openMore(act);
     else if (act === 'challenge') doChallenge();
+    else if (act === 'assignment') openAssignment(el.dataset.id);
+    else if (act === 'notif') { document.getElementById('bell').click(); }
     else if (act === 'material') openMaterial(el.dataset.id);
-    else if (act === 'banner') showToast('নোটিশ সেকশনে বিস্তারিত দেখুন।', 'info');
+    else if (act === 'banner') openBanner(el.dataset.id);
   });
+
+  function openBanner(id) {
+    const b = db.banners.find(id);
+    if (!b) return;
+    showDetail(b.title, `<p>${escapeHtml(b.desc || '')}</p><p class="meta" style="margin-top:.5rem">${escapeHtml(b.date || '')}</p>`);
+  }
+
+  function openAssignment(id) {
+    const a = db.assignments.find(id);
+    if (!a) return;
+    const st = assignmentStatus(a, student);
+    showDetail(a.title, `
+      <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(a.subject)}</span></div>
+      <div class="info-row"><span class="l">শিক্ষক</span><span class="v">${escapeHtml(a.teacher || '—')}</span></div>
+      <div class="info-row"><span class="l">ডেডলাইন</span><span class="v">${escapeHtml(a.deadline)}</span></div>
+      <div class="info-row"><span class="l">অবস্থা</span><span class="v"><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span></div>
+      ${a.marks ? `<div class="info-row"><span class="l">নম্বর</span><span class="v">${bn(a.marks)}</span></div>` : ''}
+      <p style="margin-top:.75rem;white-space:pre-wrap">${escapeHtml(a.description || '')}</p>
+      ${st.sub?.feedback ? `<p class="meta" style="margin-top:.5rem">শিক্ষকের মন্তব্য: ${escapeHtml(st.sub.feedback)}</p>` : ''}`);
+  }
 
   function openMaterial(id) {
     const m = db.materials.find(id);
@@ -359,28 +455,132 @@ export function initStudentHome() {
   /* ---------------- More view ---------------- */
   function renderMore() {
     const meRow = me || {};
+    const editable = db.settings.get().studentEditableFields || [];
+    const badges = achievementsFor(student);
+    const myMaterials = db.materials.list().filter((m) => !m.className || m.className === student.className);
+    const downloadable = myMaterials.filter((m) => (m.type || '').includes('পিডিএফ') || m.file);
+    const streak = studyStreak();
+    const queries = db.notifications.list().filter((n) => n.target === 'শিক্ষক' && n.studentId === student.id);
+
+    const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
+
     document.getElementById('more-content').innerHTML = `
       <div class="hcard" id="more-assignments"><div class="h-title">অ্যাসাইনমেন্ট</div>${
-        db.assignments.list().filter((a) => a.className === student.className).map((a) => `<div class="info-row"><span class="l">${escapeHtml(a.title)}</span><span class="v">${escapeHtml(a.deadline)}</span></div>`).join('') || '<p>কোনো অ্যাসাইনমেন্ট নেই।</p>'}</div>
+        db.assignments.list().filter((a) => a.className === student.className).map((a) => {
+          const st = assignmentStatus(a, student);
+          return `<div class="info-row" role="button" tabindex="0" data-asg="${escapeHtml(a.id)}" style="cursor:pointer">
+            <span class="l">${escapeHtml(a.title)} <span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
+            <span class="v">${escapeHtml(dueLabel(a, student))}</span></div>`;
+        }).join('') || '<p>কোনো অ্যাসাইনমেন্ট নেই।</p>'}</div>
+
       <div class="hcard" id="more-routine"><div class="h-title">রুটিন</div>${
-        db.routine.list().map((r) => `<div class="info-row"><span class="l">${escapeHtml(r.day)} · ${escapeHtml(r.subject)}</span><span class="v">${escapeHtml(r.time)}</span></div>`).join('') || '<p>রুটিন নেই।</p>'}</div>
+        db.routine.list().map((r) => row(`${r.day} · ${r.subject}`, `${r.time} · ${r.room || ''}`)).join('') || '<p>রুটিন নেই।</p>'}</div>
+
       <div class="hcard" id="more-fees"><div class="h-title">ফি</div>${
-        db.fees.list().filter((f) => f.studentId === student.id).map((f) => `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v ${f.status === 'বকেয়া' ? '' : ''}" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>
+        db.fees.list().filter((f) => f.studentId === student.id).map((f) =>
+          `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>
+
       <div class="hcard" id="more-notices"><div class="h-title">নোটিশ</div>${
-        noticesFor(student).map((n) => `<div class="info-row"><span class="l">${escapeHtml(n.title)}</span></div>`).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>
+        noticesFor(student).map((n) => row(n.title, n.date)).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>
+
       <div class="hcard" id="more-achievements"><div class="h-title">অর্জন</div>${
-        achievementsFor(student).map((b) => `<div class="info-row"><span class="l">${b.icon} ${escapeHtml(b.name)}</span></div>`).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
+        badges.map((b) => row(`${b.icon} ${b.name}`, '')).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
+
+      <div class="hcard" id="more-certificates"><div class="h-title">সনদ</div>${
+        badges.length
+          ? `<p class="meta">অর্জিত ব্যাজগুলোই আপনার সনদ। প্রতিটি ব্যাজের বিবরণ:</p>${badges.map((b) => row(`${b.icon} ${b.name}`, 'অর্জিত')).join('')}`
+          : '<p>সনদের জন্য এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
+
+      <div class="hcard" id="more-downloads"><div class="h-title">ডাউনলোড সেন্টার</div>${
+        downloadable.length
+          ? downloadable.map((m) => `<div class="info-row" role="button" tabindex="0" data-mat2="${escapeHtml(m.id)}" style="cursor:pointer"><span class="l">⬇️ ${escapeHtml(m.title)}</span><span class="v">${escapeHtml(m.type || '')}</span></div>`).join('')
+          : '<p>আপনার ক্লাসের জন্য ডাউনলোডযোগ্য ফাইল নেই।</p>'}</div>
+
+      <div class="hcard" id="more-streak"><div class="h-title">স্টাডি স্ট্রিক</div>
+        <div class="info-row"><span class="l">🔥 ধারাবাহিক দিন</span><span class="v">${bn(streak.streak)}</span></div>
+        <div class="week" style="margin-top:.5rem">${streak.week.map((d) => `<div class="d ${d.done ? 'on' : ''}">${d.day}<div class="dot"></div></div>`).join('')}</div>
+        <p class="meta" style="margin-top:.5rem">প্রতিদিন পড়াশোনা বা MCQ দিলে স্ট্রিক বাড়ে।</p></div>
+
+      <div class="hcard" id="more-query"><div class="h-title">শিক্ষক প্রশ্ন</div>
+        ${queries.length ? queries.map((q) => row(q.title, q.date)).join('') : '<p>আপনি এখনো কোনো প্রশ্ন পাঠাননি।</p>'}
+        <form id="query-form" style="margin-top:.75rem">
+          <div class="form-group"><label for="query-text">আপনার প্রশ্ন</label>
+            <textarea id="query-text" class="form-input" rows="3" required placeholder="যে বিষয়ে জানতে চান লিখুন…"></textarea></div>
+          <button type="submit" class="btn btn-block">শিক্ষককে পাঠান</button>
+        </form></div>
+
       <div class="hcard" id="more-profile"><div class="h-title">প্রোফাইল</div>
-        <div class="info-row"><span class="l">নাম</span><span class="v">${escapeHtml(session.name)}</span></div>
-        <div class="info-row"><span class="l">আইডি</span><span class="v">${escapeHtml(student.id)}</span></div>
-        <div class="info-row"><span class="l">শ্রেণি</span><span class="v">${escapeHtml(meRow.className || '—')}</span></div>
-        <div class="info-row"><span class="l">রোল</span><span class="v">${escapeHtml(meRow.roll || '—')}</span></div>
-        <div class="info-row"><span class="l">স্কুল/কলেজ</span><span class="v">${escapeHtml(meRow.school || '—')}</span></div>
-        <div class="info-row"><span class="l">অভিভাবক</span><span class="v">${escapeHtml(meRow.phone || '—')}</span></div>
-      </div>
+        ${meRow.photo ? `<img src="${escapeHtml(meRow.photo)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:.75rem">` : ''}
+        ${row('নাম', session.name)}
+        ${row('শিক্ষার্থী আইডি', student.id)}
+        ${row('শ্রেণি', meRow.className || '—')}
+        ${row('শাখা', meRow.section || '—')}
+        ${row('রোল', meRow.roll || '—')}
+        ${row('ব্যাচ', meRow.batch || '—')}
+        ${row('স্কুল/কলেজ', meRow.school || '—')}
+        ${row('অভিভাবক', meRow.guardian || '—')}
+        ${row('অভিভাবকের মোবাইল', meRow.guardianPhone || '—')}
+        ${row('ভর্তির তারিখ', meRow.admissionDate || '—')}
+        ${row('অবস্থা', meRow.status || '—')}
+        <form id="profile-edit-form" style="margin-top:.75rem">
+          ${editable.map((f) => `<div class="form-group"><label for="pf-${escapeHtml(f)}">${escapeHtml(FIELD_BN[f] || f)} (সম্পাদনাযোগ্য)</label><input id="pf-${escapeHtml(f)}" name="${escapeHtml(f)}" class="form-input" value="${escapeHtml(meRow[f] || '')}"></div>`).join('')}
+          ${editable.length ? `<button type="submit" class="btn btn-block">প্রোফাইল আপডেট করুন</button>` : `<p class="meta">প্রোফাইল সম্পাদনার অনুমতি অ্যাডমিন দেননি।</p>`}
+        </form></div>
+
+      <div class="hcard" id="more-help"><div class="h-title">সহায়তা</div>
+        ${row('প্রতিষ্ঠান', db.settings.get().orgName || 'Active Plus')}
+        ${row('মোবাইল', db.settings.get().mobile || '—')}
+        ${row('ইমেইল', db.settings.get().email || '—')}
+        <p class="meta" style="margin-top:.5rem">সমস্যা হলে উপরের নম্বরে যোগাযোগ করুন অথবা শিক্ষক প্রশ্ন পাঠান।</p></div>
+
       <button type="button" class="btn btn-error btn-block" id="home-logout">লগআউট</button>`;
+
     document.getElementById('home-logout').addEventListener('click', () => signOut({ redirect: true }));
+
+    document.getElementById('more-content').addEventListener('click', (e) => {
+      const asg = e.target.closest('[data-asg]');
+      if (asg) openAssignment(asg.dataset.asg);
+      const mat = e.target.closest('[data-mat2]');
+      if (mat) openMaterial(mat.dataset.mat2);
+    });
+
+    document.getElementById('query-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = String(document.getElementById('query-text').value || '').trim();
+      if (!text) return;
+      if (!navigator.onLine) {
+        showToast('অফলাইনে প্রশ্ন পাঠানো যাবে না।', 'error');
+        return;
+      }
+      db.notifications.add({
+        id: newId('ntf'), type: 'শিক্ষক প্রশ্ন', title: text, target: 'শিক্ষক',
+        studentId: student.id, studentName: session.name, date: todayBn(), read: false
+      });
+      document.getElementById('query-text').value = '';
+      renderMore();
+      showToast('প্রশ্ন শিক্ষকের কাছে পাঠানো হয়েছে।', 'success');
+    });
+
+    const editForm = document.getElementById('profile-edit-form');
+    editForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!navigator.onLine) {
+        showToast('অফলাইনে প্রোফাইল আপডেট করা যাবে না।', 'error');
+        return;
+      }
+      const patch = {};
+      editable.forEach((f) => {
+        const input = editForm.querySelector(`input[name="${f}"]`);
+        const value = String(input?.value || '').trim();
+        if (value) patch[f] = value;
+      });
+      if (!Object.keys(patch).length) { showToast('কোনো পরিবর্তন নেই।', 'info'); return; }
+      db.students.update(student.id, patch);
+      showToast('প্রোফাইল আপডেট হয়েছে।', 'success');
+      renderMore();
+    });
   }
+
   function openMore(section) {
     renderMore();
     switchView('more');

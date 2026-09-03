@@ -168,6 +168,13 @@
             </div>
             <div class="form-group">
               <label>শিক্ষার্থী হোমে কোন কার্ড দেখানো হবে</label>
+            <div class="form-group">
+              <label>শিক্ষার্থী নিজে কোন প্রোফাইল ফিল্ড সম্পাদনা করতে পারবে</label>
+              <div class="check-grid" id="student-editable">
+                <label class="check"><input type="checkbox" name="edit_phone" value="1"> মোবাইল</label>
+                <label class="check"><input type="checkbox" name="edit_guardianPhone" value="1"> অভিভাবকের মোবাইল</label>
+              </div>
+            </div>
               <div class="check-grid" id="home-cards">
               <label class="check"><input type="checkbox" name="home_progress" value="1"> আজকের প্রগ্রেস</label>
               <label class="check"><input type="checkbox" name="home_nextClass" value="1"> পরবর্তী ক্লাস</label>
@@ -336,6 +343,14 @@
             </div>
           </div>
           <div class="form-row">
+            <div class="form-group"><label for="student-section">শাখা</label><input class="form-input" id="student-section" name="section" placeholder="A"></div>
+            <div class="form-group"><label for="student-batch">ব্যাচ</label><input class="form-input" id="student-batch" name="batch" placeholder="A"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="student-guardian">অভিভাবকের নাম</label><input class="form-input" id="student-guardian" name="guardian"></div>
+            <div class="form-group"><label for="student-admission">ভর্তির তারিখ</label><input class="form-input" id="student-admission" name="admissionDate" type="date"></div>
+          </div>
+          <div class="form-row">
             <div class="form-group">
               <label for="student-phone">অভিভাবকের মোবাইল</label>
               <input class="form-input" id="student-phone" name="phone" inputmode="tel" placeholder="০১XXXXXXXXX">
@@ -443,6 +458,15 @@
             <div class="form-group"><label for="exam-class">ক্লাস</label><select class="form-input form-select" id="exam-class" name="className"></select></div>
             <div class="form-group"><label for="exam-subject">বিষয়</label><input class="form-input" id="exam-subject" name="subject"></div>
           </div>
+          <div class="form-row">
+            <div class="form-group"><label for="exam-date">তারিখ</label><input class="form-input" id="exam-date" name="date" placeholder="২০২৬-০৯-১০"></div>
+            <div class="form-group"><label for="exam-time">সময়</label><input class="form-input" id="exam-time" name="time" placeholder="১৭:০০"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="exam-duration">সময়কাল (মিনিট)</label><input class="form-input" id="exam-duration" name="duration" type="number" min="1" value="30"></div>
+            <div class="form-group"><label for="exam-start">শুরু (YYYY-MM-DD)</label><input class="form-input" id="exam-start" name="startDate" type="date"></div>
+          </div>
+          <div class="form-group"><label for="exam-end">শেষ (YYYY-MM-DD)</label><input class="form-input" id="exam-end" name="endDate" type="date"></div>
           <div class="card" style="margin:.75rem 0">
             <h3>প্রশ্ন যোগ করুন</h3>
             <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
@@ -567,6 +591,10 @@
           studentForm.elements.className.value = student.className || 'নবম';
           studentForm.elements.roll.value = parseInt(student.roll, 10) || 1;
           studentForm.elements.phone.value = student.phone || '';
+          studentForm.elements.section.value = student.section || '';
+          studentForm.elements.batch.value = student.batch || '';
+          studentForm.elements.guardian.value = student.guardian || '';
+          studentForm.elements.admissionDate.value = student.admissionDate || '';
           studentForm.elements.status.value = student.status || 'সক্রিয়';
         } else {
           document.getElementById('student-modal-title').textContent = 'নতুন শিক্ষার্থী ভর্তি';
@@ -588,6 +616,10 @@
           name: String(data.get('name') || '').trim(),
           school: String(data.get('school') || '').trim(),
           className,
+          section: String(data.get('section') || '').trim(),
+          batch: String(data.get('batch') || '').trim(),
+          guardian: String(data.get('guardian') || '').trim(),
+          admissionDate: String(data.get('admissionDate') || '').trim(),
           roll: String(data.get('roll')),
           phone: String(data.get('phone') || '—').trim(),
           status: String(data.get('status'))
@@ -847,6 +879,10 @@
         document.getElementById('set-org').value = settings.orgName || '';
         document.getElementById('set-address').value = settings.address || '';
         document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
+        const editableFields = settings.studentEditableFields || [];
+        document.querySelectorAll('#student-editable input').forEach((input) => {
+          input.checked = editableFields.includes(input.name.slice(5));
+        });
         const cards = homeCards();
         document.querySelectorAll('#home-cards input[name^="home_"]').forEach((input) => {
           input.checked = cards[input.name.slice(5)] !== false;
@@ -868,6 +904,10 @@
           orgName: String(data.get('orgName') || '').trim(),
           address: String(data.get('address') || '').trim(),
           monthlyFee: Number(data.get('monthlyFee')) || 0
+        });
+        db.settings.update({
+          studentEditableFields: [...event.target.querySelectorAll('#student-editable input:checked')]
+            .map((input) => input.name.slice(5))
         });
         setHomeCards(Object.fromEntries(
           [...event.target.querySelectorAll('input[name^="home_"]')]

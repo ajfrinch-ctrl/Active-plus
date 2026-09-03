@@ -57,8 +57,11 @@ test('student home renders every priority section from live data', async () => {
   assert.ok(html.includes(`width:${p.pct}%`), `progress bar shows ${p.pct}%`);
 
   // Feature grid: 8 destinations, each wired to an action.
-  const tiles = doc.querySelectorAll('#home-content .feature-grid .tile');
+  const tiles = doc.querySelectorAll('#home-content .feature-grid:not(.more-grid) .tile');
   assert.equal(tiles.length, 8, 'eight main features');
+  const moreTiles = doc.querySelectorAll('#more-features .tile');
+  assert.ok(moreTiles.length >= 6, 'See More reveals the secondary features');
+  assert.equal(doc.getElementById('more-features').hidden, true, 'collapsed by default');
   for (const t of tiles) assert.ok(t.dataset.act, 'tile has an action');
 
   // Next class / upcoming exam come from the routine + exam collections.
@@ -176,4 +179,92 @@ test('continue learning resumes the material the student actually opened last', 
   click(doc, '.bottom-nav button[data-view="home"]');      // returning home re-renders with fresh data
   assert.equal(data.lastAccessedMaterial().id, 'mat-resume', 'activity remembers the material');
   assert.ok(doc.getElementById('home-content').innerHTML.includes('Resume Me'), 'home resumes that material');
+});
+
+test('exam card follows the exam window: Start only while open', async () => {
+  const { doc, data } = await bootHome();
+  const exam = data.upcomingExam('নবম');
+  assert.equal(data.examWindow(exam).state, 'active', 'seed exam is inside its window');
+  assert.ok(doc.querySelector('#home-content [data-act="startexam"]'), 'Start Exam offered while open');
+
+  data.db.exams.update(exam.id, { endDate: '২০২০-০১-০১' }); // window long closed
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  assert.equal(doc.querySelector('#home-content [data-act="startexam"]'), null, 'no Start button when closed');
+  assert.ok(doc.querySelector('#home-content [data-act="exam"]'), 'View Exam still available');
+  data.db.exams.update(exam.id, { endDate: exam.endDate });
+});
+
+test('assignments show real status and open their details', async () => {
+  const { doc, data } = await bootHome();
+  const asg = data.db.assignments.list()[0];
+  const html = doc.getElementById('home-content').innerHTML;
+  assert.ok(html.includes(`data-id="${asg.id}"`), 'assignment row is clickable');
+  assert.ok(html.includes('জমা হয়েছে'), 'status reflects the stored submission');
+  click(doc, `#home-content [data-act="assignment"][data-id="${asg.id}"]`);
+  assert.equal(doc.getElementById('detail-modal').getAttribute('aria-hidden'), 'false', 'details modal opened');
+  assert.ok(doc.getElementById('detail-body').innerHTML.includes(asg.subject), 'details show the subject');
+});
+
+test('profile lists every required field and honours admin edit permission', async () => {
+  const { doc, data } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  const html = doc.getElementById('more-profile').innerHTML;
+  for (const label of ['শিক্ষার্থী আইডি', 'শ্রেণি', 'শাখা', 'রোল', 'ব্যাচ', 'অভিভাবক', 'ভর্তির তারিখ', 'অবস্থা']) {
+    assert.ok(html.includes(label), `profile shows ${label}`);
+  }
+  assert.ok(doc.getElementById('pf-phone'), 'phone is editable (admin permitted)');
+  assert.equal(doc.querySelectorAll('#profile-edit-form input').length, 1, 'only permitted fields are editable');
+
+  document.getElementById('pf-phone').value = '01999-000000';
+  doc.getElementById('profile-edit-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.students.find('2026-09-001').phone, '01999-000000', 'permitted field saved');
+
+  data.db.settings.update({ studentEditableFields: [] });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  click(doc, '.bottom-nav button[data-view="more"]');
+  assert.equal(doc.getElementById('pf-phone'), null, 'no editable field once admin revokes permission');
+});
+
+test('teacher query reaches the teacher notification list', async () => {
+  const { doc, data } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  doc.getElementById('query-text').value = 'স্যার, অধ্যায় ২ বুঝিয়ে দিন';
+  doc.getElementById('query-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
+  const sent = data.db.notifications.list().filter((n) => n.target === 'শিক্ষক' && n.studentId === '2026-09-001');
+  assert.equal(sent.length, 1, 'query stored for teachers');
+  assert.equal(sent[0].title, 'স্যার, অধ্যায় ২ বুঝিয়ে দিন');
+  assert.ok(doc.getElementById('more-query').innerHTML.includes('অধ্যায় ২'), 'student sees their own query listed');
+});
+
+test('notification preview, carousel and See More all work on the home screen', async () => {
+  const { doc, data } = await bootHome();
+  const html = doc.getElementById('home-content').innerHTML;
+  assert.ok(doc.querySelector('#home-content [data-act="notif"]'), 'notification preview offers View All');
+  click(doc, '#home-content [data-act="notif"]');
+  assert.equal(doc.getElementById('notif-center').getAttribute('aria-hidden'), 'false', 'opens the centre');
+  doc.getElementById('notif-center').classList.remove('active');
+
+  assert.ok(doc.getElementById('banner-track'), 'banner carousel rendered');
+  const firstBanner = data.activeBanners()[0];
+  click(doc, `#home-content [data-act="banner"][data-id="${firstBanner.id}"]`);
+  assert.equal(doc.getElementById('detail-title').textContent, firstBanner.title, 'banner CTA opens its details');
+  doc.getElementById('detail-modal').classList.remove('active');
+
+  const box = doc.getElementById('more-features');
+  assert.equal(box.hidden, true);
+  click(doc, '#home-content [data-act="seemore"]');
+  assert.equal(box.hidden, false, 'See More expands');
+  assert.equal(doc.querySelector('#home-content [data-act="seemore"]').getAttribute('aria-expanded'), 'true');
+  click(doc, '#home-content [data-act="seemore"]');
+  assert.equal(box.hidden, true, 'and collapses again');
+});
+
+test('More menu carries every secondary destination without dead links', async () => {
+  const { doc } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  for (const id of ['more-assignments', 'more-routine', 'more-fees', 'more-notices', 'more-achievements',
+    'more-certificates', 'more-downloads', 'more-streak', 'more-query', 'more-profile', 'more-help']) {
+    assert.ok(doc.getElementById(id), `${id} exists`);
+  }
+  assert.ok(doc.getElementById('home-logout'), 'logout available');
 });

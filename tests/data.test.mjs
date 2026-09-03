@@ -352,3 +352,37 @@ test('unread notification count is zero when nothing is pending', async () => {
   m.db.notices.list().forEach((n) => m.db.notices.update(n.id, { read: true }));
   assert.equal(m.unreadNotifications(student), 0, 'all read means no badge');
 });
+
+test('exam window decides View vs Start, and assignment status follows submissions', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h11');
+  const student = m.db.students.find('2026-09-001');
+  const exam = m.db.exams.list()[0];
+
+  assert.equal(m.examWindow(exam).state, 'active', 'seed exam is inside its window');
+  m.db.exams.update(exam.id, { startDate: '২০৯৯-০১-০১' });
+  const upcoming = m.examWindow(m.db.exams.find(exam.id));
+  assert.equal(upcoming.state, 'upcoming');
+  assert.equal(upcoming.canStart, false, 'cannot start before the window opens');
+  m.db.exams.update(exam.id, { startDate: '২০০০-০১-০১', endDate: '২০০০-০২-০১' });
+  assert.equal(m.examWindow(m.db.exams.find(exam.id)).state, 'closed', 'closed after the window ends');
+
+  const asg = m.db.assignments.list()[0];
+  assert.equal(m.assignmentStatus(asg, student).status, 'submitted', 'this student already submitted');
+  const other = m.db.students.find('2026-09-002');
+  assert.equal(m.assignmentStatus(asg, other).status, 'pending', 'another student is still pending');
+  m.db.assignments.update(asg.id, { deadline: '২০২০-০১-০১' });
+  assert.equal(m.assignmentStatus(m.db.assignments.find(asg.id), other).status, 'overdue', 'past deadline becomes overdue');
+});
+
+test('admin settings decide which profile fields a student may edit', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h12');
+  assert.deepEqual(m.db.settings.get().studentEditableFields, ['phone'], 'phone editable by default');
+  m.db.settings.update({ studentEditableFields: ['phone', 'guardianPhone'] });
+  assert.deepEqual(m.db.settings.get().studentEditableFields, ['phone', 'guardianPhone'], 'admin can widen permission');
+  m.db.settings.update({ studentEditableFields: [] });
+  assert.deepEqual(m.db.settings.get().studentEditableFields, [], 'admin can revoke permission');
+});
