@@ -32,6 +32,9 @@
         <button type="button" data-tab="batches">আমার ব্যাচ</button>
         <button type="button" data-tab="routine">রুটিন</button>
         <button type="button" data-tab="attendance">উপস্থিতি নিন</button>
+        <button type="button" data-tab="notice">ক্লাস নোটিশ</button>
+        <button type="button" data-tab="suggestion">সাজেশন</button>
+        <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
         <button type="button" data-tab="profile">প্রোফাইল</button>
       </nav>
 
@@ -73,11 +76,150 @@
           <div class="list" id="attendance-picker"></div>
         </section>
 
+        <section class="tab-panel" id="tab-notice" hidden>
+          <h2 class="section-title">
+            ক্লাস ভিত্তিক নোটিশ
+            <button type="button" class="btn btn-small" id="open-teacher-notice">+ নোটিশ</button>
+          </h2>
+          <div class="list" id="teacher-notice-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-suggestion" hidden>
+          <h2 class="section-title">
+            সাজেশন
+            <button type="button" class="btn btn-small" id="open-suggestion-modal">+ সাজেশন</button>
+          </h2>
+          <div class="list" id="suggestion-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-exam" hidden>
+          <h2 class="section-title">
+            MCQ পরীক্ষা
+            <button type="button" class="btn btn-small" id="open-exam-modal">+ পরীক্ষা</button>
+          </h2>
+          <div class="list" id="exam-list"></div>
+        </section>
+
         <section class="tab-panel" id="tab-profile" hidden>
           <h2 class="section-title">প্রোফাইল</h2>
           <div class="card"><div class="list" id="profile-list"></div></div>
         </section>
       </main>
+    </div>
+
+    <!-- Teacher notice modal (class-targeted) -->
+    <div class="modal-overlay" id="teacher-notice-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="teacher-notice-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="teacher-notice-title">ক্লাস ভিত্তিক নোটিশ</h2>
+        <form id="teacher-notice-form">
+          <div class="form-group">
+            <label for="teacher-notice-text">নোটিশ *</label>
+            <input class="form-input" id="teacher-notice-text" name="title" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="teacher-notice-class">ক্লাস</label>
+              <select class="form-input form-select" id="teacher-notice-class" name="className"></select>
+            </div>
+            <div class="form-group">
+              <label for="teacher-notice-aud">কাদের জন্য</label>
+              <select class="form-input form-select" id="teacher-notice-aud" name="audience">
+                <option>শিক্ষার্থী</option>
+                <option>অভিভাবক</option>
+                <option>সবাই</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-block">প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Suggestion modal -->
+    <div class="modal-overlay" id="suggestion-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="suggestion-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="suggestion-modal-title">নতুন সাজেশন</h2>
+        <form id="suggestion-form">
+          <div class="form-group">
+            <label for="sug-title">শিরোনাম *</label>
+            <input class="form-input" id="sug-title" name="title" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="sug-class">ক্লাস</label>
+              <select class="form-input form-select" id="sug-class" name="className"></select>
+            </div>
+            <div class="form-group">
+              <label for="sug-subject">বিষয়</label>
+              <input class="form-input" id="sug-subject" name="subject">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="sug-content">বিষয়বস্তু *</label>
+            <textarea class="form-input form-textarea" id="sug-content" name="content" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-block">প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Exam builder modal -->
+    <div class="modal-overlay" id="exam-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exam-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="exam-modal-title">নতুন MCQ পরীক্ষা</h2>
+        <form id="exam-form">
+          <div class="form-group">
+            <label for="exam-title">শিরোনাম *</label>
+            <input class="form-input" id="exam-title" name="title" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="exam-class">ক্লাস</label>
+              <select class="form-input form-select" id="exam-class" name="className"></select>
+            </div>
+            <div class="form-group">
+              <label for="exam-subject">বিষয়</label>
+              <input class="form-input" id="exam-subject" name="subject">
+            </div>
+          </div>
+
+          <div class="card" style="margin:.75rem 0">
+            <h3>প্রশ্ন যোগ করুন</h3>
+            <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
+            <div class="form-row">
+              <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
+              <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
+              <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+            </div>
+            <div class="form-group">
+              <label for="q-answer">সঠিক উত্তর</label>
+              <select class="form-input form-select" id="q-answer">
+                <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
+                <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
+          </div>
+
+          <div class="form-group"><label>যুক্ত প্রশ্ন</label><div class="list" id="exam-staged"></div></div>
+          <button type="submit" class="btn btn-block" id="exam-save">পরীক্ষা প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Exam results modal -->
+    <div class="modal-overlay" id="exam-results-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exam-results-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="exam-results-title">পরীক্ষার ফলাফল</h2>
+        <div class="list" id="exam-results"></div>
+      </div>
     </div>
 
     <div class="modal-overlay" id="batch-modal" aria-hidden="true">
@@ -108,11 +250,17 @@
 
     <script type="module">
       import { initApp, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast } from './js/app.js';
-      import { db } from './js/data.js';
+      import { db, newId, todayBn } from './js/data.js';
+      import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
 
       const session = initApp({ roles: ['teacher'] });
       if (session) {
         const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+
+        // Populate class selects in the authoring modals.
+        document.getElementById('teacher-notice-class').innerHTML = classOptionsHtml();
+        document.getElementById('sug-class').innerHTML = classOptionsHtml('নবম');
+        document.getElementById('exam-class').innerHTML = classOptionsHtml('নবম');
 
         const renderOverview = () => {
           const batches = db.batches.list();
@@ -202,6 +350,48 @@
           <div class="list-item">
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
           </div>`).join('');
+
+        /* -------- Class-targeted notices -------- */
+        const noticeList = document.getElementById('teacher-notice-list');
+        const renderNotices = () => {
+          const rows = db.notices.list();
+          noticeList.innerHTML = rows.length
+            ? rows.map((n) => `
+              <div class="list-item">
+                <div class="li-main">
+                  <div class="li-title">${escapeHtml(n.title)}</div>
+                  <div class="li-sub">ক্লাস: ${escapeHtml(n.className || 'সব')} · ${escapeHtml(n.audience)} · ${escapeHtml(n.date)}</div>
+                </div>
+                <button type="button" class="btn btn-small btn-error" data-del-notice="${escapeHtml(n.id)}">মুছুন</button>
+              </div>`).join('')
+            : '<div class="empty-state">কোনো নোটিশ নেই।</div>';
+        };
+        noticeList.addEventListener('click', (e) => {
+          const btn = e.target.closest('[data-del-notice]');
+          if (!btn) return;
+          const id = btn.dataset.delNotice;
+          if (window.confirm('নোটিশটি মুছে ফেলবেন?')) { db.notices.remove(id); renderNotices(); showToast('নোটিশ মুছে ফেলা হয়েছে।', 'warning'); }
+        });
+        document.getElementById('open-teacher-notice').addEventListener('click', () => {
+          document.getElementById('teacher-notice-form').reset();
+          openModal('teacher-notice-modal');
+        });
+        document.getElementById('teacher-notice-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const d = new FormData(e.target);
+          const title = String(d.get('title') || '').trim();
+          if (!title) { showToast('নোটিশ লিখুন।', 'error'); return; }
+          db.notices.add({ id: newId('n'), title, audience: String(d.get('audience')), className: String(d.get('className')), date: todayBn(), author: session.name });
+          closeModal('teacher-notice-modal');
+          renderNotices();
+          showToast('ক্লাস নোটিশ প্রকাশিত হয়েছে।', 'success');
+        });
+        renderNotices();
+
+        /* -------- Suggestions + MCQ authoring -------- */
+        setExamAuthor(session.name);
+        mountSuggestionAuthoring({ author: session.name });
+        mountExamAuthoring();
 
         renderOverview();
         renderBatches();

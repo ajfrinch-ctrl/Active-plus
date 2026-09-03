@@ -33,6 +33,8 @@
         <button type="button" data-tab="attendance">উপস্থিতি</button>
         <button type="button" data-tab="results">ফলাফল</button>
         <button type="button" data-tab="fees">বেতন</button>
+        <button type="button" data-tab="suggestion">সাজেশন</button>
+        <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
         <button type="button" data-tab="profile">প্রোফাইল</button>
       </nav>
 
@@ -80,6 +82,17 @@
           <div class="list" id="fee-list"></div>
         </section>
 
+        <section class="tab-panel" id="tab-suggestion" hidden>
+          <h2 class="section-title">সাজেশন</h2>
+          <div id="student-suggestion-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-exam" hidden>
+          <h2 class="section-title">MCQ পরীক্ষা</h2>
+          <div class="list" id="student-exam-list"></div>
+          <div id="exam-player" hidden></div>
+        </section>
+
         <section class="tab-panel" id="tab-profile" hidden>
           <h2 class="section-title">প্রোফাইল</h2>
           <div class="card">
@@ -95,16 +108,17 @@
     <script type="module">
       import { initApp, renderTable, statGrid, escapeHtml, showToast } from './js/app.js';
       import { signOut } from './js/auth.js';
-      import { db } from './js/data.js';
+      import { db, noticesFor } from './js/data.js';
+      import { renderStudentSuggestions, mountExamTaker } from './js/exams.js';
 
       const session = initApp({ roles: ['student'] });
       if (session) {
+        const me = db.students.find(session.username) || null;
         const routine = db.routine.list();
         const attendance = db.attendance.list();
         const results = db.results.list();
-        const fees = db.fees.list();
-        const notices = db.notices.list();
-        const me = db.students.find(session.username) || null;
+        const fees = db.fees.list().filter((f) => f.studentId === (me?.id || session.username));
+        const notices = noticesFor(me);
 
         const present = attendance.filter((row) => row.status === 'উপস্থিত').length;
         const rate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
@@ -174,6 +188,12 @@
           <div class="list-item">
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
           </div>`).join('');
+
+        renderStudentSuggestions('#student-suggestion-list', me?.className);
+        mountExamTaker({
+          listSelector: '#student-exam-list',
+          student: { id: me?.id || session.username, name: session.name, className: me?.className }
+        });
 
         document.getElementById('profile-logout').addEventListener('click', () => signOut({ redirect: true }));
         showToast(`স্বাগতম, ${session.name}!`, 'success');

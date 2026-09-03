@@ -30,8 +30,11 @@
       <nav class="top-tab-bar" role="tablist" aria-label="অ্যাডমিন মেনু">
         <button type="button" data-tab="overview" aria-selected="true">ড্যাশবোর্ড</button>
         <button type="button" data-tab="students">শিক্ষার্থী</button>
+        <button type="button" data-tab="dues">বকেয়া ও পেমেন্ট</button>
         <button type="button" data-tab="teachers">শিক্ষক</button>
         <button type="button" data-tab="notices">নোটিশ</button>
+        <button type="button" data-tab="suggestion">সাজেশন</button>
+        <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
         <button type="button" data-tab="settings">সেটিংস</button>
       </nav>
 
@@ -58,12 +61,47 @@
             শিক্ষার্থী তালিকা (<span id="student-count">০</span>)
             <button type="button" class="btn btn-small" id="open-student-modal">+ নতুন ভর্তি</button>
           </h2>
+          <div class="form-group" style="max-width:240px">
+            <label for="class-filter">ক্লাস ফিল্টার</label>
+            <select id="class-filter" class="form-input form-select"></select>
+          </div>
           <div class="table-wrap">
             <table class="table" id="student-table">
               <thead><tr></tr></thead>
               <tbody></tbody>
             </table>
           </div>
+        </section>
+
+        <!-- ======================= Dues & Payments ======================= -->
+        <section class="tab-panel" id="tab-dues" hidden>
+          <h2 class="section-title">বকেয়া তালিকা (<span id="due-count">০</span>)</h2>
+          <div class="table-wrap">
+            <table class="table" id="due-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <h2 class="section-title" style="margin-top:1.25rem">সাম্প্রতিক পেমেন্ট</h2>
+          <div class="list" id="payment-list"></div>
+        </section>
+
+        <!-- ======================= Suggestions ======================= -->
+        <section class="tab-panel" id="tab-suggestion" hidden>
+          <h2 class="section-title">
+            সাজেশন
+            <button type="button" class="btn btn-small" id="open-suggestion-modal">+ সাজেশন</button>
+          </h2>
+          <div class="list" id="suggestion-list"></div>
+        </section>
+
+        <!-- ======================= Exams ======================= -->
+        <section class="tab-panel" id="tab-exam" hidden>
+          <h2 class="section-title">
+            MCQ পরীক্ষা
+            <button type="button" class="btn btn-small" id="open-exam-modal">+ পরীক্ষা</button>
+          </h2>
+          <div class="list" id="exam-list"></div>
         </section>
 
         <!-- ======================= Teachers ======================= -->
@@ -210,17 +248,86 @@
             <label for="notice-title">শিরোনাম *</label>
             <input class="form-input" id="notice-title" name="title" required>
           </div>
-          <div class="form-group">
-            <label for="notice-audience">কাদের জন্য</label>
-            <select class="form-input form-select" id="notice-audience" name="audience">
-              <option>সবাই</option>
-              <option>শিক্ষার্থী</option>
-              <option>অভিভাবক</option>
-              <option>শিক্ষক</option>
-            </select>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="notice-class">ক্লাস</label>
+              <select class="form-input form-select" id="notice-class" name="className"></select>
+            </div>
+            <div class="form-group">
+              <label for="notice-audience">কাদের জন্য</label>
+              <select class="form-input form-select" id="notice-audience" name="audience">
+                <option>সবাই</option>
+                <option>শিক্ষার্থী</option>
+                <option>অভিভাবক</option>
+                <option>শিক্ষক</option>
+              </select>
+            </div>
           </div>
           <button type="submit" class="btn btn-block" id="notice-save">প্রকাশ করুন</button>
         </form>
+      </div>
+    </div>
+
+    <!-- Suggestion modal -->
+    <div class="modal-overlay" id="suggestion-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="suggestion-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="suggestion-modal-title">নতুন সাজেশন</h2>
+        <form id="suggestion-form">
+          <div class="form-group"><label for="sug-title">শিরোনাম *</label><input class="form-input" id="sug-title" name="title" required></div>
+          <div class="form-row">
+            <div class="form-group"><label for="sug-class">ক্লাস</label><select class="form-input form-select" id="sug-class" name="className"></select></div>
+            <div class="form-group"><label for="sug-subject">বিষয়</label><input class="form-input" id="sug-subject" name="subject"></div>
+          </div>
+          <div class="form-group"><label for="sug-content">বিষয়বস্তু *</label><textarea class="form-input form-textarea" id="sug-content" name="content" required></textarea></div>
+          <button type="submit" class="btn btn-block">প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Exam builder modal -->
+    <div class="modal-overlay" id="exam-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exam-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="exam-modal-title">নতুন MCQ পরীক্ষা</h2>
+        <form id="exam-form">
+          <div class="form-group"><label for="exam-title">শিরোনাম *</label><input class="form-input" id="exam-title" name="title" required></div>
+          <div class="form-row">
+            <div class="form-group"><label for="exam-class">ক্লাস</label><select class="form-input form-select" id="exam-class" name="className"></select></div>
+            <div class="form-group"><label for="exam-subject">বিষয়</label><input class="form-input" id="exam-subject" name="subject"></div>
+          </div>
+          <div class="card" style="margin:.75rem 0">
+            <h3>প্রশ্ন যোগ করুন</h3>
+            <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
+            <div class="form-row">
+              <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
+              <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
+              <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+            </div>
+            <div class="form-group">
+              <label for="q-answer">সঠিক উত্তর</label>
+              <select class="form-input form-select" id="q-answer">
+                <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
+                <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
+          </div>
+          <div class="form-group"><label>যুক্ত প্রশ্ন</label><div class="list" id="exam-staged"></div></div>
+          <button type="submit" class="btn btn-block" id="exam-save">পরীক্ষা প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Exam results modal -->
+    <div class="modal-overlay" id="exam-results-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exam-results-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="exam-results-title">পরীক্ষার ফলাফল</h2>
+        <div class="list" id="exam-results"></div>
       </div>
     </div>
 
@@ -229,8 +336,9 @@
     <script type="module">
       import { initApp, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode } from './js/app.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, CLASS_TO_NUMBER, todayBn, newNoticeId } from './js/data.js';
+      import { db, CLASS_OPTIONS, CLASS_TO_NUMBER, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment } from './js/data.js';
       import { generateStudentId } from './js/firebase.js';
+      import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
 
       const session = initApp({ roles: ['admin'] });
       if (!session) throw new Error('guard redirect');
@@ -247,9 +355,10 @@
         const settings = db.settings.get();
         const batchStudents = batches.reduce((sum, b) => sum + Number(b.students || 0), 0);
         const totalStudents = students.length + batchStudents;
-        const dueCount = students.filter((s) => s.status === 'বকেয়া').length;
-        const collected = (students.length - dueCount) * settings.monthlyFee;
-        const expected = totalStudents * settings.monthlyFee;
+        const fees = db.fees.list();
+        const dueCount = dueFees().length;
+        const collected = fees.filter((f) => f.status === 'পরিশোধিত').reduce((s, f) => s + Number(f.amount || 0), 0);
+        const expected = fees.reduce((s, f) => s + Number(f.amount || 0), 0) + batchStudents * settings.monthlyFee;
 
         statGrid('#admin-stats', [
           { label: 'মোট শিক্ষার্থী', value: bn(totalStudents), tone: 'accent' },
@@ -268,7 +377,11 @@
       /* ------------------------------------------------------------ */
       /* Students CRUD                                                 */
       /* ------------------------------------------------------------ */
+      const classFilter = document.getElementById('class-filter');
+      classFilter.innerHTML = classOptionsHtml(ALL_CLASSES);
+
       const renderStudents = () => {
+        const rows = studentsOfClass(classFilter.value || ALL_CLASSES);
         renderTable('#student-table', [
           { key: 'id', label: 'আইডি' },
           { key: 'name', label: 'নাম' },
@@ -281,9 +394,11 @@
               <button type="button" class="btn btn-small btn-secondary" data-edit-student="${escapeHtml(row.id)}">সম্পাদনা</button>
               <button type="button" class="btn btn-small btn-error" data-delete-student="${escapeHtml(row.id)}">মুছুন</button>
             </span>` }
-        ], db.students.list());
-        document.getElementById('student-count').textContent = bn(db.students.list().length);
+        ], rows);
+        document.getElementById('student-count').textContent = bn(rows.length);
       };
+
+      classFilter.addEventListener('change', renderStudents);
 
       const studentForm = document.getElementById('student-form');
       const classSelect = document.getElementById('student-class');
@@ -454,7 +569,7 @@
             <div class="list-item">
               <div class="li-main">
                 <div class="li-title">${escapeHtml(notice.title)}</div>
-                <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+                <div class="li-sub">ক্লাস: ${escapeHtml(notice.className || 'সব')} · ${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
               </div>
               <span class="row-actions">
                 <button type="button" class="btn btn-small btn-secondary" data-edit-notice="${escapeHtml(notice.id)}">সম্পাদনা</button>
@@ -465,6 +580,7 @@
       };
 
       const noticeForm = document.getElementById('notice-form');
+      document.getElementById('notice-class').innerHTML = classOptionsHtml(ALL_CLASSES);
       const openNoticeModal = (editId = null) => {
         noticeForm.reset();
         document.getElementById('notice-edit-index').value = '';
@@ -476,6 +592,7 @@
           document.getElementById('notice-edit-index').value = notice.id;
           noticeForm.elements.title.value = notice.title || '';
           noticeForm.elements.audience.value = notice.audience || 'সবাই';
+          noticeForm.elements.className.value = notice.className || ALL_CLASSES;
         } else {
           document.getElementById('notice-modal-title').textContent = 'নতুন নোটিশ';
           document.getElementById('notice-save').textContent = 'প্রকাশ করুন';
@@ -491,11 +608,12 @@
         const editId = String(data.get('editIndex') || '');
         const title = String(data.get('title') || '').trim();
         if (!title) { showToast('শিরোনাম লিখুন।', 'error'); return; }
+        const className = String(data.get('className') || ALL_CLASSES);
         if (editId) {
-          db.notices.update(editId, { title, audience: String(data.get('audience')) });
+          db.notices.update(editId, { title, audience: String(data.get('audience')), className });
           showToast('নোটিশ আপডেট হয়েছে।', 'success');
         } else {
-          db.notices.add({ id: newNoticeId(), title, audience: String(data.get('audience')), date: todayBn() });
+          db.notices.add({ id: newId('n'), title, audience: String(data.get('audience')), className, date: todayBn() });
           showToast('নোটিশ প্রকাশিত হয়েছে।', 'success');
         }
         closeModal('notice-modal');
@@ -517,6 +635,61 @@
           }
         }
       });
+
+      /* ------------------------------------------------------------ */
+      /* Dues & Payments                                               */
+      /* ------------------------------------------------------------ */
+      const renderDues = () => {
+        const dues = dueFees();
+        document.getElementById('due-count').textContent = bn(dues.length);
+        renderTable('#due-table', [
+          { key: 'studentId', label: 'আইডি' },
+          { key: 'student', label: 'নাম', render: (row) => escapeHtml(row.student?.name || '—') },
+          { key: 'className', label: 'শ্রেণি', render: (row) => escapeHtml(row.student?.className || '—') },
+          { key: 'month', label: 'মাস' },
+          { key: 'amount', label: 'পরিমাণ' },
+          { key: '_pay', label: 'অ্যাকশন', render: (row) => `<button type="button" class="btn btn-small btn-success" data-pay="${escapeHtml(row.id)}">পেমেন্ট নিন</button>` }
+        ], dues, 'সব বকেয়া পরিশোধিত 🎉');
+
+        const payments = [...db.payments.list()].reverse();
+        document.getElementById('payment-list').innerHTML = payments.length
+          ? payments.slice(0, 8).map((p) => {
+            const st = db.students.find(p.studentId);
+            return `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(st?.name || p.studentId)}</div>
+                <div class="li-sub">${escapeHtml(p.month)} · ৳${escapeHtml(p.amount)} · ${escapeHtml(p.date)} · ${escapeHtml(p.receivedBy)}</div>
+              </div>
+              <span class="badge success">গৃহীত</span>
+            </div>`;
+          }).join('')
+          : '<div class="empty-state">কোনো পেমেন্ট নেই।</div>';
+      };
+
+      document.querySelector('#tab-dues').addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-pay]');
+        if (!btn) return;
+        const fee = db.fees.find(btn.dataset.pay);
+        const student = fee ? db.students.find(fee.studentId) : null;
+        if (!fee) return;
+        if (window.confirm(`${student?.name || ''} — ${fee.month} এর ৳${fee.amount} পেমেন্ট গ্রহণ করবেন?`)) {
+          receivePayment(fee.id, session.name);
+          showToast(`পেমেন্ট গৃহীত — ${student?.name || ''}। নোটিশ পাঠানো হয়েছে।`, 'success');
+          renderDues();
+          renderStudents();
+          renderOverview();
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Suggestions + MCQ authoring (admin)                           */
+      /* ------------------------------------------------------------ */
+      document.getElementById('sug-class').innerHTML = classOptionsHtml('নবম', { allowAll: false });
+      document.getElementById('exam-class').innerHTML = classOptionsHtml('নবম', { allowAll: false });
+      setExamAuthor(session.name);
+      mountSuggestionAuthoring({ author: session.name });
+      mountExamAuthoring();
 
       /* ------------------------------------------------------------ */
       /* Settings                                                      */
@@ -560,6 +733,7 @@
       const renderAll = () => {
         renderOverview();
         renderStudents();
+        renderDues();
         renderTeachers();
         renderNotices();
         renderSettings();

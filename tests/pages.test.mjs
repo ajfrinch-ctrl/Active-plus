@@ -59,7 +59,8 @@ test('module imports resolve to real exported names', () => {
     './js/auth.js': read('js/auth.js'),
     './js/app.js': read('js/app.js'),
     './js/data.js': read('js/data.js'),
-    './js/store.js': read('js/store.js')
+    './js/store.js': read('js/store.js'),
+    './js/exams.js': read('js/exams.js')
   };
   for (const page of PAGES) {
     const html = read(page);

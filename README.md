@@ -40,14 +40,21 @@ app can always be signed into even before Firebase is configured.
 index.html          login + role selector (mobile-first)
 student.html        student portal (routine, attendance, results, fees, profile)
 teacher.html        teacher portal (batches, attendance, add-batch modal)
-admin.html          admin panel — full CRUD: student admission (with
-                    school/college name), edit/delete students & teachers,
-                    notices, institution settings, data reset
+admin.html          admin panel — full CRUD: admission (school/college name),
+                    class filter, dues & payment collection (sends a notice to
+                    the student on payment), teacher/notice CRUD, institution
+                    settings, data reset, suggestion + MCQ authoring
+teacher.html        teacher portal — class-targeted notices, suggestions,
+                    MCQ exam builder + results, batches, attendance
+student.html        student portal — routine, attendance, results, fees,
+                    class/personal notices, suggestions, take MCQ exams
 css/style.css       single mobile-first stylesheet
 js/firebase.js      Firebase integration + offline fallback + toasts
 js/auth.js          local sign-in, sessions, route guards
 js/app.js           shared shell: header, tabs, tables, modals
-js/data.js          persistent data layer (versioned, CRUD collections)
+js/data.js          persistent data layer (versioned CRUD collections +
+                    payments/suggestions/exams + domain helpers)
+js/exams.js         shared suggestion/MCQ authoring + exam-taking UI
 js/store.js         layered storage (localStorage + in-memory fallback)
 service-worker.js   offline caching (network-first for pages)
 manifest.json       PWA manifest
