@@ -317,3 +317,35 @@ test('exam list offers Start only inside the window', async () => {
   assert.equal(doc.querySelector(`[data-take="${exam.id}"]`), null, 'no Start once the window closed');
   assert.ok(doc.getElementById('student-exam-list').innerHTML.includes('সময় শেষ'), 'reason shown instead');
 });
+
+test('home lists recent study materials for the student class only', async () => {
+  const { doc, data } = await bootHome();
+  const cls = data.db.students.find('2026-09-001').className;
+  const html = doc.getElementById('home-content').innerHTML;
+  const mat = data.db.materials.list()[0];
+  assert.ok(html.includes(mat.title), 'class material listed on home');
+
+  data.db.materials.add({ id: 'mat-other', title: 'Other Class Only', subject: 'X', className: 'দশম', type: 'নোট', date: data.todayBn() });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  assert.equal(doc.getElementById('home-content').innerHTML.includes('Other Class Only'), false, 'other class material never shown');
+});
+
+test('with no material at all the home invites the student to start', async () => {
+  const { doc, data } = await bootHome();
+  [...data.db.materials.list()].forEach((m) => data.db.materials.remove(m.id));
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  const html = doc.getElementById('home-content').innerHTML;
+  assert.ok(html.includes('নতুন কিছু শেখা শুরু করুন'), 'start-learning empty state shown');
+  assert.ok(doc.querySelector('#home-content [data-act="study"]'), 'with a way in');
+});
+
+test('More includes a Settings panel with real app state', async () => {
+  const { doc, data } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  const panel = doc.getElementById('more-settings');
+  assert.ok(panel, 'settings panel exists');
+  assert.ok(panel.innerHTML.includes(`v${data.DATA_VERSION}`), 'shows the app version');
+  assert.ok(doc.getElementById('clear-cache'), 'cache refresh offered');
+  click(doc, '#more-content [data-act="settings"]');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'settings tile routes to More');
+});

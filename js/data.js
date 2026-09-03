@@ -13,7 +13,7 @@
 import { readJSON, writeJSON } from './store.js';
 
 const DATA_KEY = 'activeplus_data';
-const DATA_VERSION = 7; // student home: tips, banners, study activity, daily challenge
+export const DATA_VERSION = 7; // student home: tips, banners, study activity, daily challenge
 
 export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'একাদশ', 'দ্বাদশ'];
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };

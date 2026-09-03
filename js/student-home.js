@@ -4,7 +4,7 @@
  * All data computed live from the layered store; nothing hard-coded.
  */
 
-import { initApp, escapeHtml, showToast, openModal, closeModal, statGrid, renderTable } from './app.js';
+import { initApp, escapeHtml, showToast, openModal, closeModal, getAuthMode } from './app.js';
 import { signOut } from './auth.js';
 import {
   db, noticesFor, suggestionsFor, examsFor, examResultFor, scoreExam,
@@ -12,7 +12,7 @@ import {
   challengeState, addChallengeProgress, performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
   recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial,
-  examWindow, assignmentStatus, dueLabel, latestNotifications
+  examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
 
@@ -26,6 +26,7 @@ const MORE_FEATURES = [
   { act: 'query', ico: '✉️', label: 'শিক্ষক প্রশ্ন' },
   { act: 'streak', ico: '🔥', label: 'স্ট্রিক' },
   { act: 'profile', ico: '👤', label: 'প্রোফাইল' },
+  { act: 'settings', ico: '⚙️', label: 'সেটিংস' },
   { act: 'help', ico: '❓', label: 'সহায়তা' }
 ];
 
@@ -250,6 +251,25 @@ export function initStudentHome() {
         <div class="meta">${escapeHtml(resume.subject)} · ${escapeHtml(resume.type || '')}</div>
         <button type="button" class="btn btn-secondary btn-block" data-act="material" data-id="${escapeHtml(resume.id)}" style="margin-top:.5rem">চালিয়ে যান</button>
       </div>`);
+    } else if (cards.materials) {
+      sections.push(`
+      <div class="hcard">
+        <div class="h-title">পড়া চালিয়ে যান</div>
+        <p>নতুন কিছু শেখা শুরু করুন 📚</p>
+        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">ম্যাটেরিয়াল দেখুন</button>
+      </div>`);
+    }
+
+    if (cards.materials && materials.length) {
+      const recent = [...materials].slice(-3).reverse();
+      sections.push(`
+      <div class="hcard">
+        <div class="h-title">স্টাডি ম্যাটেরিয়াল</div>
+        ${recent.map((m) => `<div class="info-row" role="button" tabindex="0" data-act="material" data-id="${escapeHtml(m.id)}" style="cursor:pointer">
+          <span class="l">📖 ${escapeHtml(m.title)}<br><span class="meta">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')}</span></span>
+          <span class="v">${escapeHtml(m.date)}</span></div>`).join('')}
+        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">সব ম্যাটেরিয়াল</button>
+      </div>`);
     }
 
     if (cards.assignments) {
@@ -412,7 +432,7 @@ export function initStudentHome() {
       el.setAttribute('aria-expanded', String(!open));
       el.textContent = open ? 'আরও দেখুন ↓' : 'কম দেখুন ↑';
     }
-    else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'help'].includes(act)) openMore(act);
+    else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
     else if (act === 'challenge') doChallenge();
     else if (act === 'assignment') openAssignment(el.dataset.id);
     else if (act === 'notif') { document.getElementById('bell').click(); }
@@ -480,6 +500,12 @@ export function initStudentHome() {
     const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
 
     document.getElementById('more-content').innerHTML = `
+      <div class="hcard"><div class="h-title">দ্রুত যায়</div>
+        <div class="quick-row">
+          ${MORE_FEATURES.map((f) => tile(f.act, f.ico, f.label)).join('')}
+        </div>
+      </div>
+
       <div class="hcard" id="more-assignments"><div class="h-title">অ্যাসাইনমেন্ট</div>${
         db.assignments.list().filter((a) => a.className === student.className).map((a) => {
           const st = assignmentStatus(a, student);
@@ -542,6 +568,13 @@ export function initStudentHome() {
           ${editable.length ? `<button type="submit" class="btn btn-block">প্রোফাইল আপডেট করুন</button>` : `<p class="meta">প্রোফাইল সম্পাদনার অনুমতি অ্যাডমিন দেননি।</p>`}
         </form></div>
 
+      <div class="hcard" id="more-settings"><div class="h-title">সেটিংস</div>
+        ${row('ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)')}
+        ${row('অ্যাপ ভার্সন', `v${DATA_VERSION}`)}
+        ${row('সংযোগ', navigator.onLine ? 'অনলাইন' : 'অফলাইন')}
+        <button type="button" class="btn btn-secondary btn-block" id="clear-cache" style="margin-top:.75rem">অ্যাপ ক্যাশ রিফ্রেশ করুন</button>
+      </div>
+
       <div class="hcard" id="more-help"><div class="h-title">সহায়তা</div>
         ${row('প্রতিষ্ঠান', db.settings.get().orgName || 'Active Plus')}
         ${row('মোবাইল', db.settings.get().mobile || '—')}
@@ -551,6 +584,20 @@ export function initStudentHome() {
       <button type="button" class="btn btn-error btn-block" id="home-logout">লগআউট</button>`;
 
     document.getElementById('home-logout').addEventListener('click', () => signOut({ redirect: true }));
+
+    document.getElementById('clear-cache').addEventListener('click', async () => {
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        const reg = await navigator.serviceWorker?.getRegistration?.();
+        await reg?.update();
+        showToast('ক্যাশ রিফ্রেশ হয়েছে।', 'success');
+      } catch (err) {
+        showToast('ক্যাশ রিফ্রেশ করা যায়নি।', 'error');
+      }
+    });
 
     document.getElementById('more-content').addEventListener('click', (e) => {
       const asg = e.target.closest('[data-asg]');
