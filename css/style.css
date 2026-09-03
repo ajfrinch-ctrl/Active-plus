@@ -689,3 +689,8 @@ a { color: var(--accent); }
   body { background: #fff; color: #000; }
   .app-header, .top-tab-bar, .toast-container, .modal-overlay { display: none !important; }
 }
+
+/* Admin: checkbox grid for home card visibility */
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .5rem .75rem; }
+.check { display: flex; align-items: center; gap: .4rem; font-size: .875rem; cursor: pointer; min-height: 44px; }
+.check input { width: 1.15rem; height: 1.15rem; accent-color: var(--brand, #2563eb); }

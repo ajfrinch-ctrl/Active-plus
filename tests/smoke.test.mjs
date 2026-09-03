@@ -152,8 +152,29 @@ test('index.html: login UI nests correctly (button no longer swallows the page)'
   assert.ok(document.querySelector('form#login-form'), 'login form present');
 });
 
+test('student home uses the mobile app shell (header + bottom nav)', () => {
+  const dom = new JSDOM(read('student.html'));
+  const { document } = dom.window;
+  assert.ok(document.querySelector('.home-header'), 'student.html has the home header');
+  assert.ok(document.getElementById('bell'), 'notification bell present');
+  assert.ok(document.getElementById('bell-count')?.hasAttribute('hidden'), 'unread badge hidden at zero');
+  const nav = document.querySelector('.bottom-nav');
+  assert.ok(nav, 'bottom navigation present');
+  const items = nav.querySelectorAll('button[data-view]');
+  assert.equal(items.length, 5, 'five bottom nav destinations');
+  assert.equal([...items].filter((b) => b.getAttribute('aria-current') === 'true').length, 1, 'exactly one highlighted item');
+  for (const b of items) {
+    assert.ok(document.getElementById(`view-${b.dataset.view}`), `view exists for ${b.dataset.view}`);
+  }
+  assert.ok(document.getElementById('home-skeleton'), 'loading skeleton present');
+  // No table on the home page may scroll the page sideways.
+  document.querySelectorAll('table.table').forEach((table) => {
+    assert.equal(table.parentElement.classList.contains('table-wrap'), true, 'table wrapped');
+  });
+});
+
 test('dashboard pages share the mobile app shell', () => {
-  for (const page of ['student.html', 'teacher.html', 'admin.html']) {
+  for (const page of ['teacher.html', 'admin.html']) {
     const dom = new JSDOM(read(page));
     const { document } = dom.window;
     assert.ok(document.querySelector('.app-header'), `${page} has header`);

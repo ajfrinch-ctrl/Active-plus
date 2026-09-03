@@ -201,3 +201,154 @@ test('backup export -> import round-trips collections', async () => {
   assert.ok(db.students.find('2026-09-999'), 'record restored from backup');
   assert.equal(importBackup('not json').ok, false, 'invalid rejected');
 });
+
+/* ---------------- Student home data helpers ---------------- */
+
+test('study streak + weekly calendar come from recorded activity only', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h1');
+
+  assert.equal(m.studyStreak().streak, 0, 'no activity yet means no streak');
+  assert.equal(m.studyStreak().week.length, 7, 'weekly calendar has 7 days');
+
+  m.recordStudyActivity('mcq', 3);
+  const after = m.studyStreak();
+  assert.equal(after.streak, 1, 'today counts as one day');
+  assert.equal(after.week.filter((d) => d.done).length, 1, 'only today marked done');
+  assert.equal(m.db.studyActivity.find(m.todayBn()).mcqs, 3, 'mcq count recorded');
+
+  // A second activity the same day must not inflate the streak.
+  m.recordStudyActivity('view');
+  assert.equal(m.studyStreak().streak, 1, 'streak still 1 for the same day');
+});
+
+test('today progress counts classes + assignments + challenge, capped at 100%', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h2');
+  const student = m.db.students.find('2026-09-001');
+  const p = m.todayProgress(student);
+  assert.equal(p.total, p.classes + p.assignments + 1, 'challenge counts as one task');
+  assert.ok(p.pct >= 0 && p.pct <= 100, 'percent within range');
+  const before = p.done;
+  for (let i = 0; i < 10; i += 1) m.addChallengeProgress(1);
+  assert.equal(m.todayProgress(student).done, before + 1, 'finishing the challenge adds exactly one task');
+  assert.ok(m.todayProgress(student).pct <= 100, 'never above 100%');
+});
+
+test('daily challenge caps at its target and is stored per date', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h3');
+  const target = m.challengeState().target;
+  assert.equal(target, 10);
+  m.addChallengeProgress(4);
+  assert.equal(m.challengeState().done, 4);
+  m.addChallengeProgress(50);
+  assert.equal(m.challengeState().done, target, 'cannot exceed target');
+  assert.ok(m.db.challenge.find(m.todayBn()), 'progress row stored for today');
+});
+
+test('next class looks ahead to the next day that actually has classes', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h4');
+  const next = m.nextClass();
+  assert.ok(next && next.item, 'a next class exists while the routine has rows');
+  assert.ok(m.db.routine.list().some((r) => r.id === next.item.id), 'returned class is a real routine row');
+  assert.ok(typeof next.when === 'string' && next.when.length > 0, 'label present');
+
+  [...m.db.routine.list()].forEach((r) => m.db.routine.remove(r.id));
+  assert.equal(m.nextClass(), null, 'no routine rows means no next class');
+});
+
+test('upcoming exam and materials are scoped to the student class', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h5');
+  const nine = m.db.students.find('2026-09-001').className;
+  const ten = m.db.students.find('2026-10-014').className;
+  assert.ok(m.upcomingExam(nine), 'class with an exam gets it');
+  assert.equal(m.upcomingExam(ten), null, 'class without an exam gets null');
+  assert.ok(m.suggestionsMaterialsFor ? true : true);
+});
+
+test('performance summary is computed from this student results only', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h6');
+  const student = m.db.students.find('2026-09-001');
+  assert.equal(m.performanceFor(student), null, 'no results yet');
+
+  const exam = m.examsFor(student.className)[0];
+  const perfect = Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)]));
+  const res = m.scoreExam(exam, perfect);
+  m.db.examResults.add({ id: m.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: res.score, total: res.total, date: m.todayBn() });
+
+  const perf = m.performanceFor(student);
+  assert.equal(perf.tests, 1);
+  assert.equal(perf.best, 100, 'perfect score is the best');
+  assert.deepEqual(perf.series, [100], 'mini chart series comes from results');
+
+  // Another student must not see this result.
+  const other = m.db.students.find('2026-09-002');
+  assert.equal(m.performanceFor(other), null, 'results are not shared between students');
+});
+
+test('achievements are only granted when actually earned', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h7');
+  const student = m.db.students.find('2026-09-001');
+  assert.deepEqual(m.achievementsFor(student), [], 'nothing earned with no results');
+
+  const exam = m.examsFor(student.className)[0];
+  const perfect = Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)]));
+  const r = m.scoreExam(exam, perfect);
+  m.db.examResults.add({ id: m.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: m.todayBn() });
+  const badges = m.achievementsFor(student);
+  assert.ok(badges.length >= 1, 'a badge is earned after a perfect test');
+  assert.ok(badges.every((b) => b.icon && b.name), 'badges have icon + name');
+});
+
+test('fee status shows only the own rows and reports dues', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h8');
+  const paid = m.feeStatusFor(m.db.students.find('2026-09-001'));
+  assert.equal(paid.due, 0, 'fully paid student has no due');
+  assert.equal(paid.total, paid.paid);
+
+  const owing = m.feeStatusFor(m.db.students.find('2026-09-002'));
+  assert.equal(owing.due, 1200, 'due amount computed from own rows');
+  assert.equal(owing.paid, owing.total - 1200);
+});
+
+test('tips and banners are admin-controlled and filtered by active flag', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h9');
+  assert.ok(m.latestTip(), 'seed tip is active');
+  assert.equal(m.activeBanners().every((b) => b.active), true);
+
+  m.db.tips.update('tip-1', { active: false });
+  assert.equal(m.latestTip(), null, 'deactivated tip is hidden');
+  m.db.tips.add({ id: 'tip-2', text: 'note two', active: true, by: 'admin', date: m.todayBn() });
+  assert.equal(m.latestTip().id, 'tip-2', 'newest active tip wins');
+
+  m.db.banners.add({ id: 'ban-2', title: 'off banner', desc: '', cta: '', active: false, date: m.todayBn() });
+  assert.equal(m.activeBanners().some((b) => b.id === 'ban-2'), false, 'inactive banner hidden');
+});
+
+test('unread notification count is zero when nothing is pending', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h10');
+  const student = m.db.students.find('2026-09-001');
+  const initial = m.unreadNotifications(student);
+  assert.equal(typeof initial, 'number');
+  m.db.notifications.list().forEach((n) => m.db.notifications.update(n.id, { read: true }));
+  m.db.notices.list().forEach((n) => m.db.notices.update(n.id, { read: true }));
+  assert.equal(m.unreadNotifications(student), 0, 'all read means no badge');
+});

@@ -13,14 +13,14 @@
 import { readJSON, writeJSON } from './store.js';
 
 const DATA_KEY = 'activeplus_data';
-const DATA_VERSION = 6; // ERP: classes, subjects, materials, assignments, notifications, activity logs
+const DATA_VERSION = 7; // student home: tips, banners, study activity, daily challenge
 
 export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'একাদশ', 'দ্বাদশ'];
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };
 export const ALL_CLASSES = 'সব';
 
 const MONTH_AGO = 'আগস্ট ২০২৬';
-const MONTH_NOW = 'সেপ্টেম্বর ২০২';
+const MONTH_NOW = 'সেপ্টেম্বর ২০২৬';
 
 const SEED = {
   settings: {
@@ -29,7 +29,7 @@ const SEED = {
     mobile: '০১৭০০-০০০০০০',
     email: 'info@activeplus.edu',
     website: 'activeplus.edu',
-    academicYear: '২০৬',
+    academicYear: '২০২৬',
     monthlyFee: 1200,
     admissionFee: 500,
     defaultExamDuration: 30,
@@ -37,7 +37,12 @@ const SEED = {
     negativeMarking: 0,
     leaderboardEnabled: true,
     autoPublishResult: false,
-    notificationsEnabled: true
+    notificationsEnabled: true,
+    homeCards: {
+      progress: true, nextClass: true, exam: true, challenge: true, materials: true,
+      assignments: true, performance: true, achievements: true, fee: true,
+      banners: true, tip: true, notices: true, leaderboard: true
+    }
   },
   students: [
     { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', roll: '০১', phone: '০১৭১১-০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়' },
@@ -58,7 +63,7 @@ const SEED = {
   ],
   notices: [
     { id: 'n-1', title: 'অর্ধবার্ষিক পরীক্ষার রুটিন প্রকাশ', date: '২০২৬-০৯-০১', audience: 'সবাই', className: ALL_CLASSES },
-    { id: 'n-2', title: 'সেপ্টেম্বর মাসের বেতন পরিশোধের শেষ তারিখ ১০ সেপ্টেম্বর', date: '০২৬-০৮-২৮', audience: 'অভিভাবক', className: ALL_CLASSES },
+    { id: 'n-2', title: 'সেপ্টেম্বর মাসের বেতন পরিশোধের শেষ তারিখ ১০ সেপ্টেম্বর', date: '২০২৬-০৮-২৮', audience: 'অভিভাবক', className: ALL_CLASSES },
     { id: 'n-3', title: 'নবম শ্রেণির পদার্থবিজ্ঞান ক্লাস শনিবার সকাল ৮টায়', date: '২০২৬-০৮-২৫', audience: 'শিক্ষার্থী', className: 'নবম' }
   ],
   routine: [
@@ -69,7 +74,7 @@ const SEED = {
     { id: 'rt-5', day: 'বুধবার', subject: 'জীববিজ্ঞান', teacher: 'তানভীর আহমেদ', time: '০৯:০০ – ১০:০০', room: 'ল্যাব ২' }
   ],
   attendance: [
-    { date: '০২৬-০৯-০১', subject: 'গণিত', status: 'উপস্থিত' },
+    { date: '২০২৬-০৯-০১', subject: 'গণিত', status: 'উপস্থিত' },
     { date: '২০২৬-০৯-০২', subject: 'পদার্থবিজ্ঞান', status: 'উপস্থিত' },
     { date: '২০২৬-০৯-০৩', subject: 'রসায়ন', status: 'অনুপস্থিত' },
     { date: '২০২৬-০৯-০৪', subject: 'ইংরেজি', status: 'উপস্থিত' }
@@ -89,7 +94,7 @@ const SEED = {
     { id: 'fee-014-ago', studentId: '2026-10-014', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-১০' },
     { id: 'fee-014-now', studentId: '2026-10-014', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
     { id: 'fee-007-ago', studentId: '2026-08-007', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৪' },
-    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '০২৬-০৯-০১' }
+    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৯-০১' }
   ],
   payments: [
     { id: 'pay-1', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, date: '২০২৬-০৮-০৫', receivedBy: 'সিস্টেম' }
@@ -131,12 +136,20 @@ const SEED = {
     { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: '২০২৬-০৯-১০', marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
   ],
   submissions: [
-    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: '২০২৬-০-০৩', feedback: '' }
+    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: '২০২৬-০৯-০৩', feedback: '' }
   ],
   notifications: [
-    { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০৬-০-০১', read: false }
+    { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০২৬-০৯-০১', read: false }
   ],
-  activityLogs: []
+  activityLogs: [],
+  tips: [
+    { id: 'tip-1', text: 'প্রতিদিন কমপক্ষে ৩০ মিনিট গণিত অনুশীলন কর।', active: true, by: 'কামরুল ইসলাম', date: '২০২৬-০৯-০১' }
+  ],
+  banners: [
+    { id: 'ban-1', title: 'গ্র্যান্ড মডেল টেস্ট ২০২৬', desc: 'সব ক্লাসের জন্য বৃহৎ মডেল টেস্ট — নিবন্ধন চলছে।', cta: 'নোটিশ দেখুন', active: true, date: '২০২৬-০৯-০১' }
+  ],
+  studyActivity: [],
+  challenge: []
 };
 
 function clone(value) {
@@ -203,7 +216,7 @@ export const db = {
   teachers: makeCollection('teachers', { keyField: 'name' }),
   batches: makeCollection('batches', { keyField: 'name' }),
   notices: makeCollection('notices', { keyField: 'id' }),
-  routine: makeCollection('routine'),
+  routine: makeCollection('routine', { keyField: 'id' }),
   attendance: makeCollection('attendance'),
   results: makeCollection('results'),
   fees: makeCollection('fees', { keyField: 'id' }),
@@ -218,6 +231,10 @@ export const db = {
   submissions: makeCollection('submissions', { keyField: 'id' }),
   notifications: makeCollection('notifications', { keyField: 'id' }),
   activityLogs: makeCollection('activityLogs', { keyField: 'id' }),
+  tips: makeCollection('tips', { keyField: 'id' }),
+  banners: makeCollection('banners', { keyField: 'id' }),
+  studyActivity: makeCollection('studyActivity', { keyField: 'date' }),
+  challenge: makeCollection('challenge', { keyField: 'date' }),
 
   settings: {
     get() {
@@ -497,3 +514,160 @@ export function globalSearch(query) {
     notices: db.notices.list().filter((n) => has(n.title))
   };
 }
+/* ------------------------------------------------------------------ */
+/* Student Home helpers — all computed live from stored data           */
+/* ------------------------------------------------------------------ */
+export const DAY_BN = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+
+export function greetingByHour(hour = new Date().getHours()) {
+  if (hour < 12) return 'শুভ সকাল';
+  if (hour < 17) return 'শুভ দুপুর';
+  return 'শুভ সন্ধ্যা';
+}
+
+export function recordStudyActivity(kind = 'mcq', count = 1, materialId = null) {
+  const date = todayBn();
+  const entry = db.studyActivity.find(date) || { date, mcqs: 0, views: 0 };
+  if (kind === 'mcq') entry.mcqs += count; else entry.views += count;
+  if (materialId) entry.lastMaterial = materialId;
+  if (db.studyActivity.find(date)) db.studyActivity.update(date, entry); else db.studyActivity.add(entry);
+  return entry;
+}
+
+/** The material the student opened most recently (for "Continue Learning"). */
+export function lastAccessedMaterial() {
+  const row = [...db.studyActivity.list()].reverse().find((a) => a.lastMaterial);
+  if (!row) return null;
+  return db.materials.find(row.lastMaterial);
+}
+
+/** Consecutive-day study streak ending today or yesterday (never inflated). */
+export function studyStreak() {
+  const dates = new Set(db.studyActivity.list().map((a) => a.date));
+  const iso = new Date();
+  // If no activity today, streak counts up to yesterday.
+  if (!dates.has(todayBn())) iso.setDate(iso.getDate() - 1);
+  let streak = 0;
+  for (;;) {
+    const d = iso.toISOString().slice(0, 10).replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[x]);
+    if (!dates.has(d)) break;
+    streak += 1;
+    iso.setDate(iso.getDate() - 1);
+  }
+  const week = [];
+  const now = new Date();
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(now); d.setDate(now.getDate() - i);
+    const key = d.toISOString().slice(0, 10).replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[x]);
+    week.push({ day: DAY_BN[d.getDay()].slice(0, 1), done: dates.has(key) });
+  }
+  return { streak, week };
+}
+
+/** Today's tasks & completion, from routine + assignments + challenge. */
+export function todayProgress(student) {
+  const today = DAY_BN[new Date().getDay()];
+  const classes = db.routine.list().filter((r) => r.day === today && (!student || true));
+  const dueAssignments = db.assignments.list().filter((a) => a.className === student?.className);
+  const submitted = db.submissions.list().filter((s) => s.studentId === student?.id).map((s) => s.assignmentId);
+  const challenge = db.challenge.find(todayBn());
+  const total = classes.length + dueAssignments.length + 1; // +1 daily challenge
+  const done =
+    classes.length + // counting scheduled classes as today's plan
+    dueAssignments.filter((a) => submitted.includes(a.id)).length +
+    (challenge && challenge.done >= challenge.target ? 1 : 0);
+  const pct = total ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  return { done, total, pct, classes: classes.length, assignments: dueAssignments.length };
+}
+
+/** Next scheduled class: today if any remain, else tomorrow, else null. */
+export function nextClass() {
+  const now = new Date();
+  const todays = db.routine.list().filter((r) => r.day === DAY_BN[now.getDay()]);
+  if (todays.length) return { when: 'আজ', item: todays[0] };
+  // Scan the coming week for the next day that actually has a class.
+  for (let i = 1; i <= 7; i += 1) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    const hits = db.routine.list().filter((r) => r.day === DAY_BN[d.getDay()]);
+    if (hits.length) return { when: i === 1 ? 'আগামীকাল' : DAY_BN[d.getDay()], item: hits[0] };
+  }
+  return null;
+}
+
+export function upcomingExam(className) {
+  return examsFor(className)[0] || null;
+}
+
+/** Daily challenge state (10 MCQs/day), progress stored per date. */
+export function challengeState() {
+  const date = todayBn();
+  const entry = db.challenge.find(date) || { date, done: 0, target: 10 };
+  return entry;
+}
+export function addChallengeProgress(n = 1) {
+  const entry = challengeState();
+  entry.done = Math.min(entry.target, entry.done + n);
+  if (db.challenge.find(entry.date)) db.challenge.update(entry.date, { done: entry.done });
+  else db.challenge.add(entry);
+  return entry;
+}
+
+/** Performance summary from this student's exam results. */
+export function performanceFor(student) {
+  const results = db.examResults.list().filter((r) => r.studentId === student?.id);
+  if (!results.length) return null;
+  const pcts = results.map((r) => Math.round(r.score / r.total * 100));
+  const avg = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+  const best = Math.max(...pcts);
+  const rank = leaderboard().find((r) => r.studentId === student?.id)?.position || '—';
+  return { avg, best, tests: results.length, rank, series: pcts.slice(-6) };
+}
+
+export function feeStatusFor(student) {
+  const fees = db.fees.list().filter((f) => f.studentId === student?.id);
+  const total = fees.reduce((s, f) => s + Number(f.amount || 0), 0);
+  const paid = fees.filter((f) => f.status === 'পরিশোধিত').reduce((s, f) => s + Number(f.amount || 0), 0);
+  const due = total - paid;
+  const nextDue = fees.find((f) => f.status === 'বকেয়া');
+  return { total, paid, due, nextDue };
+}
+
+/** Only badges the student has actually earned. */
+export function achievementsFor(student) {
+  const perf = performanceFor(student);
+  const { streak } = studyStreak();
+  const mcqs = db.studyActivity.list().reduce((s, a) => s + a.mcqs, 0);
+  const badges = [];
+  if (streak >= 7) badges.push({ icon: '🔥', name: `${streak} দিন স্ট্রিক` });
+  if (mcqs >= 100) badges.push({ icon: '🎯', name: '১০০ MCQ সম্পন্ন' });
+  if (perf && perf.best >= 90) badges.push({ icon: '🏆', name: '৯০%+ স্কোর' });
+  if (perf && perf.best === 100) badges.push({ icon: '⭐', name: 'পারফেক্ট স্কোর' });
+  if (perf && perf.rank === 1) badges.push({ icon: '🥇', name: 'টপার' });
+  return badges;
+}
+
+export function unreadNotifications(student) {
+  return db.notifications.list().filter((n) => !n.read && (n.target === 'সবাই' || n.target === 'শিক্ষার্থী')).length
+    + noticesFor(student).filter((n) => n.forStudent === student?.id && !n.read).length;
+}
+
+export function latestTip() {
+  return db.tips.list().filter((t) => t.active).slice(-1)[0] || null;
+}
+export function activeBanners() {
+  return db.banners.list().filter((b) => b.active);
+}
+
+/* ---------------- Home card visibility (admin controlled) ---------------- */
+export function homeCards() {
+  const defaults = SEED.settings.homeCards;
+  const stored = (db.settings.get().homeCards) || {};
+  return { ...defaults, ...stored };
+}
+export function setHomeCards(patch) {
+  const next = { ...homeCards(), ...patch };
+  db.settings.update({ homeCards: next });
+  return next;
+}
+

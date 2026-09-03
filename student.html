@@ -3,201 +3,92 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>শিক্ষার্থী পোর্টাল · Active Plus</title>
+    <title>Active Plus · হোম</title>
     <meta name="theme-color" content="#2d3748">
     <meta name="color-scheme" content="dark">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/home.css">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   </head>
 
-  <body>
-    <div class="app">
-      <header class="app-header">
-        <div class="brand">
-          <div class="brand-mark" id="user-initial" aria-hidden="true">A</div>
-          <div class="brand-text">
-            <strong id="user-name">শিক্ষার্থী</strong>
-            <span id="user-role">লোড হচ্ছে…</span>
-          </div>
+  <body class="home-body">
+    <main class="home">
+      <!-- Header -->
+      <header class="home-header">
+        <div class="avatar" id="avatar" aria-hidden="true">A</div>
+        <div class="who">
+          <div class="greet" id="greet">শুভ সকাল 👋</div>
+          <div class="name" id="student-name">…</div>
+          <div class="meta" id="student-meta">…</div>
         </div>
-        <button type="button" class="icon-btn" id="logout-btn">লগআউট</button>
+        <span class="net-chip" id="net-chip" role="status" aria-live="polite">…</span>
+        <button type="button" class="bell" id="bell" aria-label="নোটিফিকেশন">🔔<span class="badge-dot" id="bell-count" hidden>0</span></button>
       </header>
 
-      <nav class="top-tab-bar" role="tablist" aria-label="শিক্ষার্থী মেনু">
-        <button type="button" data-tab="overview" aria-selected="true">সংক্ষেপ</button>
-        <button type="button" data-tab="routine">ক্লাস রুটিন</button>
-        <button type="button" data-tab="attendance">উপস্থিতি</button>
-        <button type="button" data-tab="results">ফলাফল</button>
-        <button type="button" data-tab="fees">বেতন</button>
-        <button type="button" data-tab="suggestion">সাজেশন</button>
-        <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
-        <button type="button" data-tab="profile">প্রোফাইল</button>
-      </nav>
+      <!-- HOME view -->
+      <section id="view-home" class="home-view">
+        <div id="home-skeleton">
+          <div class="hcard skeleton"><div class="sk-line" style="width:40%"></div><div class="sk-line" style="width:70%"></div></div>
+          <div class="hcard skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:80%"></div></div>
+        </div>
+        <div id="home-content" hidden></div>
+      </section>
 
-      <main class="app-main">
-        <section class="tab-panel" id="tab-overview">
-          <div class="stat-grid" id="student-stats"></div>
-          <div class="section">
-            <h2 class="section-title">নোটিশ</h2>
-            <div class="list" id="notice-list"></div>
-          </div>
-        </section>
+      <!-- STUDY view -->
+      <section id="view-study" class="home-view" hidden>
+        <h2 class="section-title">স্টাডি ম্যাটেরিয়াল</h2>
+        <div id="material-list"></div>
+        <h2 class="section-title">সাজেশন</h2>
+        <div id="student-suggestion-list"></div>
+      </section>
 
-        <section class="tab-panel" id="tab-routine" hidden>
-          <h2 class="section-title">সাপ্তাহিক রুটিন</h2>
-          <div class="table-wrap">
-            <table class="table">
-              <thead><tr></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
+      <!-- EXAM view -->
+      <section id="view-exam" class="home-view" hidden>
+        <h2 class="section-title">MCQ পরীক্ষা</h2>
+        <div class="list" id="student-exam-list"></div>
+        <div id="exam-player" hidden></div>
+      </section>
 
-        <section class="tab-panel" id="tab-attendance" hidden>
-          <h2 class="section-title">উপস্থিতি রেকর্ড</h2>
-          <div class="table-wrap">
-            <table class="table" id="attendance-table">
-              <thead><tr></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
+      <!-- RESULT view -->
+      <section id="view-result" class="home-view" hidden>
+        <div id="result-content"></div>
+      </section>
 
-        <section class="tab-panel" id="tab-results" hidden>
-          <h2 class="section-title">পরীক্ষার ফলাফল</h2>
-          <div class="table-wrap">
-            <table class="table" id="result-table">
-              <thead><tr></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
+      <!-- MORE view -->
+      <section id="view-more" class="home-view" hidden>
+        <div id="more-content"></div>
+      </section>
+    </main>
 
-        <section class="tab-panel" id="tab-fees" hidden>
-          <h2 class="section-title">বেতন</h2>
-          <div class="list" id="fee-list"></div>
-        </section>
-
-        <section class="tab-panel" id="tab-suggestion" hidden>
-          <h2 class="section-title">সাজেশন</h2>
-          <div id="student-suggestion-list"></div>
-        </section>
-
-        <section class="tab-panel" id="tab-exam" hidden>
-          <h2 class="section-title">MCQ পরীক্ষা</h2>
-          <div class="list" id="student-exam-list"></div>
-          <div id="exam-player" hidden></div>
-        </section>
-
-        <section class="tab-panel" id="tab-profile" hidden>
-          <h2 class="section-title">প্রোফাইল</h2>
-          <div class="card">
-            <div class="list" id="profile-list"></div>
-          </div>
-          <button type="button" class="btn btn-secondary btn-block" id="profile-logout">লগআউট করুন</button>
-        </section>
-      </main>
+    <!-- Notification center modal -->
+    <div class="modal-overlay" id="notif-center" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2>নোটিফিকেশন</h2>
+        <div class="list" id="notif-list"></div>
+      </div>
     </div>
+
+    <!-- Bottom navigation -->
+    <nav class="bottom-nav" aria-label="মূল নেভিগেশন">
+      <div class="inner">
+        <button type="button" data-view="home" aria-current="true"><span class="ico">🏠</span>হোম</button>
+        <button type="button" data-view="study"><span class="ico">📚</span>স্টাডি</button>
+        <button type="button" data-view="exam"><span class="ico">📝</span>পরীক্ষা</button>
+        <button type="button" data-view="result"><span class="ico">🏆</span>ফলাফল</button>
+        <button type="button" data-view="more"><span class="ico">☰</span>আরও</button>
+      </div>
+    </nav>
 
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <script type="module">
-      import { initApp, renderTable, statGrid, escapeHtml, showToast } from './js/app.js';
-      import { signOut } from './js/auth.js';
-      import { db, noticesFor } from './js/data.js';
-      import { renderStudentSuggestions, mountExamTaker } from './js/exams.js';
-
-      const session = initApp({ roles: ['student'] });
-      if (session) {
-        const me = db.students.find(session.username) || null;
-        const routine = db.routine.list();
-        const attendance = db.attendance.list();
-        const results = db.results.list();
-        const fees = db.fees.list().filter((f) => f.studentId === (me?.id || session.username));
-        const notices = noticesFor(me);
-
-        const present = attendance.filter((row) => row.status === 'উপস্থিত').length;
-        const rate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
-        const due = fees.filter((row) => row.status === 'বকেয়া').length;
-        const avg = results.length ? Math.round(results.reduce((sum, row) => sum + Number(row.marks), 0) / results.length) : 0;
-
-        statGrid('#student-stats', [
-          { label: 'উপস্থিতি', value: `${rate}%`, tone: 'success', note: `${present}/${attendance.length} দিন` },
-          { label: 'গড় নম্বর', value: avg, tone: 'accent', note: 'প্রথম সাময়িক' },
-          { label: 'বকেয়া বেতন', value: due ? `${due} মাস` : 'নেই', tone: due ? 'warning' : 'success' },
-          { label: 'ক্লাস', value: routine.length, note: 'সাপ্তাহিক' }
-        ]);
-
-        document.getElementById('notice-list').innerHTML = notices.length
-          ? notices.map((notice) => `
-            <div class="list-item">
-              <div class="li-main">
-                <div class="li-title">${escapeHtml(notice.title)}</div>
-                <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
-              </div>
-              <span class="badge accent">নোটিশ</span>
-            </div>`).join('')
-          : '<div class="empty-state">কোনো নোটিশ নেই।</div>';
-
-        renderTable('#tab-routine table', [
-          { key: 'day', label: 'দিন' },
-          { key: 'time', label: 'সময়' },
-          { key: 'subject', label: 'বিষয়' },
-          { key: 'teacher', label: 'শিক্ষক' },
-          { key: 'room', label: 'কক্ষ' }
-        ], routine);
-
-        renderTable('#attendance-table', [
-          { key: 'date', label: 'তারিখ' },
-          { key: 'subject', label: 'বিষয়' },
-          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'উপস্থিত' ? 'success' : 'error'}">${escapeHtml(row.status)}</span>` }
-        ], attendance);
-
-        renderTable('#result-table', [
-          { key: 'exam', label: 'পরীক্ষা' },
-          { key: 'subject', label: 'বিষয়' },
-          { key: 'marks', label: 'নম্বর' },
-          { key: 'grade', label: 'গ্রেড', render: (row) => `<span class="badge accent">${escapeHtml(row.grade)}</span>` }
-        ], results);
-
-        document.getElementById('fee-list').innerHTML = fees.length
-          ? fees.map((fee) => `
-            <div class="list-item">
-              <div class="li-main">
-                <div class="li-title">${escapeHtml(fee.month)}</div>
-                <div class="li-sub">৳ ${escapeHtml(fee.amount)} · ${escapeHtml(fee.date)}</div>
-              </div>
-              <span class="badge ${fee.status === 'পরিশোধিত' ? 'success' : 'warning'}">${escapeHtml(fee.status)}</span>
-            </div>`).join('')
-          : '<div class="empty-state">কোনো বেতন তথ্য নেই।</div>';
-
-        const settings = db.settings.get();
-        document.getElementById('profile-list').innerHTML = [
-          ['নাম', session.name],
-          ['স্টুডেন্ট আইডি', session.username],
-          ['স্কুল / কলেজ', me?.school || '—'],
-          ['শ্রেণি', me ? `${me.className} · রোল ${me.roll}` : (session.detail || '—')],
-          ['প্রতিষ্ঠান', settings.orgName],
-          ['লগিন সময়', new Date(session.loginTime).toLocaleString('bn-BD')],
-          ['ডেটা সোর্স', session.provider === 'firebase' ? 'Firebase' : 'এই ডিভাইস (লোকাল)']
-        ].map(([label, value]) => `
-          <div class="list-item">
-            <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
-          </div>`).join('');
-
-        renderStudentSuggestions('#student-suggestion-list', me?.className);
-        mountExamTaker({
-          listSelector: '#student-exam-list',
-          student: { id: me?.id || session.username, name: session.name, className: me?.className }
-        });
-
-        document.getElementById('profile-logout').addEventListener('click', () => signOut({ redirect: true }));
-        showToast(`স্বাগতম, ${session.name}!`, 'success');
-      }
+      import { initStudentHome } from './js/student-home.js';
+      initStudentHome();
     </script>
   </body>
 </html>

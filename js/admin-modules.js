@@ -24,6 +24,8 @@ export function mountExtraAdmin(session) {
   mountMaterials(session);
   mountAssignments(session);
   mountRoutine(session);
+  mountTips(session);
+  mountBanners(session);
   mountQuestionBank(session);
   mountResults(session);
   mountNotifications(session);
@@ -186,6 +188,51 @@ function mountRoutine(session) {
       { name: 'teacher', label: 'শিক্ষক' },
       { name: 'room', label: 'কক্ষ' }
     ]
+  });
+}
+
+/* ---------------- Teacher tips & banners (student home feed) ---------------- */
+function mountTips(session) {
+  mountCrud({
+    container: 'tips-crud', collection: 'tips', keyField: 'id', singular: '\u099F\u09BF\u09AA', idPrefix: 'tip',
+    searchKeys: ['text'], session,
+    columns: [
+      { key: 'text', label: '\u099F\u09BF\u09AA' },
+      { key: 'active', label: '\u0985\u09AC\u09B8\u09CD\u09A5\u09BE', render: (r) => `<span class="badge ${r.active ? 'success' : 'warning'}">${r.active ? '\u09A8\u09BE\u09B0\u09C0\u09AD' : '\u0985\u09A8\u09BF\u09B7\u09CD\u0995\u09CD\u09B0\u09BF\u09AF\u09BC'}</span>` },
+      { key: 'date', label: '\u09A4\u09BE\u09B0\u09BF\u0996' }
+    ],
+    fields: [
+      { name: 'text', label: '\u099F\u09BF\u09AA', type: 'textarea', required: true },
+      { name: 'active', label: '\u09A8\u09BE\u09B0\u09C0\u09AD', type: 'select', options: ['yes', 'no'] }
+    ],
+    validate: (rec) => {
+      rec.active = rec.active === 'yes' || rec.active === true;
+      rec.date = todayBn(); rec.by = session.name;
+      return rec.text ? null : '\u099F\u09BF\u09AA \u09B2\u09BF\u0996\u09C1\u09A8\u0964';
+    }
+  });
+}
+
+function mountBanners(session) {
+  mountCrud({
+    container: 'banners-crud', collection: 'banners', keyField: 'id', singular: '\u09AC\u09CD\u09AF\u09BE\u09A8\u09BE\u09B0', idPrefix: 'ban',
+    searchKeys: ['title', 'desc'], session,
+    columns: [
+      { key: 'title', label: '\u09B6\u09BF\u09B0\u09CB\u09A8\u09BE\u09AE' },
+      { key: 'cta', label: '\u09AC\u09BE\u099F\u09A8' },
+      { key: 'active', label: '\u0985\u09AC\u09B8\u09CD\u09A5\u09BE', render: (r) => `<span class="badge ${r.active ? 'success' : 'warning'}">${r.active ? '\u09A8\u09BE\u09B0\u09C0\u09AD' : '\u0985\u09A8\u09BF\u09B7\u09CD\u0995\u09CD\u09B0\u09BF\u09AF\u09BC'}</span>` }
+    ],
+    fields: [
+      { name: 'title', label: '\u09B6\u09BF\u09B0\u09CB\u09A8\u09BE\u09AE', required: true },
+      { name: 'desc', label: '\u09AC\u09BF\u09AC\u09B0\u09A3', type: 'textarea' },
+      { name: 'cta', label: '\u09AC\u09BE\u099F\u09A8 \u099F\u09C7\u0995\u09B8\u099F' },
+      { name: 'active', label: '\u09A8\u09BE\u09B0\u09C0\u09AD', type: 'select', options: ['yes', 'no'] }
+    ],
+    validate: (rec) => {
+      rec.active = rec.active === 'yes' || rec.active === true;
+      rec.date = todayBn(); rec.by = session.name;
+      return rec.title ? null : '\u09B6\u09BF\u09B0\u09CB\u09A8\u09BE\u09AE \u09B2\u09BF\u0996\u09C1\u09A8\u0964';
+    }
   });
 }
 

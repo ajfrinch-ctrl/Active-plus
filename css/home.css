@@ -1,0 +1,185 @@
+/* ==========================================================================
+   ACTIVE PLUS — Student Home (modern mobile-app feel)
+   Layered on top of style.css. Dark premium surfaces, big rounded cards,
+   feature grid, bottom navigation with safe-area support.
+   ========================================================================== */
+
+body.home-body {
+  background:
+    radial-gradient(900px 420px at 50% -12%, rgba(66, 153, 225, 0.16), transparent 60%),
+    var(--primary);
+  padding-bottom: calc(76px + var(--safe-bottom)); /* room for bottom nav */
+}
+
+.home {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(0.75rem + var(--safe-top)) var(--gutter) 1rem;
+}
+
+/* ---------- Header ---------- */
+.home-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.avatar {
+  width: 48px; height: 48px; flex: 0 0 auto;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  display: grid; place-items: center;
+  color: #fff; font-weight: 700; font-size: 1.125rem;
+  box-shadow: 0 6px 16px rgba(0,0,0,.25);
+}
+.home-header .who { flex: 1 1 auto; min-width: 0; }
+.home-header .greet { font-size: 0.75rem; color: var(--text-muted); }
+.home-header .name { font-size: 1.0625rem; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-header .meta { font-size: 0.75rem; color: var(--text-muted); }
+.bell {
+  position: relative;
+  width: var(--tap); height: var(--tap);
+  display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; font-size: 1.125rem; cursor: pointer;
+}
+.bell .badge-dot {
+  position: absolute; top: 6px; right: 6px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  background: var(--error); color: #fff; border-radius: 999px;
+  font-size: 0.625rem; font-weight: 700;
+  display: grid; place-items: center;
+}
+
+/* ---------- Cards ---------- */
+.hcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  margin-bottom: 0.875rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+.hcard .h-title {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.75rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 0.625rem; font-weight: 600;
+}
+.hcard .big { font-size: 1.25rem; font-weight: 700; }
+
+/* Hero progress */
+.hero { background: linear-gradient(135deg, rgba(66,153,225,.22), rgba(49,120,199,.12)); }
+.hero .row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.hero .pct { font-size: 1.75rem; font-weight: 800; }
+.streak-chip {
+  display: inline-flex; align-items: center; gap: .25rem;
+  background: rgba(214,158,46,.15); color: var(--warning);
+  border: 1px solid rgba(214,158,46,.4);
+  padding: .25rem .625rem; border-radius: 999px; font-size: .75rem; font-weight: 600;
+}
+.week { display: flex; gap: .375rem; margin-top: .75rem; }
+.week .d {
+  flex: 1; text-align: center; font-size: .6875rem; color: var(--text-muted);
+}
+.week .d .dot {
+  width: 100%; height: 6px; border-radius: 999px; margin-top: .25rem;
+  background: rgba(255,255,255,.12);
+}
+.week .d.on { color: var(--success); }
+.week .d.on .dot { background: var(--success); }
+
+/* ---------- Feature grid ---------- */
+.feature-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: .625rem;
+}
+@media (max-width: 420px) { .feature-grid { grid-template-columns: repeat(4, 1fr); gap: .5rem; } }
+.tile {
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: var(--radius); padding: .75rem .25rem;
+  display: flex; flex-direction: column; align-items: center; gap: .375rem;
+  min-height: 76px; cursor: pointer; color: var(--text-light);
+  font-size: .6875rem; text-align: center; position: relative;
+  transition: transform .12s ease, background .2s ease;
+}
+.tile:active { transform: scale(.97); }
+.tile .ico { font-size: 1.375rem; line-height: 1; }
+.tile .fb {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--accent); color: #fff; font-size: .5625rem; font-weight: 700;
+  border-radius: 999px; padding: 1px 6px;
+}
+.see-more { width: 100%; margin-top: .625rem; background: transparent; border: none; color: var(--accent); font-size: .8125rem; cursor: pointer; min-height: 44px; }
+
+/* ---------- Info rows ---------- */
+.info-row { display: flex; justify-content: space-between; gap: .75rem; font-size: .875rem; padding: .25rem 0; }
+.info-row .l { color: var(--text-muted); }
+.info-row .v { font-weight: 600; text-align: right; }
+
+/* ---------- Banner carousel ---------- */
+.banner {
+  border-radius: var(--radius-lg); padding: 1rem; color: #fff;
+  background: linear-gradient(135deg, #3182ce, #2b6cb0);
+  display: flex; flex-direction: column; gap: .375rem; margin-bottom: .875rem;
+}
+.banner h3 { font-size: 1rem; }
+.banner p { font-size: .8125rem; opacity: .9; }
+
+/* ---------- Quick horizontal ---------- */
+.quick-row { display: flex; gap: .625rem; overflow-x: auto; padding-bottom: .25rem; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.quick-row::-webkit-scrollbar { display: none; }
+.quick-row .tile { min-width: 84px; }
+
+/* ---------- Bottom navigation ---------- */
+.bottom-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+  display: flex; justify-content: center;
+  background: var(--primary-dark);
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bottom);
+}
+.bottom-nav .inner { display: flex; width: 100%; max-width: 640px; }
+.bottom-nav button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: .25rem;
+  padding: .5rem 0 .625rem; background: transparent; border: none;
+  color: var(--text-muted); font-size: .6875rem; cursor: pointer; min-height: 56px;
+}
+.bottom-nav button .ico { font-size: 1.25rem; line-height: 1; }
+.bottom-nav button[aria-current="true"] { color: var(--accent); }
+
+/* ---------- Skeleton loading ---------- */
+.skeleton { position: relative; overflow: hidden; background: rgba(255,255,255,.06); border-radius: var(--radius); }
+.skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer { from { transform: translateX(-100%);} to { transform: translateX(100%);} }
+.sk-line { height: 14px; margin: .375rem 0; }
+
+/* Performance mini bar chart */
+.mini-chart { display: flex; align-items: flex-end; gap: .375rem; height: 72px; margin-top: .5rem; }
+.mini-chart .bar { flex: 1; background: var(--accent); border-radius: 6px 6px 0 0; min-height: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+}
+
+/* Online / offline indicator (PWA) */
+.net-chip {
+  flex: none;
+  align-self: flex-start;
+  margin-top: .35rem;
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  font-size: .625rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+}
+.net-chip.off {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 40%, transparent);
+}

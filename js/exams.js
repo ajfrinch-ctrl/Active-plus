@@ -4,7 +4,7 @@
  * students take exams and read suggestions (mountExamTaker / suggestion list).
  */
 
-import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor } from './data.js';
+import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast } from './app.js';
 
 export function classOptionsHtml(selected = ALL_CLASSES, { allowAll = true } = {}) {
@@ -271,6 +271,7 @@ export function mountExamTaker({ listSelector, student }) {
       const answers = {};
       exam.questions.forEach((_, qi) => { answers[qi] = d.get(`q${qi}`); });
       const { score, total } = scoreExam(exam, answers);
+      recordStudyActivity('mcq', exam.questions.length); // feeds streak + achievements
       db.examResults.add({
         id: newId('res'), examId, studentId: student.id, studentName: student.name,
         score, total, date: todayBn()
