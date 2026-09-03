@@ -93,31 +93,41 @@
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <script type="module">
-      import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, showToast } from './js/app.js';
+      import { initApp, renderTable, statGrid, escapeHtml, showToast } from './js/app.js';
       import { signOut } from './js/auth.js';
+      import { db } from './js/data.js';
 
       const session = initApp({ roles: ['student'] });
       if (session) {
-        const present = DEMO_DATA.attendance.filter((row) => row.status === 'উপস্থিত').length;
-        const rate = Math.round((present / DEMO_DATA.attendance.length) * 100);
-        const due = DEMO_DATA.fees.filter((row) => row.status === 'বকেয়া').length;
-        const avg = Math.round(DEMO_DATA.results.reduce((sum, row) => sum + row.marks, 0) / DEMO_DATA.results.length);
+        const routine = db.routine.list();
+        const attendance = db.attendance.list();
+        const results = db.results.list();
+        const fees = db.fees.list();
+        const notices = db.notices.list();
+        const me = db.students.find(session.username) || null;
+
+        const present = attendance.filter((row) => row.status === 'উপস্থিত').length;
+        const rate = attendance.length ? Math.round((present / attendance.length) * 100) : 0;
+        const due = fees.filter((row) => row.status === 'বকেয়া').length;
+        const avg = results.length ? Math.round(results.reduce((sum, row) => sum + Number(row.marks), 0) / results.length) : 0;
 
         statGrid('#student-stats', [
-          { label: 'উপস্থিতি', value: `${rate}%`, tone: 'success', note: `${present}/${DEMO_DATA.attendance.length} দিন` },
+          { label: 'উপস্থিতি', value: `${rate}%`, tone: 'success', note: `${present}/${attendance.length} দিন` },
           { label: 'গড় নম্বর', value: avg, tone: 'accent', note: 'প্রথম সাময়িক' },
           { label: 'বকেয়া বেতন', value: due ? `${due} মাস` : 'নেই', tone: due ? 'warning' : 'success' },
-          { label: 'ক্লাস', value: DEMO_DATA.routine.length, note: 'সাপ্তাহিক' }
+          { label: 'ক্লাস', value: routine.length, note: 'সাপ্তাহিক' }
         ]);
 
-        document.getElementById('notice-list').innerHTML = DEMO_DATA.notices.map((notice) => `
-          <div class="list-item">
-            <div class="li-main">
-              <div class="li-title">${escapeHtml(notice.title)}</div>
-              <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
-            </div>
-            <span class="badge accent">নতুন</span>
-          </div>`).join('');
+        document.getElementById('notice-list').innerHTML = notices.length
+          ? notices.map((notice) => `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(notice.title)}</div>
+                <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+              </div>
+              <span class="badge accent">নোটিশ</span>
+            </div>`).join('')
+          : '<div class="empty-state">কোনো নোটিশ নেই।</div>';
 
         renderTable('#tab-routine table', [
           { key: 'day', label: 'দিন' },
@@ -125,35 +135,39 @@
           { key: 'subject', label: 'বিষয়' },
           { key: 'teacher', label: 'শিক্ষক' },
           { key: 'room', label: 'কক্ষ' }
-        ], DEMO_DATA.routine);
+        ], routine);
 
         renderTable('#attendance-table', [
           { key: 'date', label: 'তারিখ' },
           { key: 'subject', label: 'বিষয়' },
           { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'উপস্থিত' ? 'success' : 'error'}">${escapeHtml(row.status)}</span>` }
-        ], DEMO_DATA.attendance);
+        ], attendance);
 
         renderTable('#result-table', [
           { key: 'exam', label: 'পরীক্ষা' },
           { key: 'subject', label: 'বিষয়' },
           { key: 'marks', label: 'নম্বর' },
           { key: 'grade', label: 'গ্রেড', render: (row) => `<span class="badge accent">${escapeHtml(row.grade)}</span>` }
-        ], DEMO_DATA.results);
+        ], results);
 
-        document.getElementById('fee-list').innerHTML = DEMO_DATA.fees.map((fee) => `
-          <div class="list-item">
-            <div class="li-main">
-              <div class="li-title">${escapeHtml(fee.month)}</div>
-              <div class="li-sub">৳ ${escapeHtml(fee.amount)} · ${escapeHtml(fee.date)}</div>
-            </div>
-            <span class="badge ${fee.status === 'পরিশোধিত' ? 'success' : 'warning'}">${escapeHtml(fee.status)}</span>
-          </div>`).join('');
+        document.getElementById('fee-list').innerHTML = fees.length
+          ? fees.map((fee) => `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(fee.month)}</div>
+                <div class="li-sub">৳ ${escapeHtml(fee.amount)} · ${escapeHtml(fee.date)}</div>
+              </div>
+              <span class="badge ${fee.status === 'পরিশোধিত' ? 'success' : 'warning'}">${escapeHtml(fee.status)}</span>
+            </div>`).join('')
+          : '<div class="empty-state">কোনো বেতন তথ্য নেই।</div>';
 
+        const settings = db.settings.get();
         document.getElementById('profile-list').innerHTML = [
           ['নাম', session.name],
           ['স্টুডেন্ট আইডি', session.username],
-          ['ভূমিকা', 'শিক্ষার্থী'],
-          ['শ্রেণি', session.detail || '—'],
+          ['স্কুল / কলেজ', me?.school || '—'],
+          ['শ্রেণি', me ? `${me.className} · রোল ${me.roll}` : (session.detail || '—')],
+          ['প্রতিষ্ঠান', settings.orgName],
           ['লগিন সময়', new Date(session.loginTime).toLocaleString('bn-BD')],
           ['ডেটা সোর্স', session.provider === 'firebase' ? 'Firebase' : 'এই ডিভাইস (লোকাল)']
         ].map(([label, value]) => `

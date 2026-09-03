@@ -25,6 +25,7 @@ import {
   addActivityLog,
   showToast
 } from './firebase.js';
+import { storeGet, storeSet, storeRemove, readJSON, writeJSON } from './store.js';
 
 export const ROLES = ['student', 'teacher', 'admin'];
 
@@ -72,40 +73,6 @@ export class AuthError extends Error {
     this.name = 'AuthError';
     this.code = code;
   }
-}
-
-/* ------------------------------------------------------------------ */
-/* Layered storage: localStorage first, in-memory fallback             */
-/* ------------------------------------------------------------------ */
-const memoryStore = new Map();
-
-function storeGet(key) {
-  try {
-    const value = window.localStorage.getItem(key);
-    if (value !== null) return value;
-  } catch (e) { /* storage blocked — fall through to memory */ }
-  return memoryStore.has(key) ? memoryStore.get(key) : null;
-}
-
-function storeSet(key, value) {
-  memoryStore.set(key, String(value));
-  try { window.localStorage.setItem(key, value); } catch (e) { /* blocked */ }
-}
-
-function storeRemove(key) {
-  memoryStore.delete(key);
-  try { window.localStorage.removeItem(key); } catch (e) { /* blocked */ }
-}
-
-function readJSON(key, fallback) {
-  const raw = storeGet(key);
-  if (raw === null) return fallback;
-  try { return JSON.parse(raw); } catch (e) { return fallback; }
-}
-
-function writeJSON(key, value) {
-  storeSet(key, JSON.stringify(value));
-  return true;
 }
 
 /* ------------------------------------------------------------------ */

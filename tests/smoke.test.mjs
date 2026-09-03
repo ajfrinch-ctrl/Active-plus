@@ -85,6 +85,7 @@ test('without a real config the app boots into local mode, never throwing', asyn
 
 test('local sign-in: valid, wrong password, and role mismatch', async () => {
   installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
   await import('../js/firebase.js');
   // Fresh module instance per scenario (mirrors a fresh browser page load).
   const auth = await import('../js/auth.js?suite=signin');
@@ -107,6 +108,7 @@ test('local sign-in: valid, wrong password, and role mismatch', async () => {
 test('requireRole guards: guest redirected, right role passes, wrong role bounced home', async () => {
   const storage = makeLocalStorage();
   installWindow(storage);
+  (await import('../js/store.js'))._clearMemoryStore();
   await import('../js/firebase.js');
   const auth = await import('../js/auth.js?suite=guard');
 

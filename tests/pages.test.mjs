@@ -57,7 +57,9 @@ test('module imports resolve to real exported names', () => {
   const localSources = {
     './js/firebase.js': read('js/firebase.js'),
     './js/auth.js': read('js/auth.js'),
-    './js/app.js': read('js/app.js')
+    './js/app.js': read('js/app.js'),
+    './js/data.js': read('js/data.js'),
+    './js/store.js': read('js/store.js')
   };
   for (const page of PAGES) {
     const html = read(page);

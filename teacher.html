@@ -47,7 +47,7 @@
         <section class="tab-panel" id="tab-batches" hidden>
           <h2 class="section-title">
             ব্যাচসমূহ
-            <button type="button" class="btn btn-small" id="open-batch-modal">নতুন ব্যাচ</button>
+            <button type="button" class="btn btn-small" id="open-batch-modal">+ নতুন ব্যাচ</button>
           </h2>
           <div class="table-wrap">
             <table class="table" id="batch-table">
@@ -69,7 +69,7 @@
 
         <section class="tab-panel" id="tab-attendance" hidden>
           <h2 class="section-title">উপস্থিতি</h2>
-          <div class="alert alert-info">শিক্ষার্থীর নামে ট্যাপ করে উপস্থিত/অনুপস্থিত নির্বাচন করুন।</div>
+          <div class="alert alert-info">শিক্ষার্থীর নামের পাশের বাটনে ট্যাপ করে উপস্থিত/অনুপস্থিত নির্বাচন করুন।</div>
           <div class="list" id="attendance-picker"></div>
         </section>
 
@@ -86,7 +86,7 @@
         <h2 id="batch-modal-title">নতুন ব্যাচ যোগ করুন</h2>
         <form id="batch-form">
           <div class="form-group">
-            <label for="batch-name">ব্যাচের নাম</label>
+            <label for="batch-name">ব্যাচের নাম *</label>
             <input class="form-input" id="batch-name" name="name" placeholder="যেমন: দশম (বিজ্ঞান)" required>
           </div>
           <div class="form-row">
@@ -107,53 +107,59 @@
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <script type="module">
-      import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast } from './js/app.js';
+      import { initApp, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast } from './js/app.js';
+      import { db } from './js/data.js';
 
       const session = initApp({ roles: ['teacher'] });
       if (session) {
-        const myBatches = DEMO_DATA.batches;
-        const totalStudents = myBatches.reduce((sum, batch) => sum + batch.students, 0);
+        const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 
-        statGrid('#teacher-stats', [
-          { label: 'ব্যাচ', value: myBatches.length, tone: 'accent' },
-          { label: 'শিক্ষার্থী', value: totalStudents },
-          { label: 'সাপ্তাহিক ক্লাস', value: DEMO_DATA.routine.length, tone: 'success' },
-          { label: 'আজকের ক্লাস', value: 2, note: 'রুটিন অনুযায়ী' }
-        ]);
-
-        document.getElementById('today-classes').innerHTML = DEMO_DATA.routine.slice(0, 2).map((slot) => `
-          <div class="list-item">
-            <div class="li-main">
-              <div class="li-title">${escapeHtml(slot.subject)}</div>
-              <div class="li-sub">${escapeHtml(slot.time)} · ${escapeHtml(slot.room)}</div>
-            </div>
-            <span class="badge accent">${escapeHtml(slot.day)}</span>
-          </div>`).join('');
+        const renderOverview = () => {
+          const batches = db.batches.list();
+          const routine = db.routine.list();
+          const totalStudents = batches.reduce((sum, batch) => sum + Number(batch.students || 0), 0);
+          statGrid('#teacher-stats', [
+            { label: 'ব্যাচ', value: bn(batches.length), tone: 'accent' },
+            { label: 'শিক্ষার্থী', value: bn(totalStudents) },
+            { label: 'সাপ্তাহিক ক্লাস', value: bn(routine.length), tone: 'success' },
+            { label: 'আজকের ক্লাস', value: bn(Math.min(2, routine.length)), note: 'রুটিন অনুযায়ী' }
+          ]);
+          document.getElementById('today-classes').innerHTML = routine.slice(0, 2).map((slot) => `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(slot.subject)}</div>
+                <div class="li-sub">${escapeHtml(slot.time)} · ${escapeHtml(slot.room)}</div>
+              </div>
+              <span class="badge accent">${escapeHtml(slot.day)}</span>
+            </div>`).join('') || '<div class="empty-state">রুটিন নেই।</div>';
+        };
 
         const renderBatches = () => renderTable('#batch-table', [
           { key: 'name', label: 'ব্যাচ' },
           { key: 'students', label: 'শিক্ষার্থী' },
           { key: 'teacher', label: 'দায়িত্বপ্রাপ্ত' },
           { key: 'time', label: 'সময়' }
-        ], myBatches);
-        renderBatches();
+        ], db.batches.list());
 
         renderTable('#routine-table', [
           { key: 'day', label: 'দিন' },
           { key: 'time', label: 'সময়' },
           { key: 'subject', label: 'বিষয়' },
           { key: 'room', label: 'কক্ষ' }
-        ], DEMO_DATA.routine);
+        ], db.routine.list());
 
         const picker = document.getElementById('attendance-picker');
-        picker.innerHTML = DEMO_DATA.students.map((student, index) => `
-          <div class="list-item">
-            <div class="li-main">
-              <div class="li-title">${escapeHtml(student.name)}</div>
-              <div class="li-sub">${escapeHtml(student.id)} · ${escapeHtml(student.className)} · রোল ${escapeHtml(student.roll)}</div>
-            </div>
-            <button type="button" class="btn btn-small btn-success" data-student="${index}" aria-pressed="true">উপস্থিত</button>
-          </div>`).join('');
+        const renderPicker = () => {
+          picker.innerHTML = db.students.list().map((student, index) => `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(student.name)}</div>
+                <div class="li-sub">${escapeHtml(student.id)} · ${escapeHtml(student.className)} · রোল ${escapeHtml(student.roll)}</div>
+              </div>
+              <button type="button" class="btn btn-small btn-success" data-student="${index}" aria-pressed="true">উপস্থিত</button>
+            </div>`).join('') || '<div class="empty-state">কোনো শিক্ষার্থী নেই।</div>';
+        };
+        renderPicker();
 
         picker.addEventListener('click', (event) => {
           const button = event.target.closest('button[data-student]');
@@ -163,23 +169,27 @@
           button.textContent = present ? 'উপস্থিত' : 'অনুপস্থিত';
           button.classList.toggle('btn-success', present);
           button.classList.toggle('btn-error', !present);
-          const student = DEMO_DATA.students[Number(button.dataset.student)];
-          showToast(`${student.name} — ${present ? 'উপস্থিত' : 'অনুপস্থিত'}`, present ? 'success' : 'warning');
+          const student = db.students.list()[Number(button.dataset.student)];
+          if (student) showToast(`${student.name} — ${present ? 'উপস্থিত' : 'অনুপস্থিত'}`, present ? 'success' : 'warning');
         });
 
         document.getElementById('open-batch-modal').addEventListener('click', () => openModal('batch-modal'));
         document.getElementById('batch-form').addEventListener('submit', (event) => {
           event.preventDefault();
           const data = new FormData(event.target);
-          myBatches.push({
-            name: String(data.get('name') || 'নতুন ব্যাচ'),
+          const name = String(data.get('name') || '').trim();
+          if (!name) { showToast('ব্যাচের নাম লিখুন।', 'error'); return; }
+          if (db.batches.find(name)) { showToast('এই নামে ব্যাচ আগে থেকেই আছে।', 'error'); return; }
+          db.batches.add({
+            name,
             time: String(data.get('time') || '—'),
             students: Number(data.get('students')) || 0,
             teacher: session.name
           });
-          renderBatches();
           event.target.reset();
           closeModal('batch-modal');
+          renderBatches();
+          renderOverview();
           showToast('ব্যাচ যোগ করা হয়েছে।', 'success');
         });
 
@@ -192,6 +202,9 @@
           <div class="list-item">
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
           </div>`).join('');
+
+        renderOverview();
+        renderBatches();
       }
     </script>
   </body>

@@ -46,8 +46,11 @@ function makeWindow({ pathname = '/index.html', hash = '' } = {}) {
 }
 
 test('login + redirect work even when localStorage is completely blocked', async () => {
+  const { _clearMemoryStore } = await import('../js/store.js');
+
   /* ---- Page load 1: the login page ---- */
   makeWindow({ pathname: '/index.html' });
+  _clearMemoryStore(); // a real browser starts each page load with a fresh realm
   const auth1 = await import('../js/auth.js?load=1');
   await import('../js/firebase.js');
 
@@ -60,6 +63,7 @@ test('login + redirect work even when localStorage is completely blocked', async
   /* ---- Page load 2: the dashboard after the redirect ---- */
   const hash = `#${target.split('#')[1]}`;
   const { redirects } = makeWindow({ pathname: '/student.html', hash });
+  _clearMemoryStore();
   const auth2 = await import('../js/auth.js?load=2');
 
   const adopted = auth2.requireRole(['student']);
@@ -71,6 +75,7 @@ test('login + redirect work even when localStorage is completely blocked', async
 
   /* ---- Tampered token must be rejected ---- */
   const { redirects: redirects2 } = makeWindow({ pathname: '/student.html', hash: '#s=AAAA.tampered' });
+  _clearMemoryStore();
   const auth3 = await import('../js/auth.js?load=3');
   assert.equal(auth3.requireRole(['student']), null);
   assert.match(redirects2.at(-1)[1], /index\.html\?next=student\.html/);

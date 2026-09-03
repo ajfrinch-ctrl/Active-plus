@@ -36,6 +36,7 @@
       </nav>
 
       <main class="app-main">
+        <!-- ======================= Dashboard ======================= -->
         <section class="tab-panel" id="tab-overview">
           <div class="stat-grid" id="admin-stats"></div>
           <div class="section card-grid">
@@ -51,10 +52,11 @@
           </div>
         </section>
 
+        <!-- ======================= Students ======================= -->
         <section class="tab-panel" id="tab-students" hidden>
           <h2 class="section-title">
-            শিক্ষার্থী তালিকা
-            <button type="button" class="btn btn-small" id="open-student-modal">নতুন শিক্ষার্থী</button>
+            শিক্ষার্থী তালিকা (<span id="student-count">০</span>)
+            <button type="button" class="btn btn-small" id="open-student-modal">+ নতুন ভর্তি</button>
           </h2>
           <div class="table-wrap">
             <table class="table" id="student-table">
@@ -64,8 +66,12 @@
           </div>
         </section>
 
+        <!-- ======================= Teachers ======================= -->
         <section class="tab-panel" id="tab-teachers" hidden>
-          <h2 class="section-title">শিক্ষক তালিকা</h2>
+          <h2 class="section-title">
+            শিক্ষক তালিকা
+            <button type="button" class="btn btn-small" id="open-teacher-modal">+ নতুন শিক্ষক</button>
+          </h2>
           <div class="table-wrap">
             <table class="table" id="teacher-table">
               <thead><tr></tr></thead>
@@ -74,56 +80,146 @@
           </div>
         </section>
 
+        <!-- ======================= Notices ======================= -->
         <section class="tab-panel" id="tab-notices" hidden>
-          <h2 class="section-title">নোটিশ বোর্ড</h2>
+          <h2 class="section-title">
+            নোটিশ বোর্ড
+            <button type="button" class="btn btn-small" id="open-notice-modal">+ নতুন নোটিশ</button>
+          </h2>
           <div class="list" id="notice-list"></div>
         </section>
 
+        <!-- ======================= Settings ======================= -->
         <section class="tab-panel" id="tab-settings" hidden>
-          <h2 class="section-title">সেটিংস</h2>
+          <h2 class="section-title">প্রতিষ্ঠান সেটিংস</h2>
+          <form id="settings-form" class="card">
+            <div class="form-group">
+              <label for="set-org">প্রতিষ্ঠানের নাম</label>
+              <input class="form-input" id="set-org" name="orgName" required>
+            </div>
+            <div class="form-group">
+              <label for="set-address">ঠিকানা</label>
+              <input class="form-input" id="set-address" name="address">
+            </div>
+            <div class="form-group">
+              <label for="set-fee">মাসিক ফি (৳)</label>
+              <input class="form-input" id="set-fee" name="monthlyFee" type="number" min="0">
+            </div>
+            <button type="submit" class="btn btn-block">সংরক্ষণ করুন</button>
+          </form>
+
+          <h2 class="section-title">সিস্টেম</h2>
           <div class="card">
-            <h3>সিস্টেম অবস্থা</h3>
             <div class="list" id="system-list"></div>
           </div>
           <div class="card">
             <h3>রেজিস্টার্ড অ্যাকাউন্ট</h3>
             <div class="list" id="account-list"></div>
           </div>
+          <div class="card">
+            <h3>ডেঞ্জার জোন</h3>
+            <p style="margin-bottom:.75rem">ডেমো ডেটা মুছে প্রথম অবস্থায় ফিরে যাবে।</p>
+            <button type="button" class="btn btn-error btn-block" id="reset-data">ডেটা রিসেট করুন</button>
+          </div>
         </section>
       </main>
     </div>
 
+    <!-- Student add/edit modal -->
     <div class="modal-overlay" id="student-modal" aria-hidden="true">
       <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="student-modal-title">
         <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
-        <h2 id="student-modal-title">নতুন শিক্ষার্থী যোগ করুন</h2>
+        <h2 id="student-modal-title">নতুন শিক্ষার্থী ভর্তি</h2>
         <form id="student-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="student-name">নাম</label>
-              <input class="form-input" id="student-name" name="name" required>
-            </div>
-            <div class="form-group">
-              <label for="student-phone">অভিভাবকের মোবাইল</label>
-              <input class="form-input" id="student-phone" name="phone" inputmode="tel">
-            </div>
+          <input type="hidden" id="student-edit-id" name="editId" value="">
+          <div class="form-group">
+            <label for="student-name">নাম *</label>
+            <input class="form-input" id="student-name" name="name" required>
+          </div>
+          <div class="form-group">
+            <label for="student-school">স্কুল / কলেজের নাম</label>
+            <input class="form-input" id="student-school" name="school" placeholder="যেমন: মিরপুর বেঙ্গল উচ্চ বিদ্যালয়">
           </div>
           <div class="form-row">
             <div class="form-group">
               <label for="student-class">শ্রেণি</label>
-              <select class="form-input form-select" id="student-class" name="className">
-                <option value="অষ্টম">অষ্টম</option>
-                <option value="নবম">নবম</option>
-                <option value="দশম">দশম</option>
-              </select>
+              <select class="form-input form-select" id="student-class" name="className"></select>
             </div>
             <div class="form-group">
-              <label for="student-roll">রোল</label>
-              <input class="form-input" id="student-roll" name="roll" type="number" min="1" value="1">
+              <label for="student-roll">রোল *</label>
+              <input class="form-input" id="student-roll" name="roll" type="number" min="1" value="1" required>
             </div>
           </div>
-          <p class="form-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।</p>
-          <button type="submit" class="btn btn-block">সংরক্ষণ করুন</button>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-phone">অভিভাবকের মোবাইল</label>
+              <input class="form-input" id="student-phone" name="phone" inputmode="tel" placeholder="০১XXXXXXXXX">
+            </div>
+            <div class="form-group">
+              <label for="student-status">অবস্থা</label>
+              <select class="form-input form-select" id="student-status" name="status">
+                <option value="সক্রিয়">সক্রিয়</option>
+                <option value="বকেয়া">বকেয়া</option>
+              </select>
+            </div>
+          </div>
+          <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।</p>
+          <button type="submit" class="btn btn-block" id="student-save">ভর্তি করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Teacher add/edit modal -->
+    <div class="modal-overlay" id="teacher-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="teacher-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="teacher-modal-title">নতুন শিক্ষক</h2>
+        <form id="teacher-form">
+          <input type="hidden" id="teacher-edit-name" name="editName" value="">
+          <div class="form-group">
+            <label for="teacher-name">নাম *</label>
+            <input class="form-input" id="teacher-name" name="name" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="teacher-subject">বিষয় *</label>
+              <input class="form-input" id="teacher-subject" name="subject" required>
+            </div>
+            <div class="form-group">
+              <label for="teacher-classes">ক্লাস / সপ্তাহ</label>
+              <input class="form-input" id="teacher-classes" name="classes" type="number" min="0" value="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="teacher-phone">মোবাইল</label>
+            <input class="form-input" id="teacher-phone" name="phone" inputmode="tel">
+          </div>
+          <button type="submit" class="btn btn-block" id="teacher-save">সংরক্ষণ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Notice add/edit modal -->
+    <div class="modal-overlay" id="notice-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="notice-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="notice-modal-title">নতুন নোটিশ</h2>
+        <form id="notice-form">
+          <input type="hidden" id="notice-edit-index" name="editIndex" value="">
+          <div class="form-group">
+            <label for="notice-title">শিরোনাম *</label>
+            <input class="form-input" id="notice-title" name="title" required>
+          </div>
+          <div class="form-group">
+            <label for="notice-audience">কাদের জন্য</label>
+            <select class="form-input form-select" id="notice-audience" name="audience">
+              <option>সবাই</option>
+              <option>শিক্ষার্থী</option>
+              <option>অভিভাবক</option>
+              <option>শিক্ষক</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-block" id="notice-save">প্রকাশ করুন</button>
         </form>
       </div>
     </div>
@@ -131,56 +227,305 @@
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <script type="module">
-      import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode } from './js/app.js';
+      import { initApp, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode } from './js/app.js';
       import { listUsers, seedUsers } from './js/auth.js';
+      import { db, CLASS_OPTIONS, CLASS_TO_NUMBER, todayBn, newNoticeId } from './js/data.js';
       import { generateStudentId } from './js/firebase.js';
 
       const session = initApp({ roles: ['admin'] });
-      if (session) {
-        const students = [...DEMO_DATA.students];
-        const teachers = DEMO_DATA.teachers;
-        const totalStudents = students.length + DEMO_DATA.batches.reduce((sum, batch) => sum + batch.students, 0);
-        const monthlyFee = 1200;
-        const collected = students.filter((student) => student.status === 'সক্রিয়').length * monthlyFee;
-        const expected = totalStudents * monthlyFee;
+      if (!session) throw new Error('guard redirect');
+
+      const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+
+      /* ------------------------------------------------------------ */
+      /* Dashboard                                                     */
+      /* ------------------------------------------------------------ */
+      const renderOverview = () => {
+        const students = db.students.list();
+        const teachers = db.teachers.list();
+        const batches = db.batches.list();
+        const settings = db.settings.get();
+        const batchStudents = batches.reduce((sum, b) => sum + Number(b.students || 0), 0);
+        const totalStudents = students.length + batchStudents;
+        const dueCount = students.filter((s) => s.status === 'বকেয়া').length;
+        const collected = (students.length - dueCount) * settings.monthlyFee;
+        const expected = totalStudents * settings.monthlyFee;
 
         statGrid('#admin-stats', [
-          { label: 'মোট শিক্ষার্থী', value: totalStudents, tone: 'accent' },
-          { label: 'শিক্ষক', value: teachers.length },
-          { label: 'ব্যাচ', value: DEMO_DATA.batches.length, tone: 'success' },
-          { label: 'বকেয়া', value: `${expected - collected > 0 ? '৳' + (expected - collected) : 'নেই'}`, tone: expected - collected > 0 ? 'warning' : 'success' }
+          { label: 'মোট শিক্ষার্থী', value: bn(totalStudents), tone: 'accent' },
+          { label: 'শিক্ষক', value: bn(teachers.length) },
+          { label: 'ব্যাচ', value: bn(batches.length), tone: 'success' },
+          { label: 'বকেয়া', value: dueCount ? `${bn(dueCount)} জন` : 'নেই', tone: dueCount ? 'warning' : 'success' }
         ]);
 
         document.getElementById('income-summary').textContent =
-          `সংগৃহীত ৳${collected.toLocaleString('bn-BD')} / প্রত্যাশিত ৳${expected.toLocaleString('bn-BD')}`;
-        document.getElementById('income-bar').style.width = `${Math.min(100, Math.round((collected / expected) * 100))}%`;
-        document.getElementById('latest-notice').textContent = DEMO_DATA.notices[0]?.title || '—';
+          `সংগৃহীত ৳${bn(collected.toLocaleString('en-US'))} / প্রত্যাশিত ৳${bn(expected.toLocaleString('en-US'))}`;
+        document.getElementById('income-bar').style.width = `${expected ? Math.min(100, Math.round((collected / expected) * 100)) : 0}%`;
+        document.getElementById('latest-notice').textContent = db.notices.list()[0]?.title || '—';
+        document.getElementById('student-count').textContent = bn(students.length);
+      };
 
-        const renderStudents = () => renderTable('#student-table', [
+      /* ------------------------------------------------------------ */
+      /* Students CRUD                                                 */
+      /* ------------------------------------------------------------ */
+      const renderStudents = () => {
+        renderTable('#student-table', [
           { key: 'id', label: 'আইডি' },
           { key: 'name', label: 'নাম' },
           { key: 'className', label: 'শ্রেণি' },
-          { key: 'roll', label: 'রোল' },
+          { key: 'school', label: 'স্কুল / কলেজ' },
           { key: 'phone', label: 'মোবাইল' },
-          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'সক্রিয়' ? 'success' : 'warning'}">${escapeHtml(row.status)}</span>` }
-        ], students);
-        renderStudents();
+          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'সক্রিয়' ? 'success' : 'warning'}">${escapeHtml(row.status)}</span>` },
+          { key: '_actions', label: 'অ্যাকশন', render: (row) => `
+            <span class="row-actions">
+              <button type="button" class="btn btn-small btn-secondary" data-edit-student="${escapeHtml(row.id)}">সম্পাদনা</button>
+              <button type="button" class="btn btn-small btn-error" data-delete-student="${escapeHtml(row.id)}">মুছুন</button>
+            </span>` }
+        ], db.students.list());
+        document.getElementById('student-count').textContent = bn(db.students.list().length);
+      };
 
+      const studentForm = document.getElementById('student-form');
+      const classSelect = document.getElementById('student-class');
+      classSelect.innerHTML = CLASS_OPTIONS.map((c) => `<option>${c}</option>`).join('');
+
+      const openStudentModal = (editId = null) => {
+        studentForm.reset();
+        document.getElementById('student-edit-id').value = '';
+        if (editId) {
+          const student = db.students.find(editId);
+          if (!student) return;
+          document.getElementById('student-modal-title').textContent = 'শিক্ষার্থী সম্পাদনা';
+          document.getElementById('student-save').textContent = 'আপডেট করুন';
+          document.getElementById('student-id-hint').textContent = `আইডি: ${student.id}`;
+          document.getElementById('student-edit-id').value = student.id;
+          studentForm.elements.name.value = student.name || '';
+          studentForm.elements.school.value = student.school || '';
+          studentForm.elements.className.value = student.className || 'নবম';
+          studentForm.elements.roll.value = parseInt(student.roll, 10) || 1;
+          studentForm.elements.phone.value = student.phone || '';
+          studentForm.elements.status.value = student.status || 'সক্রিয়';
+        } else {
+          document.getElementById('student-modal-title').textContent = 'নতুন শিক্ষার্থী ভর্তি';
+          document.getElementById('student-save').textContent = 'ভর্তি করুন';
+          document.getElementById('student-id-hint').textContent = 'স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।';
+        }
+        openModal('student-modal');
+      };
+
+      document.getElementById('open-student-modal').addEventListener('click', () => openStudentModal());
+
+      studentForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(studentForm);
+        const editId = String(data.get('editId') || '');
+        const className = String(data.get('className'));
+        const roll = Number(data.get('roll')) || 1;
+        const record = {
+          name: String(data.get('name') || '').trim(),
+          school: String(data.get('school') || '').trim(),
+          className,
+          roll: String(data.get('roll')),
+          phone: String(data.get('phone') || '—').trim(),
+          status: String(data.get('status'))
+        };
+        if (!record.name) { showToast('নাম লিখুন।', 'error'); return; }
+
+        if (editId) {
+          db.students.update(editId, record);
+          showToast('শিক্ষার্থীর তথ্য আপডেট হয়েছে।', 'success');
+        } else {
+          const id = generateStudentId(new Date().getFullYear(), CLASS_TO_NUMBER[className] || 9, roll);
+          if (db.students.find(id)) { showToast('এই আইডি আগে থেকেই আছে — রোল বদলান।', 'error'); return; }
+          db.students.add({ id, ...record });
+          showToast(`ভর্তি সম্পন্ন — আইডি ${id}`, 'success');
+        }
+        closeModal('student-modal');
+        renderStudents();
+        renderOverview();
+      });
+
+      document.querySelector('#tab-students').addEventListener('click', (event) => {
+        const editBtn = event.target.closest('[data-edit-student]');
+        const delBtn = event.target.closest('[data-delete-student]');
+        if (editBtn) { openStudentModal(editBtn.dataset.editStudent); return; }
+        if (delBtn) {
+          const id = delBtn.dataset.deleteStudent;
+          const student = db.students.find(id);
+          if (window.confirm(`"${student?.name}" কে মুছে ফেলবেন?`)) {
+            db.students.remove(id);
+            showToast('শিক্ষার্থী মুছে ফেলা হয়েছে।', 'warning');
+            renderStudents();
+            renderOverview();
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Teachers CRUD                                                 */
+      /* ------------------------------------------------------------ */
+      const renderTeachers = () => {
         renderTable('#teacher-table', [
           { key: 'name', label: 'নাম' },
           { key: 'subject', label: 'বিষয়' },
           { key: 'phone', label: 'মোবাইল' },
-          { key: 'classes', label: 'ক্লাস/সপ্তাহ' }
-        ], teachers);
+          { key: 'classes', label: 'ক্লাস/সপ্তাহ' },
+          { key: '_actions', label: 'অ্যাকশন', render: (row) => `
+            <span class="row-actions">
+              <button type="button" class="btn btn-small btn-secondary" data-edit-teacher="${escapeHtml(row.name)}">সম্পাদনা</button>
+              <button type="button" class="btn btn-small btn-error" data-delete-teacher="${escapeHtml(row.name)}">মুছুন</button>
+            </span>` }
+        ], db.teachers.list());
+      };
 
-        document.getElementById('notice-list').innerHTML = DEMO_DATA.notices.map((notice) => `
-          <div class="list-item">
-            <div class="li-main">
-              <div class="li-title">${escapeHtml(notice.title)}</div>
-              <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
-            </div>
-          </div>`).join('');
+      const teacherForm = document.getElementById('teacher-form');
+      const openTeacherModal = (editName = null) => {
+        teacherForm.reset();
+        document.getElementById('teacher-edit-name').value = '';
+        if (editName) {
+          const teacher = db.teachers.find(editName);
+          if (!teacher) return;
+          document.getElementById('teacher-modal-title').textContent = 'শিক্ষক সম্পাদনা';
+          document.getElementById('teacher-save').textContent = 'আপডেট করুন';
+          document.getElementById('teacher-edit-name').value = teacher.name;
+          teacherForm.elements.name.value = teacher.name || '';
+          teacherForm.elements.subject.value = teacher.subject || '';
+          teacherForm.elements.classes.value = Number(teacher.classes) || 0;
+          teacherForm.elements.phone.value = teacher.phone || '';
+        } else {
+          document.getElementById('teacher-modal-title').textContent = 'নতুন শিক্ষক';
+          document.getElementById('teacher-save').textContent = 'সংরক্ষণ করুন';
+        }
+        openModal('teacher-modal');
+      };
 
+      document.getElementById('open-teacher-modal').addEventListener('click', () => openTeacherModal());
+
+      teacherForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(teacherForm);
+        const editName = String(data.get('editName') || '');
+        const record = {
+          name: String(data.get('name') || '').trim(),
+          subject: String(data.get('subject') || '').trim(),
+          classes: Number(data.get('classes')) || 0,
+          phone: String(data.get('phone') || '—').trim()
+        };
+        if (!record.name || !record.subject) { showToast('নাম ও বিষয় দুটোই দিন।', 'error'); return; }
+        if (editName && editName !== record.name && db.teachers.find(record.name)) {
+          showToast('এই নামে আরেকজন শিক্ষক আছেন।', 'error'); return;
+        }
+        if (editName) {
+          db.teachers.remove(editName);
+          db.teachers.add(record);
+          showToast('শিক্ষকের তথ্য আপডেট হয়েছে।', 'success');
+        } else {
+          if (db.teachers.find(record.name)) { showToast('এই নামে শিক্ষক আগে থেকেই আছেন।', 'error'); return; }
+          db.teachers.add(record);
+          showToast('শিক্ষক যোগ করা হয়েছে।', 'success');
+        }
+        closeModal('teacher-modal');
+        renderTeachers();
+        renderOverview();
+      });
+
+      document.querySelector('#tab-teachers').addEventListener('click', (event) => {
+        const editBtn = event.target.closest('[data-edit-teacher]');
+        const delBtn = event.target.closest('[data-delete-teacher]');
+        if (editBtn) { openTeacherModal(editBtn.dataset.editTeacher); return; }
+        if (delBtn) {
+          const name = delBtn.dataset.deleteTeacher;
+          if (window.confirm(`"${name}" কে মুছে ফেলবেন?`)) {
+            db.teachers.remove(name);
+            showToast('শিক্ষক মুছে ফেলা হয়েছে।', 'warning');
+            renderTeachers();
+            renderOverview();
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Notices CRUD                                                  */
+      /* ------------------------------------------------------------ */
+      const renderNotices = () => {
+        const list = db.notices.list();
+        document.getElementById('notice-list').innerHTML = list.length
+          ? list.map((notice) => `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(notice.title)}</div>
+                <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+              </div>
+              <span class="row-actions">
+                <button type="button" class="btn btn-small btn-secondary" data-edit-notice="${escapeHtml(notice.id)}">সম্পাদনা</button>
+                <button type="button" class="btn btn-small btn-error" data-delete-notice="${escapeHtml(notice.id)}">মুছুন</button>
+              </span>
+            </div>`).join('')
+          : '<div class="empty-state">কোনো নোটিশ নেই।</div>';
+      };
+
+      const noticeForm = document.getElementById('notice-form');
+      const openNoticeModal = (editId = null) => {
+        noticeForm.reset();
+        document.getElementById('notice-edit-index').value = '';
+        if (editId) {
+          const notice = db.notices.find(editId);
+          if (!notice) return;
+          document.getElementById('notice-modal-title').textContent = 'নোটিশ সম্পাদনা';
+          document.getElementById('notice-save').textContent = 'আপডেট করুন';
+          document.getElementById('notice-edit-index').value = notice.id;
+          noticeForm.elements.title.value = notice.title || '';
+          noticeForm.elements.audience.value = notice.audience || 'সবাই';
+        } else {
+          document.getElementById('notice-modal-title').textContent = 'নতুন নোটিশ';
+          document.getElementById('notice-save').textContent = 'প্রকাশ করুন';
+        }
+        openModal('notice-modal');
+      };
+
+      document.getElementById('open-notice-modal').addEventListener('click', () => openNoticeModal());
+
+      noticeForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(noticeForm);
+        const editId = String(data.get('editIndex') || '');
+        const title = String(data.get('title') || '').trim();
+        if (!title) { showToast('শিরোনাম লিখুন।', 'error'); return; }
+        if (editId) {
+          db.notices.update(editId, { title, audience: String(data.get('audience')) });
+          showToast('নোটিশ আপডেট হয়েছে।', 'success');
+        } else {
+          db.notices.add({ id: newNoticeId(), title, audience: String(data.get('audience')), date: todayBn() });
+          showToast('নোটিশ প্রকাশিত হয়েছে।', 'success');
+        }
+        closeModal('notice-modal');
+        renderNotices();
+        renderOverview();
+      });
+
+      document.querySelector('#tab-notices').addEventListener('click', (event) => {
+        const editBtn = event.target.closest('[data-edit-notice]');
+        const delBtn = event.target.closest('[data-delete-notice]');
+        if (editBtn) { openNoticeModal(editBtn.dataset.editNotice); return; }
+        if (delBtn) {
+          const notice = db.notices.find(delBtn.dataset.deleteNotice);
+          if (notice && window.confirm(`"${notice.title}" মুছে ফেলবেন?`)) {
+            db.notices.remove(notice.id);
+            showToast('নোটিশ মুছে ফেলা হয়েছে।', 'warning');
+            renderNotices();
+            renderOverview();
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Settings                                                      */
+      /* ------------------------------------------------------------ */
+      const renderSettings = () => {
+        const settings = db.settings.get();
+        document.getElementById('set-org').value = settings.orgName || '';
+        document.getElementById('set-address').value = settings.address || '';
+        document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
         document.getElementById('system-list').innerHTML = [
           ['ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)'],
           ['লগিন করা', session.name],
@@ -189,37 +534,48 @@
           <div class="list-item">
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
           </div>`).join('');
+      };
 
-        await seedUsers();
-        document.getElementById('account-list').innerHTML = listUsers().map((user) => `
-          <div class="list-item">
-            <div class="li-main">
-              <div class="li-title">${escapeHtml(user.name)}</div>
-              <div class="li-sub">${escapeHtml(user.username)}</div>
-            </div>
-            <span class="badge accent">${escapeHtml(user.role)}</span>
-          </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
-
-        document.getElementById('open-student-modal').addEventListener('click', () => openModal('student-modal'));
-        document.getElementById('student-form').addEventListener('submit', (event) => {
-          event.preventDefault();
-          const data = new FormData(event.target);
-          const year = new Date().getFullYear();
-          const classNumber = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10 }[String(data.get('className'))] || 9;
-          students.push({
-            id: generateStudentId(year, classNumber, Number(data.get('roll')) || 1),
-            name: String(data.get('name') || 'নতুন শিক্ষার্থী'),
-            className: String(data.get('className')),
-            roll: String(data.get('roll') || '১'),
-            phone: String(data.get('phone') || '—'),
-            status: 'সক্রিয়'
-          });
-          renderStudents();
-          event.target.reset();
-          closeModal('student-modal');
-          showToast('শিক্ষার্থী যোগ করা হয়েছে।', 'success');
+      document.getElementById('settings-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(event.target);
+        db.settings.update({
+          orgName: String(data.get('orgName') || '').trim(),
+          address: String(data.get('address') || '').trim(),
+          monthlyFee: Number(data.get('monthlyFee')) || 0
         });
-      }
+        showToast('সেটিংস সংরক্ষিত হয়েছে।', 'success');
+        renderOverview();
+      });
+
+      document.getElementById('reset-data').addEventListener('click', () => {
+        if (window.confirm('সব ডেটা মুছে ডেমো অবস্থায় ফিরে যাবেন?')) {
+          db.reset();
+          renderAll();
+          showToast('ডেটা রিসেট হয়েছে।', 'warning');
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      const renderAll = () => {
+        renderOverview();
+        renderStudents();
+        renderTeachers();
+        renderNotices();
+        renderSettings();
+      };
+
+      await seedUsers();
+      document.getElementById('account-list').innerHTML = listUsers().map((user) => `
+        <div class="list-item">
+          <div class="li-main">
+            <div class="li-title">${escapeHtml(user.name)}</div>
+            <div class="li-sub">${escapeHtml(user.username)}</div>
+          </div>
+          <span class="badge accent">${escapeHtml(user.role)}</span>
+        </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
+
+      renderAll();
     </script>
   </body>
 </html>
