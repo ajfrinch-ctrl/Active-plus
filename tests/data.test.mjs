@@ -113,7 +113,7 @@ test('class filtering + class-targeted notices reach the right students', async 
   assert.equal(studentsOfClass(ALL_CLASSES).length, db.students.list().length);
 
   // A class-targeted notice reaches that class only (+ everyone notices).
-  db.notices.add({ id: 'n-ten', title: 'দশম ক্লাস নোটিশ', audience: 'শিক্ষার্থী', className: 'দশম', date: '২০৬-০৯-০৩' });
+  db.notices.add({ id: 'n-ten', title: 'দশম ক্লাস নোটিশ', audience: 'শিক্ষার্থী', className: 'দশম', date: '২০২৬-০৯-০৩' });
   const tenth = studentsOfClass('দশম')[0];
   const ninthSt = studentsOfClass('নবম')[0];
   const tenNotices = noticesFor(tenth).map((n) => n.id);
