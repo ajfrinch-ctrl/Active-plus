@@ -424,3 +424,30 @@ test('home follows the priority order: progress first, announcement after result
   assert.ok(announce < fee, 'announcement before fee status');
   assert.ok(fee < quick, 'fee before quick features');
 });
+
+test('the student home registers the service worker (PWA install/offline)', async () => {
+  const dom = new JSDOM(read('student.html'), { url: 'http://localhost:8080/student.html', pretendToBeVisual: true });
+  dom.window.scrollTo = () => {};
+  dom.window.HTMLElement.prototype.scrollIntoView = () => {};
+  const registered = [];
+  Object.defineProperty(dom.window.navigator, 'serviceWorker', {
+    configurable: true,
+    value: { register: (url) => { registered.push(url); return Promise.resolve({}); } }
+  });
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.localStorage = dom.window.localStorage;
+  Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true, writable: true });
+  globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
+  globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+
+  (await import('../js/store.js'))._clearMemoryStore();
+  const auth = await import('../js/auth.js');
+  await auth.seedUsers({ force: true });
+  await auth.signIn('2026-09-001', 'Student@123', 'student');
+  const mod = await import('../js/student-home.js');
+  mod.initStudentHome();
+  await new Promise((r) => setTimeout(r, 350));
+  dom.window.dispatchEvent(new dom.window.Event('load'));
+  assert.ok(registered.includes('service-worker.js'), 'service worker registered from the home page');
+});

@@ -7,13 +7,19 @@ import { requireRole, currentSession, logoutButton, homeFor, ROLES } from './aut
 import { showToast, getAuthMode } from './firebase.js';
 
 export { showToast, getAuthMode, ROLES, homeFor };
+/**
+ * Registers the PWA service worker. Safe to call on every page: module scripts
+ * run after parsing, so 'load' may already have fired — registering only inside
+ * a load listener silently skipped deep-linked pages like student.html.
+ */
 export function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return Promise.resolve(null);
-  return window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js').catch((error) => {
-      console.warn('[Active Plus] Service worker registration failed:', error.message);
-    });
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return Promise.resolve(null);
+  const register = () => navigator.serviceWorker.register('service-worker.js').catch((error) => {
+    console.warn('[Active Plus] Service worker registration failed:', error.message);
   });
+  if (typeof document !== 'undefined' && document.readyState === 'complete') return register();
+  window.addEventListener('load', register, { once: true });
+  return Promise.resolve(null);
 }
 
 /** Fills the sticky header with the signed-in user's details. */
@@ -170,6 +176,7 @@ export function initApp({ roles = [], tabs = true } = {}) {
   mountHeader(session);
   logoutButton('#logout-btn');
   initModals();
+  registerServiceWorker(); // every portal is installable/offline-capable
   if (tabs) initTabs();
   return session;
 }
