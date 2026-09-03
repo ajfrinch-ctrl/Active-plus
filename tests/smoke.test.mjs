@@ -86,7 +86,8 @@ test('without a real config the app boots into local mode, never throwing', asyn
 test('local sign-in: valid, wrong password, and role mismatch', async () => {
   installWindow(makeLocalStorage());
   await import('../js/firebase.js');
-  const auth = await import('../js/auth.js');
+  // Fresh module instance per scenario (mirrors a fresh browser page load).
+  const auth = await import('../js/auth.js?suite=signin');
 
   const session = await auth.signIn('2026-09-001', 'Student@123', 'student');
   assert.equal(session.role, 'student');
@@ -107,7 +108,7 @@ test('requireRole guards: guest redirected, right role passes, wrong role bounce
   const storage = makeLocalStorage();
   installWindow(storage);
   await import('../js/firebase.js');
-  const auth = await import('../js/auth.js');
+  const auth = await import('../js/auth.js?suite=guard');
 
   // Guest on student.html -> redirected to the login page with ?next.
   redirects.length = 0;
@@ -120,10 +121,10 @@ test('requireRole guards: guest redirected, right role passes, wrong role bounce
   const session = auth.requireRole(['student']);
   assert.equal(session.role, 'student');
 
-  // A student on admin.html is sent to their own home.
+  // A student on admin.html is sent to their own home (with session handoff).
   redirects.length = 0;
   assert.equal(auth.requireRole(['admin']), null);
-  assert.equal(redirects.at(-1)[1], 'student.html');
+  assert.match(redirects.at(-1)[1], /^student\.html(#s=.*)?$/);
 });
 
 /* ------------------------------------------------------------------ */

@@ -132,7 +132,7 @@
 
     <script type="module">
       import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode } from './js/app.js';
-      import { listUsers } from './js/auth.js';
+      import { listUsers, seedUsers } from './js/auth.js';
       import { generateStudentId } from './js/firebase.js';
 
       const session = initApp({ roles: ['admin'] });
@@ -190,6 +190,7 @@
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
           </div>`).join('');
 
+        await seedUsers();
         document.getElementById('account-list').innerHTML = listUsers().map((user) => `
           <div class="list-item">
             <div class="li-main">

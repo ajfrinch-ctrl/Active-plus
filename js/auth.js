@@ -7,6 +7,12 @@
  *                      usable on GitHub Pages / offline with no backend.
  *
  * The login page calls `signIn()`; the dashboards call `requireRole()`.
+ *
+ * Storage resilience: some embedded/preview contexts (sandboxed iframes,
+ * strict private browsing) block `localStorage` entirely. Every read/write
+ * here therefore falls back to an in-memory store, and the signed-in session
+ * is additionally handed to the next page through a URL fragment token so a
+ * redirect never loses the login.
  */
 
 import {
@@ -58,6 +64,7 @@ export const DEMO_ACCOUNTS = [
 
 const USERS_KEY = 'activeplus_users';
 const SESSION_KEY = 'activeplus_session';
+const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export class AuthError extends Error {
   constructor(code, message) {
@@ -68,28 +75,37 @@ export class AuthError extends Error {
 }
 
 /* ------------------------------------------------------------------ */
-/* Storage helpers                                                     */
+/* Layered storage: localStorage first, in-memory fallback             */
 /* ------------------------------------------------------------------ */
-function readJSON(key, fallback) {
+const memoryStore = new Map();
+
+function storeGet(key) {
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    return fallback;
-  }
+    const value = window.localStorage.getItem(key);
+    if (value !== null) return value;
+  } catch (e) { /* storage blocked — fall through to memory */ }
+  return memoryStore.has(key) ? memoryStore.get(key) : null;
+}
+
+function storeSet(key, value) {
+  memoryStore.set(key, String(value));
+  try { window.localStorage.setItem(key, value); } catch (e) { /* blocked */ }
+}
+
+function storeRemove(key) {
+  memoryStore.delete(key);
+  try { window.localStorage.removeItem(key); } catch (e) { /* blocked */ }
+}
+
+function readJSON(key, fallback) {
+  const raw = storeGet(key);
+  if (raw === null) return fallback;
+  try { return JSON.parse(raw); } catch (e) { return fallback; }
 }
 
 function writeJSON(key, value) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function removeKey(key) {
-  try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+  storeSet(key, JSON.stringify(value));
+  return true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -129,11 +145,74 @@ function randomSalt() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Session tokens (survive redirects even when storage is blocked)     */
+/* ------------------------------------------------------------------ */
+function b64urlEncode(text) {
+  const b64 = btoa(unescape(encodeURIComponent(text)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function b64urlDecode(token) {
+  const b64 = token.replace(/-/g, '+').replace(/_/g, '/');
+  return decodeURIComponent(escape(atob(b64)));
+}
+
+/** Signed, expiring copy of the session used for the `#s=` URL handoff. */
+export function encodeSessionToken(session) {
+  try {
+    const payload = { ...session, exp: Date.now() + TOKEN_TTL_MS };
+    const json = JSON.stringify(payload);
+    return `${b64urlEncode(json)}.${fallbackHash(json, 'activeplus-handoff')}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+export function decodeSessionToken(token) {
+  try {
+    const [body, sig] = String(token || '').split('.');
+    if (!body || !sig) return null;
+    const json = b64urlDecode(body);
+    if (fallbackHash(json, 'activeplus-handoff') !== sig) return null;
+    const payload = JSON.parse(json);
+    if (!payload || !payload.uid || !payload.role) return null;
+    if (typeof payload.exp === 'number' && Date.now() > payload.exp) return null;
+    const { exp, ...session } = payload;
+    void exp;
+    return session;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Pulls a handoff token out of the URL, adopts it, and cleans the address bar. */
+export function adoptSessionFromLocation() {
+  const hash = typeof window !== 'undefined' ? (window.location.hash || '') : '';
+  const match = hash.match(/(?:^#|[#&])s=([^&]+)/);
+  if (!match) return null;
+  const session = decodeSessionToken(decodeURIComponent(match[1]));
+  if (session) {
+    storeSet(SESSION_KEY, JSON.stringify(session));
+    persistRole(session.role);
+  }
+  try {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch (e) { /* sandboxed frames may forbid this */ }
+  return session;
+}
+
+/** Builds `page.html#s=<token>` so the next page can pick the session up. */
+export function handoffUrl(page, session) {
+  const token = encodeSessionToken(session);
+  return token ? `${page}#s=${encodeURIComponent(token)}` : page;
+}
+
+/* ------------------------------------------------------------------ */
 /* Local user store                                                    */
 /* ------------------------------------------------------------------ */
 export async function seedUsers({ force = false } = {}) {
   const existing = readJSON(USERS_KEY, null);
-  if (existing && Array.isArray(existing.users) && !force) return existing;
+  if (existing && Array.isArray(existing.users) && existing.users.length && !force) return existing;
 
   const users = [];
   for (const account of DEMO_ACCOUNTS) {
@@ -174,9 +253,10 @@ function findUser(identifier) {
 /* Session                                                             */
 /* ------------------------------------------------------------------ */
 export function currentSession() {
-  const session = readJSON(SESSION_KEY, null);
-  if (!session || !session.uid) return null;
-  return session;
+  const stored = readJSON(SESSION_KEY, null);
+  if (stored && stored.uid) return stored;
+  // Last resort (storage blocked): adopt a handoff token from the URL.
+  return adoptSessionFromLocation();
 }
 
 export function currentUser() {
@@ -191,7 +271,7 @@ export function currentUser() {
         name: user.displayName || user.email || 'User',
         email: user.email || null,
         username: user.email || '',
-        role: readJSON(SESSION_KEY, null)?.role || window.localStorage.getItem('activeplus_role') || 'student',
+        role: readJSON(SESSION_KEY, null)?.role || 'student',
         provider: 'firebase'
       };
     }
@@ -220,7 +300,7 @@ function saveSession(user) {
   };
   writeJSON(SESSION_KEY, session);
   persistRole(session.role);
-  try { window.localStorage.setItem('activeplus_user', JSON.stringify(session)); } catch (e) { /* ignore */ }
+  storeSet('activeplus_user', JSON.stringify(session));
   return session;
 }
 
@@ -260,8 +340,7 @@ export async function signIn(identifier, password, role) {
   if (!ROLES.includes(role)) {
     throw new AuthError('missing-role', 'লগিন করার আগে একটি ভূমিকা (Student / Teacher / Admin) বেছে নিন।');
   }
-  if (role === 'student' && id.includes('@') === false && !validateStudentId(id)) {
-    // Not fatal — Firebase accounts may use plain usernames — but worth a hint.
+  if (role === 'student' && !id.includes('@') && !validateStudentId(id)) {
     console.info('[Active Plus] Student ID does not match YYYY-C-RRR:', id);
   }
 
@@ -304,10 +383,10 @@ export async function signOut({ redirect = true } = {}) {
   const session = currentSession();
   addActivityLog('logout', 'auth');
   if (getAuthMode() === 'firebase') { try { await firebaseSignOut(); } catch (e) { /* ignore */ } }
-  removeKey(SESSION_KEY);
-  removeKey('activeplus_user');
-  removeKey('activeplus_role');
-  removeKey('activeplus_studentId');
+  storeRemove(SESSION_KEY);
+  storeRemove('activeplus_user');
+  storeRemove('activeplus_role');
+  storeRemove('activeplus_studentId');
   if (redirect && typeof window !== 'undefined') {
     window.location.href = 'index.html';
   }
@@ -324,7 +403,8 @@ export async function signOut({ redirect = true } = {}) {
 export function requireRole(...roles) {
   const allowed = roles.flat().filter(Boolean);
   const session = currentSession();
-  const here = (window.location.pathname.split('/').pop() || 'index.html');
+  const here = ((typeof window !== 'undefined' ? window.location.pathname : '')
+    .split('/').pop() || 'index.html');
 
   if (!session) {
     const next = encodeURIComponent(here);
@@ -334,7 +414,7 @@ export function requireRole(...roles) {
   }
   if (allowed.length && !allowed.includes(session.role)) {
     showToast('এই পেজটি দেখার অনুমতি আপনার নেই।', 'error');
-    window.location.replace(homeFor(session.role));
+    window.location.replace(handoffUrl(homeFor(session.role), session));
     return null;
   }
   return session;

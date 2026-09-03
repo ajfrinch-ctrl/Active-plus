@@ -110,7 +110,7 @@
 
     <script type="module">
       import { initFirebase, checkConnectionStatus, getAuthMode, showToast } from './js/firebase.js';
-      import { signIn, DEMO_ACCOUNTS, homeFor, ROLES, currentSession } from './js/auth.js';
+      import { signIn, DEMO_ACCOUNTS, homeFor, ROLES, currentSession, handoffUrl } from './js/auth.js';
 
       const ALLOWED_PAGES = ['student.html', 'teacher.html', 'admin.html'];
 
@@ -217,7 +217,7 @@
           const session = await signIn(identifier, secret, role);
           setStatus(`স্বাগতম, ${session.name}!`, 'connected');
           showToast(`সফলভাবে লগিন হয়েছে — ${session.name}`, 'success');
-          window.location.replace(safeNext() || homeFor(session.role));
+          window.location.replace(handoffUrl(safeNext() || homeFor(session.role), session));
         } catch (error) {
           console.warn('[Active Plus] Login failed:', error.code || '', error.message);
           showError(error.message || 'লগিন করা যায়নি। আবার চেষ্টা করুন।');
@@ -233,7 +233,7 @@
         const session = currentSession();
         if (session) {
           setStatus(`আগে থেকেই লগিন করা আছে — ${session.name}`, 'connected');
-          window.location.replace(safeNext() || homeFor(session.role));
+          window.location.replace(handoffUrl(safeNext() || homeFor(session.role), session));
           return;
         }
 
