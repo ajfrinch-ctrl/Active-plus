@@ -546,7 +546,9 @@ export function initStudentHome() {
         <p class="meta" style="margin-top:.5rem">প্রতিদিন পড়াশোনা বা MCQ দিলে স্ট্রিক বাড়ে।</p></div>
 
       <div class="hcard" id="more-query"><div class="h-title">শিক্ষক প্রশ্ন</div>
-        ${queries.length ? queries.map((q) => row(q.title, q.date)).join('') : '<p>আপনি এখনো কোনো প্রশ্ন পাঠাননি।</p>'}
+        ${queries.length ? queries.map((q) => `
+          ${row(q.title, q.date)}
+          ${q.reply ? `<div class="alert alert-success" style="margin:.25rem 0 .75rem">শিক্ষকের উত্তর: ${escapeHtml(q.reply)}</div>` : '<p class="meta" style="margin:.25rem 0 .75rem">উত্তরের অপেক্ষায়…</p>'}`).join('') : '<p>আপনি এখনো কোনো প্রশ্ন পাঠাননি।</p>'}
         <form id="query-form" style="margin-top:.75rem">
           <div class="form-group"><label for="query-text">আপনার প্রশ্ন</label>
             <textarea id="query-text" class="form-input" rows="3" required placeholder="যে বিষয়ে জানতে চান লিখুন…"></textarea></div>

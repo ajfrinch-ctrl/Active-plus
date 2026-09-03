@@ -33,6 +33,7 @@
         <button type="button" data-tab="routine">রুটিন</button>
         <button type="button" data-tab="attendance">উপস্থিতি নিন</button>
         <button type="button" data-tab="notice">ক্লাস নোটিশ</button>
+        <button type="button" data-tab="queries">ছাত্র প্রশ্ন</button>
         <button type="button" data-tab="suggestion">সাজেশন</button>
         <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
         <button type="button" data-tab="profile">প্রোফাইল</button>
@@ -98,6 +99,11 @@
             <button type="button" class="btn btn-small" id="open-exam-modal">+ পরীক্ষা</button>
           </h2>
           <div class="list" id="exam-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-queries" hidden>
+          <h2 class="section-title">ছাত্রদের প্রশ্ন</h2>
+          <div class="card"><div class="list" id="teacher-query-list"></div></div>
         </section>
 
         <section class="tab-panel" id="tab-profile" hidden>
@@ -387,6 +393,38 @@
           showToast('ক্লাস নোটিশ প্রকাশিত হয়েছে।', 'success');
         });
         renderNotices();
+
+        /* -------- Student queries (from the student home) -------- */
+        const queryList = document.getElementById('teacher-query-list');
+        const renderQueries = () => {
+          const rows = db.notifications.list().filter((n) => n.target === 'শিক্ষক');
+          queryList.innerHTML = rows.length
+            ? rows.map((n) => `
+              <div class="list-item" style="display:block">
+                <div class="li-main">
+                  <div class="li-title">${escapeHtml(n.title)}</div>
+                  <div class="li-sub">${escapeHtml(n.studentName || '')} · ${escapeHtml(n.date)}</div>
+                  ${n.reply ? `<div class="alert alert-success" style="margin-top:.5rem">উত্তর: ${escapeHtml(n.reply)}</div>` : ''}
+                </div>
+                <form data-reply-form="${escapeHtml(n.id)}" style="margin-top:.5rem">
+                  <div class="form-group"><input class="form-input" name="reply" placeholder="উত্তর লিখুন…" value="${escapeHtml(n.reply || '')}"></div>
+                  <button type="submit" class="btn btn-small">উত্তর পাঠান</button>
+                </form>
+              </div>`).join('')
+            : '<div class="empty-state">কোনো শিক্ষার্থী প্রশ্ন পাঠায়নি।</div>';
+        };
+        queryList.addEventListener('submit', (e) => {
+          const form = e.target.closest('[data-reply-form]');
+          if (!form) return;
+          e.preventDefault();
+          const id = form.dataset.replyForm;
+          const reply = String(new FormData(form).get('reply') || '').trim();
+          if (!reply) { showToast('উত্তর লিখুন।', 'error'); return; }
+          db.notifications.update(id, { reply, replyDate: todayBn(), read: false });
+          renderQueries();
+          showToast('উত্তর শিক্ষার্থীকে পাঠানো হয়েছে।', 'success');
+        });
+        renderQueries();
 
         /* -------- Suggestions + MCQ authoring -------- */
         setExamAuthor(session.name);

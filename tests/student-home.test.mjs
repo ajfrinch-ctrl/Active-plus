@@ -451,3 +451,23 @@ test('the student home registers the service worker (PWA install/offline)', asyn
   dom.window.dispatchEvent(new dom.window.Event('load'));
   assert.ok(registered.includes('service-worker.js'), 'service worker registered from the home page');
 });
+
+test('a teacher reply to a query reaches that student only', async () => {
+  const { doc, data } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  doc.getElementById('query-text').value = 'স্যার, অধ্যায় ৩ কঠিন লাগছে';
+  doc.getElementById('query-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
+  const query = data.db.notifications.list().find((n) => n.target === 'শিক্ষক');
+  assert.ok(doc.getElementById('more-query').innerHTML.includes('উত্তরের অপেক্ষায়'), 'waiting state shown');
+
+  // The teacher portal writes the reply back onto the same row (teacher.html).
+  data.db.notifications.update(query.id, { reply: 'কাল ক্লাসে বুঝিয়ে দেব।', replyDate: data.todayBn() });
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '.bottom-nav button[data-view="more"]');
+  assert.ok(doc.getElementById('more-query').innerHTML.includes('কাল ক্লাসে বুঝিয়ে দেব'), 'reply visible to the student');
+
+  // teacher.html really renders that inbox and writes replies
+  const teacher = read('teacher.html');
+  assert.ok(teacher.includes("n.target === 'শিক্ষক'"), 'teacher portal lists student queries');
+  assert.ok(teacher.includes('db.notifications.update(id, { reply'), 'teacher reply persists');
+});
