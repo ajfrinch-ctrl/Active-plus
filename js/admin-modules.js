@@ -10,7 +10,8 @@ import {
   todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees
 } from './data.js';
 import { mountCrud } from './crud.js';
-import { escapeHtml, renderTable, statGrid, showToast, openModal, closeModal } from './app.js';
+import { escapeHtml, renderTable, statGrid, showToast, openModal, closeModal, getAuthMode } from './app.js';
+import { checkConnectionStatus } from './firebase.js';
 import { listUsers, updateProfile, changePassword } from './auth.js';
 
 const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
@@ -54,6 +55,7 @@ function mountDashboard(session) {
   const a = analytics();
   const recent = (arr, n) => [...arr].slice(-n).reverse();
   host.innerHTML = `
+    <div class="section"><div class="alert alert-info" id="db-status" role="status">ডেটাবেস: যাচাই হচ্ছে…</div></div>
     <div class="section card-grid">
       <div class="card"><h3>আজকের ক্লাস</h3><p>${db.routine.list().slice(0, 3).map((r) => `${escapeHtml(r.subject)} ${escapeHtml(r.time)}`).join(' · ') || '—'}</p></div>
       <div class="card"><h3>আসন্ন পরীক্ষা</h3><p>${db.exams.list().slice(0, 3).map((e) => escapeHtml(e.title)).join(' · ') || '—'}</p></div>
@@ -62,6 +64,16 @@ function mountDashboard(session) {
       <div class="card"><h3>ঝুলন্ত অ্যাসাইনমেন্ট</h3><p>${bn(db.assignments.list().length)}</p></div>
       <div class="card"><h3>সাম্প্রতিক অ্যাডমিন কার্যক্রম</h3><p>${activityLogs().slice(0, 3).map((l) => escapeHtml(l.action)).join(' · ') || '—'}</p></div>
     </div>`;
+
+  checkConnectionStatus().then((connected) => {
+    const el = document.getElementById('db-status');
+    if (!el) return;
+    const mode = getAuthMode();
+    el.className = `alert ${connected || mode === 'local' ? 'alert-success' : 'alert-error'}`;
+    el.textContent = mode === 'local'
+      ? `ডেটাবেস: লোকাল মোড (সংযুক্ত) · শেষ সিঙ্ক: ${todayBn()}`
+      : connected ? `ডেটাবেস: সংযুক্ত · শেষ সিঙ্ক: ${todayBn()}` : 'ডেটাবেস: বিচ্ছিন্ন (অফলাইন)';
+  });
   logActivity({ user: session.name, role: session.role, action: 'viewed dashboard' });
 }
 
