@@ -170,6 +170,10 @@
             <div class="form-group">
               <label>শিক্ষার্থী হোমে কোন কার্ড দেখানো হবে</label>
             <div class="form-group">
+              <label for="set-challenge">ডেইলি চ্যালেঞ্জের প্রশ্ন সংখ্যা</label>
+              <input class="form-input" id="set-challenge" name="dailyChallengeTarget" type="number" min="1" max="50">
+            </div>
+            <div class="form-group">
               <label>শিক্ষার্থী নিজে কোন প্রোফাইল ফিল্ড সম্পাদনা করতে পারবে</label>
               <div class="check-grid" id="student-editable">
                 <label class="check"><input type="checkbox" name="edit_phone" value="1"> মোবাইল</label>
@@ -885,6 +889,7 @@
         document.getElementById('set-org').value = settings.orgName || '';
         document.getElementById('set-address').value = settings.address || '';
         document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
+        document.getElementById('set-challenge').value = settings.dailyChallengeTarget ?? 10;
         const editableFields = settings.studentEditableFields || [];
         document.querySelectorAll('#student-editable input').forEach((input) => {
           input.checked = editableFields.includes(input.name.slice(5));
@@ -912,6 +917,7 @@
           monthlyFee: Number(data.get('monthlyFee')) || 0
         });
         db.settings.update({
+          dailyChallengeTarget: Math.max(1, Number(data.get('dailyChallengeTarget')) || 10),
           studentEditableFields: [...event.target.querySelectorAll('#student-editable input:checked')]
             .map((input) => input.name.slice(5))
         });

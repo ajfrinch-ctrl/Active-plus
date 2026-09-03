@@ -35,6 +35,7 @@ const SEED = {
     admissionFee: 500,
     defaultExamDuration: 30,
     passMark: 40,
+    dailyChallengeTarget: 10,
     studentEditableFields: ['phone'],
     negativeMarking: 0,
     leaderboardEnabled: true,
@@ -642,8 +643,9 @@ export function upcomingExam(className) {
 /** Daily challenge state (10 MCQs/day), progress stored per date. */
 export function challengeState() {
   const date = todayBn();
-  const entry = db.challenge.find(date) || { date, done: 0, target: 10 };
-  return entry;
+  const target = Number(db.settings.get().dailyChallengeTarget) || 10;
+  const entry = db.challenge.find(date) || { date, done: 0, target };
+  return { ...entry, target }; // target always reflects the current admin setting
 }
 export function addChallengeProgress(n = 1) {
   const entry = challengeState();

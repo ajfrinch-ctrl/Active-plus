@@ -432,3 +432,16 @@ test('the 10-materials badge is earned from real activity', async () => {
   for (let i = 0; i < 10; i += 1) m.recordStudyActivity('view', 1, 'mat-1');
   assert.ok(m.achievementsFor(student).some((b) => b.name.includes('ম্যাটেরিয়াল')), 'earned after 10 views');
 });
+
+test('admin can configure the daily challenge target', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h16');
+  assert.equal(m.challengeState().target, 10, 'default target');
+  m.db.settings.update({ dailyChallengeTarget: 5 });
+  assert.equal(m.challengeState().target, 5, 'admin setting applies');
+  for (let i = 0; i < 8; i += 1) m.addChallengeProgress(1);
+  assert.equal(m.challengeState().done, 5, 'progress caps at the configured target');
+  m.db.settings.update({ dailyChallengeTarget: 20 });
+  assert.equal(m.challengeState().done, 5, 'raising the target does not fake completion');
+});
