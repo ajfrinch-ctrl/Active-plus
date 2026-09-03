@@ -145,8 +145,7 @@ export function initStudentHome() {
 
     const sections = [];
 
-    if (banners.length) {
-      sections.push(`
+    const bannerHtml = banners.length ? `
       <div class="carousel">
         <div class="carousel-track" id="banner-track">
           ${banners.map((b) => `
@@ -157,8 +156,7 @@ export function initStudentHome() {
           </div>`).join('')}
         </div>
         ${banners.length > 1 ? `<div class="carousel-dots" id="banner-dots">${banners.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
-      </div>`);
-    }
+      </div>` : '';
 
     if (cards.progress) {
       sections.push(`
@@ -311,6 +309,7 @@ export function initStudentHome() {
     }
 
     sections.push(lastResultHtml());
+    if (bannerHtml) sections.push(bannerHtml);
 
     if (badges.length) {
       sections.push(`

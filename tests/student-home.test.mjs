@@ -391,3 +391,36 @@ test('every tile in the More quick row actually navigates (no dead buttons)', as
     doc.getElementById('notif-center').setAttribute('aria-hidden', 'true');
   }
 });
+
+test('home follows the priority order: progress first, announcement after result', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
+  data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+
+  const html = doc.getElementById('home-content').innerHTML;
+  const at = (needle) => html.indexOf(needle);
+  const progress = at('আজকের প্রগ্রেস');
+  const grid = at('feature-grid');
+  const nextCls = at('পরবর্তী ক্লাস');
+  const nextExam = at('আসন্ন পরীক্ষা');
+  const challenge = at('ডেইলি চ্যালেঞ্জ');
+  const result = at('সাম্প্রতিক ফলাফল');
+  const announce = at('carousel');
+  const fee = at('ফি স্ট্যাটাস');
+  const quick = at('কুইক ফিচার');
+
+  for (const [name, pos] of Object.entries({ progress, grid, nextCls, nextExam, challenge, result, announce, fee, quick })) {
+    assert.ok(pos >= 0, `${name} rendered`);
+  }
+  assert.ok(progress < grid, 'progress before the feature grid');
+  assert.ok(grid < nextCls, 'grid before next class');
+  assert.ok(nextCls < nextExam, 'next class before upcoming exam');
+  assert.ok(nextExam < challenge, 'exam before daily challenge');
+  assert.ok(challenge < result, 'challenge before latest result');
+  assert.ok(result < announce, 'announcement sits after the result card');
+  assert.ok(announce < fee, 'announcement before fee status');
+  assert.ok(fee < quick, 'fee before quick features');
+});
