@@ -12,7 +12,8 @@ import {
   challengeState, addChallengeProgress, performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
   recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial,
-  examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION, subscribeRemote
+  examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION, subscribeRemote,
+  submitAssignment
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
 
@@ -460,7 +461,27 @@ export function initStudentHome() {
       <div class="info-row"><span class="l">অবস্থা</span><span class="v"><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span></div>
       ${a.marks ? `<div class="info-row"><span class="l">নম্বর</span><span class="v">${bn(a.marks)}</span></div>` : ''}
       <p style="margin-top:.75rem;white-space:pre-wrap">${escapeHtml(a.description || '')}</p>
-      ${st.sub?.feedback ? `<p class="meta" style="margin-top:.5rem">শিক্ষকের মন্তব্য: ${escapeHtml(st.sub.feedback)}</p>` : ''}`);
+      ${st.sub?.feedback ? `<p class="meta" style="margin-top:.5rem">শিক্ষকের মন্তব্য: ${escapeHtml(st.sub.feedback)}</p>` : ''}
+      ${st.status === 'pending' || st.status === 'overdue' ? `
+      <form id="submit-assignment-form" style="margin-top:.75rem">
+        <div class="form-group"><label for="submit-note">মন্তব্য / লিংক (ঐচ্ছিক)</label>
+          <input id="submit-note" class="form-input" placeholder="যেমন: খাতার ছবি বা লিংক"></div>
+        <button type="submit" class="btn btn-block">জমা দিন</button>
+      </form>` : `<p class="meta" style="margin-top:.75rem">${st.status === 'checked' ? 'শিক্ষক আপনার কাজ চেক করেছেন ✓' : 'আপনি এটি জমা দিয়েছেন ✓'}</p>`}`);
+
+    const form = detail.querySelector('#submit-assignment-form');
+    form?.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      if (!navigator.onLine) {
+        showToast('অফলাইনে অ্যাসাইনমেন্ট জমা দেওয়া যাবে না।', 'error');
+        return;
+      }
+      const note = String(detail.querySelector('#submit-note')?.value || '').trim();
+      submitAssignment(a, { id: student.id, name: session.name }, note);
+      closeModal('detail-modal');
+      renderHomeSafe();
+      showToast('অ্যাসাইনমেন্ট জমা হয়েছে।', 'success');
+    });
   }
 
   function openMaterial(id) {

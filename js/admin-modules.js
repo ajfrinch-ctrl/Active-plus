@@ -7,7 +7,7 @@
 import {
   db, analytics, examSummary, classPerformance, leaderboard, exportBackup, importBackup,
   parseMcqPaste, toCSV, downloadText, globalSearch, logActivity, activityLogs,
-  todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees
+  todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor
 } from './data.js';
 import { mountCrud } from './crud.js';
 import { escapeHtml, renderTable, statGrid, showToast, openModal, closeModal, getAuthMode } from './app.js';
@@ -24,6 +24,7 @@ export function mountExtraAdmin(session) {
   mountMaterials(session);
   mountAssignments(session);
   mountRoutine(session);
+  mountSubmissions(session);
   mountTips(session);
   mountBanners(session);
   mountQuestionBank(session);
@@ -189,6 +190,47 @@ function mountRoutine(session) {
       { name: 'room', label: 'কক্ষ' }
     ]
   });
+}
+
+/* ---------------- Submitted assignments: review + mark checked ---------------- */
+function mountSubmissions(session) {
+  const host = document.getElementById('submissions-crud');
+  if (!host) return;
+
+  const render = () => {
+    const rows = db.submissions.list();
+    host.innerHTML = `
+      <div class="table-wrap"><table class="table" id="submissions-table">
+        <thead><tr><th>শিক্ষার্থী</th><th>অ্যাসাইনমেন্ট</th><th>জমার তারিখ</th><th>অবস্থা</th><th></th></tr></thead>
+        <tbody>
+          ${rows.length ? rows.map((r) => {
+            const asg = db.assignments.find(r.assignmentId);
+            return `<tr>
+              <td>${escapeHtml(r.studentName || r.studentId)}</td>
+              <td>${escapeHtml(asg?.title || r.assignmentId)}</td>
+              <td>${escapeHtml(r.date || '—')}</td>
+              <td>${escapeHtml(r.status)}</td>
+              <td>${r.status === 'চেক হয়েছে'
+                ? `<span class="badge success">✓ ${escapeHtml(r.feedback || '')}</span>`
+                : `<button type="button" class="btn btn-small" data-check="${escapeHtml(r.id)}">চেক করুন</button>`}</td>
+            </tr>`;
+          }).join('') : '<tr><td colspan="5">এখনো কোনো কাজ জমা পড়েনি।</td></tr>'}
+        </tbody>
+      </table></div>`;
+  };
+
+  host.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-check]');
+    if (!btn) return;
+    const feedback = window.prompt('শিক্ষকের মন্তব্য (ঐচ্ছিক):') || '';
+    checkSubmission(btn.dataset.check, feedback);
+    logActivity('assignment-checked', 'assignments');
+    render();
+    showToast('কাজ চেক হিসেবে চিহ্নিত হয়েছে।', 'success');
+  });
+
+  render();
+  window.__renderSubmissions = render;
 }
 
 /* ---------------- Teacher tips & banners (student home feed) ---------------- */

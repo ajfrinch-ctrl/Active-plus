@@ -681,6 +681,8 @@ export function achievementsFor(student) {
   const badges = [];
   if (streak >= 7) badges.push({ icon: '🔥', name: `${streak} দিন স্ট্রিক` });
   if (mcqs >= 100) badges.push({ icon: '🎯', name: '১০০ MCQ সম্পন্ন' });
+  const views = db.studyActivity.list().reduce((s, a) => s + (a.views || 0), 0);
+  if (views >= 10) badges.push({ icon: '📚', name: '১০ ম্যাটেরিয়াল সম্পন্ন' });
   if (perf && perf.best >= 90) badges.push({ icon: '🏆', name: '৯০%+ স্কোর' });
   if (perf && perf.best === 100) badges.push({ icon: '⭐', name: 'পারফেক্ট স্কোর' });
   if (perf && perf.rank === 1) badges.push({ icon: '🥇', name: 'টপার' });
@@ -749,6 +751,37 @@ export function latestNotifications(student, limit = 2) {
       .map((n) => ({ id: n.id, title: n.title, body: n.type || 'ঘোষণা', date: n.date, read: !!n.read }))
   ];
   return all.slice(-limit).reverse();
+}
+
+/* ---------------- Assignment submission flow ---------------- */
+
+/** Student submits (or resubmits) an assignment. Returns the stored row. */
+export function submitAssignment(assignment, student, note = '') {
+  if (!assignment || !student) return null;
+  const existing = db.submissions.list()
+    .find((s) => s.assignmentId === assignment.id && s.studentId === student.id);
+  const payload = {
+    assignmentId: assignment.id, studentId: student.id, studentName: student.name,
+    status: 'জমা হয়েছে', date: todayBn(), feedback: '', note: String(note || '')
+  };
+  if (existing) { db.submissions.update(existing.id, payload); return db.submissions.find(existing.id); }
+  const row = { id: newId('subm'), ...payload };
+  db.submissions.add(row);
+  return row;
+}
+
+/** Teacher/admin marks a submission checked, optionally with feedback. */
+export function checkSubmission(submissionId, feedback = '') {
+  const row = db.submissions.find(submissionId);
+  if (!row) return null;
+  db.submissions.update(submissionId, { status: 'চেক হয়েছে', feedback: String(feedback || ''), checkedDate: todayBn() });
+  return db.submissions.find(submissionId);
+}
+
+/** Submissions for a class (teachers/admins reviewing work). */
+export function submissionsFor(className) {
+  const ids = db.assignments.list().filter((a) => a.className === className).map((a) => a.id);
+  return db.submissions.list().filter((s) => ids.includes(s.assignmentId));
 }
 
 /* ---------------- Home card visibility (admin controlled) ---------------- */

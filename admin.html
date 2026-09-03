@@ -43,6 +43,7 @@
         <button type="button" data-tab="results">ফলাফল</button>
         <button type="button" data-tab="materials">ম্যাটেরিয়াল</button>
         <button type="button" data-tab="assignments">অ্যাসাইনমেন্ট</button>
+        <button type="button" data-tab="submissions">জমাকৃত কাজ</button>
         <button type="button" data-tab="routine">রুটিন</button>
         <button type="button" data-tab="notifications">নোটিফিকেশন</button>
         <button type="button" data-tab="analytics">অ্যানালিটিক্স</button>
@@ -289,6 +290,11 @@
             <button type="button" class="btn btn-block" id="backup-export">ব্যাকআপ ডাউনলোড করুন</button>
             <div class="form-group" style="margin-top:.75rem"><label for="backup-import">ব্যাকআপ আপলোড</label><input type="file" id="backup-import" class="form-input" accept=".json,application/json"></div>
           </div>
+        </section>
+
+        <section class="tab-panel" id="tab-submissions" hidden>
+          <h2 class="section-title">জমাকৃত অ্যাসাইনমেন্ট</h2>
+          <div id="submissions-crud"></div>
         </section>
 
         <section class="tab-panel" id="tab-tips" hidden>

@@ -402,3 +402,33 @@ test('the store mirrors to the remote backend when one is configured', async () 
   // Local mode (no backend) must not try to sync and still works.
   assert.equal(m.subscribeRemote(() => {}), null, 'nothing to subscribe to without Firebase');
 });
+
+test('assignment submission and checking move through real states', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h14');
+  const student = { id: '2026-09-002', name: 'Sumaiya' };
+  const asg = m.db.assignments.list()[0];
+
+  assert.equal(m.assignmentStatus(asg, student).status, 'pending', 'starts pending');
+  const row = m.submitAssignment(asg, student, 'link');
+  assert.ok(row && row.id, 'submission stored');
+  assert.equal(m.assignmentStatus(asg, student).status, 'submitted', 'now submitted');
+
+  const checked = m.checkSubmission(row.id, 'ভালো হয়েছে');
+  assert.equal(checked.status, 'চেক হয়েছে', 'marked checked');
+  assert.equal(m.assignmentStatus(asg, student).status, 'checked', 'student sees it as checked');
+  assert.equal(m.assignmentStatus(asg, student).sub.feedback, 'ভালো হয়েছে', 'feedback attached');
+
+  assert.ok(m.submissionsFor(asg.className).some((s) => s.id === row.id), 'class review list includes it');
+});
+
+test('the 10-materials badge is earned from real activity', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h15');
+  const student = m.db.students.find('2026-09-001');
+  assert.equal(m.achievementsFor(student).some((b) => b.name.includes('ম্যাটেরিয়াল')), false, 'not earned yet');
+  for (let i = 0; i < 10; i += 1) m.recordStudyActivity('view', 1, 'mat-1');
+  assert.ok(m.achievementsFor(student).some((b) => b.name.includes('ম্যাটেরিয়াল')), 'earned after 10 views');
+});

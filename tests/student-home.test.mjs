@@ -471,3 +471,26 @@ test('a teacher reply to a query reaches that student only', async () => {
   assert.ok(teacher.includes("n.target === 'শিক্ষক'"), 'teacher portal lists student queries');
   assert.ok(teacher.includes('db.notifications.update(id, { reply'), 'teacher reply persists');
 });
+
+test('a student can submit a pending assignment from its details', async () => {
+  const { doc, data } = await bootHome();
+  const other = data.db.students.find('2026-09-002');
+  const asg = data.db.assignments.list()[0];
+  assert.equal(data.assignmentStatus(asg, other).status, 'pending');
+
+  // the signed-in student (2026-09-001) already submitted in seed, so use a fresh one
+  const fresh = { id: 'asg-ui', title: 'UI Test Task', subject: 'Math', className: 'নবম', deadline: '২০২৬-০৯-৩০', teacher: 'T', marks: 10, description: '' };
+  data.db.assignments.add(fresh);
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  click(doc, '#home-content [data-act="assignment"][data-id="asg-ui"]');
+  const form = doc.getElementById('submit-assignment-form');
+  assert.ok(form, 'submit form offered for pending work');
+  doc.getElementById('submit-note').value = 'done';
+  form.dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
+
+  const stored = data.db.submissions.list().find((s) => s.assignmentId === 'asg-ui');
+  assert.ok(stored, 'submission stored');
+  assert.equal(stored.studentId, '2026-09-001', 'recorded against the signed-in student only');
+  assert.equal(data.assignmentStatus(fresh, data.db.students.find('2026-09-001')).status, 'submitted');
+  assert.ok(doc.getElementById('home-content').innerHTML.includes('জমা হয়েছে'), 'home chip updated');
+});
