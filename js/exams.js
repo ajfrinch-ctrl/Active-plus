@@ -4,7 +4,7 @@
  * students take exams and read suggestions (mountExamTaker / suggestion list).
  */
 
-import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity } from './data.js';
+import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity, examWindow } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast } from './app.js';
 
 export function classOptionsHtml(selected = ALL_CLASSES, { allowAll = true } = {}) {
@@ -235,7 +235,9 @@ export function mountExamTaker({ listSelector, student }) {
           </div>
           ${done
             ? `<span class="badge ${done.score / done.total >= 0.5 ? 'success' : 'warning'}">${done.score}/${done.total}</span>`
-            : `<button type="button" class="btn btn-small" data-take="${escapeHtml(exam.id)}">শুরু করুন</button>`}
+            : (examWindow(exam).canStart
+              ? `<button type="button" class="btn btn-small" data-take="${escapeHtml(exam.id)}">শুরু করুন</button>`
+              : `<span class="badge warning">${escapeHtml(examWindow(exam).state === 'closed' ? 'সময় শেষ' : 'শুরু হয়নি')}</span>`)}
         </div>`;
       }).join('')
       : '<div class="empty-state">আপনার ক্লাসের কোনো পরীক্ষা নেই।</div>';
@@ -301,4 +303,5 @@ export function mountExamTaker({ listSelector, student }) {
   }
 
   render();
+  return render; // lets the home refresh the list when the tab is revisited
 }

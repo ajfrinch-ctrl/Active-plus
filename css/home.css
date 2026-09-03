@@ -212,3 +212,24 @@ body.home-body {
 .chip.overdue { color: var(--danger, #e53e3e); border-color: color-mix(in srgb, var(--danger, #e53e3e) 45%, transparent); }
 .notif-preview { display: flex; gap: .625rem; align-items: flex-start; }
 .notif-preview .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: .45rem; flex: none; }
+
+/* Tablet: wider column, roomier grid (still the same mobile design language) */
+@media (min-width: 640px) {
+  .home { max-width: 720px; padding: 1.25rem 1.25rem calc(84px + var(--safe-bottom)); }
+  .feature-grid { gap: .875rem; }
+  .tile { min-height: 84px; font-size: .8125rem; }
+  .carousel-track .banner { flex: 0 0 60%; }
+}
+
+/* Desktop: centre the mobile experience, never stretch it edge to edge */
+@media (min-width: 1024px) {
+  body.home-body { background: var(--bg, #f6f7fb); }
+  .home {
+    max-width: 760px; margin: 1.5rem auto; padding: 1.5rem 1.5rem calc(88px + var(--safe-bottom));
+    border-radius: 28px; background: var(--surface, #fff);
+    box-shadow: 0 18px 50px rgb(15 23 42 / 10%);
+  }
+  .bottom-nav .inner { max-width: 760px; }
+  .feature-grid { grid-template-columns: repeat(4, 1fr); }
+  .carousel-track .banner { flex: 0 0 48%; }
+}

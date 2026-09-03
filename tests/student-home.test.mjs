@@ -268,3 +268,52 @@ test('More menu carries every secondary destination without dead links', async (
   }
   assert.ok(doc.getElementById('home-logout'), 'logout available');
 });
+
+test('clickable rows work from the keyboard, not just a tap', async () => {
+  const { doc } = await bootHome();
+  const row = doc.querySelector('#home-content [role="button"][data-act="assignment"]');
+  assert.ok(row, 'assignment row is focusable');
+  assert.equal(row.getAttribute('tabindex'), '0');
+  row.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  assert.equal(doc.getElementById('detail-modal').getAttribute('aria-hidden'), 'false', 'Enter opened the details');
+});
+
+test('opening the notification centre clears the unread badge', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  assert.ok(data.unreadNotifications(student) > 0, 'starts with unread items');
+  assert.equal(doc.getElementById('bell-count').hidden, false, 'badge visible');
+  click(doc, '#bell');
+  assert.equal(doc.getElementById('bell-count').hidden, true, 'badge hidden after reading');
+  assert.equal(data.unreadNotifications(student), 0, 'notifications marked read');
+});
+
+test('leaderboard visibility is an admin switch', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
+  data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+
+  data.setHomeCards({ leaderboard: true });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  assert.ok(doc.getElementById('home-content').innerHTML.includes('র‍্যাঙ্ক'), 'rank shown when leaderboard is on');
+
+  data.setHomeCards({ leaderboard: false });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  assert.equal(doc.getElementById('home-content').innerHTML.includes('র‍্যাঙ্ক'), false, 'rank hidden when admin turns it off');
+  data.setHomeCards({ leaderboard: true });
+});
+
+test('exam list offers Start only inside the window', async () => {
+  const { doc, data } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="exam"]');
+  const exam = data.examsFor('নবম')[0];
+  assert.ok(doc.querySelector(`[data-take="${exam.id}"]`), 'Start offered while open');
+
+  data.db.exams.update(exam.id, { endDate: '২০০০-০১-০১' });
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '.bottom-nav button[data-view="exam"]');
+  assert.equal(doc.querySelector(`[data-take="${exam.id}"]`), null, 'no Start once the window closed');
+  assert.ok(doc.getElementById('student-exam-list').innerHTML.includes('সময় শেষ'), 'reason shown instead');
+});

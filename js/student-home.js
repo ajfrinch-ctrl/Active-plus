@@ -93,6 +93,7 @@ export function initStudentHome() {
     document.querySelectorAll('.bottom-nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === name)));
     // Render lazily so the data shown is always current.
     if (name === 'home') renderHomeSafe();
+    else if (name === 'exam') refreshExams?.();
     else if (name === 'more') renderMore();
     else if (name === 'study') renderStudy();
     else if (name === 'result') renderResult();
@@ -110,10 +111,14 @@ export function initStudentHome() {
       ? rows.map((n) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(n.title)}</div><div class="li-sub">${escapeHtml(n.date)} · ${escapeHtml(n.audience)}</div></div></div>`).join('')
       : '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
     openModal('notif-center');
+    db.notifications.list().filter((n) => !n.read && (n.target === 'সবাই' || n.target === 'শিক্ষার্থী'))
+      .forEach((n) => db.notifications.update(n.id, { read: true }));
+    bellCount.hidden = true;
   });
 
   /* ---------------- Home content ---------------- */
   const host = document.getElementById('home-content');
+  let refreshExams = null;
 
   const renderHome = () => {
     const cards = homeCards();
@@ -275,7 +280,7 @@ export function initStudentHome() {
           <div class="tile"><span class="ico">${bn(perf.avg)}%</span>গড়</div>
           <div class="tile"><span class="ico">${bn(perf.best)}%</span>সেরা</div>
           <div class="tile"><span class="ico">${bn(perf.tests)}</span>টেস্ট</div>
-          <div class="tile"><span class="ico">#${bn(perf.rank)}</span>র‍্যাঙ্ক</div>
+          ${cards.leaderboard ? `<div class="tile"><span class="ico">#${bn(perf.rank)}</span>র‍্যাঙ্ক</div>` : ''}
         </div>
         <div class="mini-chart">${perf.series.map((v) => `<div class="bar" style="height:${v}%"></div>`).join('')}</div>
         <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">পুরো প্রগ্রেস দেখুন</button>
@@ -375,6 +380,16 @@ export function initStudentHome() {
       <div class="info-row"><span class="l">স্কোর</span><span class="v">${bn(mine.score)}/${bn(mine.total)} (${bn(pct)}%)</span></div>
       <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">ফলাফল দেখুন</button></div>`;
   }
+
+  /* Keyboard parity: rows marked role="button" must work with Enter/Space. */
+  const keyboardActivate = (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('[role="button"][data-act], [role="button"][data-asg]');
+    if (!row) return;
+    e.preventDefault();
+    row.click();
+  };
+  host.addEventListener('keydown', keyboardActivate);
 
   /* ---------------- Home actions ---------------- */
   host.addEventListener('click', (e) => {
@@ -620,6 +635,6 @@ export function initStudentHome() {
     document.getElementById('home-skeleton').hidden = true;
     host.hidden = false;
     renderHomeSafe();
-    mountExamTaker({ listSelector: '#student-exam-list', student });
+    refreshExams = mountExamTaker({ listSelector: '#student-exam-list', student });
   }, 300);
 }
