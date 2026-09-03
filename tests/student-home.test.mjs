@@ -14,6 +14,7 @@ const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
 async function bootHome() {
   const dom = new JSDOM(read('student.html'), { url: 'http://localhost:8080/student.html', pretendToBeVisual: true });
   dom.window.scrollTo = () => {};
+  dom.window.HTMLElement.prototype.scrollIntoView = () => {}; // jsdom has no layout
   globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
   globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
   globalThis.window = dom.window;
@@ -371,4 +372,22 @@ test('latest result card shows the class position when leaderboard is on', async
   data.setHomeCards({ leaderboard: false });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
   assert.equal(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), false, 'hidden with the leaderboard');
+});
+
+test('every tile in the More quick row actually navigates (no dead buttons)', async () => {
+  const { doc } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  const tiles = [...doc.querySelectorAll('#more-content [data-act]')];
+  assert.ok(tiles.length >= 8, 'quick row rendered');
+
+  for (const t of tiles) {
+    // start each from the More view
+    click(doc, '.bottom-nav button[data-view="more"]');
+    click(doc, `#more-content [data-act="${t.dataset.act}"]`);
+    const stillOnMore = doc.getElementById('view-more').hidden === false;
+    const moved = ['view-study', 'view-exam', 'view-result'].some((id) => doc.getElementById(id).hidden === false);
+    const openedModal = doc.getElementById('notif-center').getAttribute('aria-hidden') === 'false';
+    assert.ok(stillOnMore || moved || openedModal, `tile ${t.dataset.act} does something`);
+    doc.getElementById('notif-center').setAttribute('aria-hidden', 'true');
+  }
 });

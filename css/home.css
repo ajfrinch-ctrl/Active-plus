@@ -233,3 +233,9 @@ body.home-body {
   .feature-grid { grid-template-columns: repeat(4, 1fr); }
   .carousel-track .banner { flex: 0 0 48%; }
 }
+
+/* Clickable info rows must be comfortable touch targets */
+.info-row[role="button"] { min-height: 44px; border-radius: 12px; }
+.info-row[role="button"]:hover, .info-row[role="button"]:focus-visible {
+  background: color-mix(in srgb, var(--text) 6%, transparent); outline: none;
+}

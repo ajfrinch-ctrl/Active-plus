@@ -600,11 +600,20 @@ export function initStudentHome() {
       }
     });
 
-    document.getElementById('more-content').addEventListener('click', (e) => {
+    const moreHost = document.getElementById('more-content');
+    moreHost.addEventListener('click', (e) => {
       const asg = e.target.closest('[data-asg]');
-      if (asg) openAssignment(asg.dataset.asg);
+      if (asg) { openAssignment(asg.dataset.asg); return; }
       const mat = e.target.closest('[data-mat2]');
-      if (mat) openMaterial(mat.dataset.mat2);
+      if (mat) { openMaterial(mat.dataset.mat2); return; }
+      const tileEl = e.target.closest('[data-act]');
+      if (!tileEl) return;
+      const act = tileEl.dataset.act;
+      if (['study', 'questionbank', 'downloads', 'result', 'progress', 'exam'].includes(act)) switchView(
+        act === 'study' || act === 'questionbank' || act === 'downloads' ? 'study'
+          : act === 'result' || act === 'progress' ? 'result' : 'exam');
+      else if (act === 'notif') document.getElementById('bell').click();
+      else openMore(act === 'seemore' ? null : act);
     });
 
     document.getElementById('query-form').addEventListener('submit', (e) => {
@@ -647,7 +656,7 @@ export function initStudentHome() {
   function openMore(section) {
     renderMore();
     switchView('more');
-    if (section) setTimeout(() => document.getElementById(`more-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    if (section) setTimeout(() => document.getElementById(`more-${section}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 60);
   }
 
   /* ---------------- Study / Exam / Result views ---------------- */
