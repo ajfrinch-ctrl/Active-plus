@@ -69,6 +69,26 @@ Once the placeholders are replaced the app initialises Firebase Auth + Realtime
 Database and signs in against it; until then it runs in local mode so nothing
 breaks on GitHub Pages.
 
+### Deploy the security rules
+
+`database.rules.json` holds the Realtime Database rules. Deploy them with
+`firebase deploy --only database` (or paste them into the console under
+Realtime Database → Rules). They deny anonymous access by default and enforce
+the same boundaries the UI shows:
+
+- `activeplus/data` (the mirrored store) is **admin-only** — a student client
+  cannot pull the whole database.
+- `fees/<studentId>` is readable only by that student (plus admin);
+  `payments` is admin-only.
+- `students/<id>/phone` is the only student-writable profile field unless the
+  admin widens `studentEditableFields` in Settings.
+- Shared reference data (classes, routine, materials, exams, notices, tips) is
+  readable when signed in and never student-writable.
+
+In local mode there is no server to enforce anything, so the data layer
+(`js/data.js`) applies the same filters: every home helper takes the signed-in
+student and returns only their own rows.
+
 ## Notes
 
 - The whole UI is mobile-first: safe-area insets, 44px touch targets, swipeable

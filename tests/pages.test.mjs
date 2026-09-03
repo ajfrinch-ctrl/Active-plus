@@ -99,3 +99,30 @@ test('service worker precaches every page asset (offline home must render)', () 
   const missing = [...assets].filter((a) => !precached.has(a));
   assert.deepEqual(missing, [], `not precached: ${missing.join(', ')}`);
 });
+
+test('database rules deny by default and scope student-owned data', () => {
+  const rules = JSON.parse(read('database.rules.json')).rules;
+  assert.equal(rules['.read'], false, 'no anonymous reads');
+  assert.equal(rules['.write'], false, 'no anonymous writes');
+
+  const adminOnly = "root.child('roles/' + auth.uid + '/role').val() === 'admin'";
+  // Financial data: the student alone (and admin) — never another student.
+  assert.ok(rules.fees.$studentId['.read'].includes("auth.uid === data.child('uid').val()"), 'fees read is owner-scoped');
+  assert.equal(rules.fees.$studentId['.write'], adminOnly, 'only admin writes fees');
+  assert.equal(rules.payments.$studentId['.read'], adminOnly, 'payments are admin-only');
+  assert.equal(rules.payments.$studentId['.write'], adminOnly);
+
+  // Full store mirror is admin-only, so a student client cannot pull everything.
+  assert.equal(rules.activeplus.data['.read'], adminOnly, 'store mirror is admin-only');
+
+  // Student-writable surfaces are narrow and self-scoped.
+  assert.ok(rules.students.$studentId.phone['.write'].includes('auth.uid ==='), 'phone editable by its owner only');
+  assert.ok(rules.studyActivity.$studentId['.write'].includes('auth.uid === data.child'), 'activity written by its owner only');
+
+  // Reference/shared data: readable when signed in, never student-writable.
+  for (const key of ['classes', 'subjects', 'routine', 'materials', 'assignments', 'exams', 'notices', 'tips', 'attendance', 'teachers']) {
+    assert.equal(rules[key]['.read'], 'auth !== null', `${key} needs a session`);
+    assert.notEqual(rules[key]['.write'], 'auth !== null', `${key} is not freely writable`);
+  }
+  assert.equal(rules.banners['.write'], adminOnly, 'banners are admin-managed');
+});
