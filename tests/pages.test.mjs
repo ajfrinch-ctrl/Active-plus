@@ -79,3 +79,23 @@ test('module imports resolve to real exported names', () => {
     }
   }
 });
+
+test('service worker precaches every page asset (offline home must render)', () => {
+  const sw = read('service-worker.js');
+  const precached = new Set([...sw.matchAll(/'([^']+\.(?:html|css|js|json|png))'/g)].map((m) => m[1]));
+  const assets = new Set();
+  for (const page of PAGES) {
+    const html = read(page);
+    assets.add(page);
+    for (const m of html.matchAll(/href=["'](css\/[^"']+)["']/g)) assets.add(m[1]);
+    for (const m of html.matchAll(/from\s+['"](\.\/js\/[^'"]+)['"]/g)) assets.add(m[1].replace('./', ''));
+    for (const m of html.matchAll(/import\(['"](\.\/js\/[^'"]+)['"]\)/g)) assets.add(m[1].replace('./', ''));
+  }
+  // Modules imported by our modules must be cached too, or the graph breaks offline.
+  for (const file of [...assets]) {
+    if (!file.startsWith('js/')) continue;
+    for (const m of read(file).matchAll(/from\s+['"]\.\/([^'"]+)['"]/g)) assets.add(`js/${m[1]}`);
+  }
+  const missing = [...assets].filter((a) => !precached.has(a));
+  assert.deepEqual(missing, [], `not precached: ${missing.join(', ')}`);
+});
