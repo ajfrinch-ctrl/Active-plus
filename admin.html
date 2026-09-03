@@ -24,8 +24,10 @@
             <span id="user-role">লোড হচ্ছে…</span>
           </div>
         </div>
+        <input type="search" id="global-search" class="form-input" placeholder="🔍 খুঁজুন…" style="max-width:160px;flex:1 1 auto" aria-label="গ্লোবাল সার্চ">
         <button type="button" class="icon-btn" id="logout-btn">লগআউট</button>
       </header>
+      <div id="global-results" class="container" style="position:absolute;top:56px;right:.5rem;z-index:60;max-width:320px"></div>
 
       <nav class="top-tab-bar" role="tablist" aria-label="অ্যাডমিন মেনু">
         <button type="button" data-tab="overview" aria-selected="true">ড্যাশবোর্ড</button>
@@ -35,6 +37,20 @@
         <button type="button" data-tab="notices">নোটিশ</button>
         <button type="button" data-tab="suggestion">সাজেশন</button>
         <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
+        <button type="button" data-tab="classes">ক্লাস</button>
+        <button type="button" data-tab="subjects">বিষয়</button>
+        <button type="button" data-tab="questionbank">প্রশ্ন ব্যাংক</button>
+        <button type="button" data-tab="results">ফলাফল</button>
+        <button type="button" data-tab="materials">ম্যাটেরিয়াল</button>
+        <button type="button" data-tab="assignments">অ্যাসাইনমেন্ট</button>
+        <button type="button" data-tab="routine">রুটিন</button>
+        <button type="button" data-tab="notifications">নোটিফিকেশন</button>
+        <button type="button" data-tab="analytics">অ্যানালিটিক্স</button>
+        <button type="button" data-tab="reports">রিপোর্ট</button>
+        <button type="button" data-tab="users">ইউজার</button>
+        <button type="button" data-tab="activity">অ্যাক্টিভিটি লগ</button>
+        <button type="button" data-tab="backup">ব্যাকআপ</button>
+        <button type="button" data-tab="profile">প্রোফাইল</button>
         <button type="button" data-tab="settings">সেটিংস</button>
       </nav>
 
@@ -42,6 +58,11 @@
         <!-- ======================= Dashboard ======================= -->
         <section class="tab-panel" id="tab-overview">
           <div class="stat-grid" id="admin-stats"></div>
+          <div class="section">
+            <h2 class="section-title">কুইক অ্যাকশন</h2>
+            <div class="row-actions" id="quick-actions"></div>
+          </div>
+          <div id="overview-extra"></div>
           <div class="section card-grid">
             <div class="card">
               <h3>মাসিক আয়</h3>
@@ -159,6 +180,102 @@
             <p style="margin-bottom:.75rem">ডেমো ডেটা মুছে প্রথম অবস্থায় ফিরে যাবে।</p>
             <button type="button" class="btn btn-error btn-block" id="reset-data">ডেটা রিসেট করুন</button>
           </div>
+        </section>
+
+        <!-- ===== New ERP tabs ===== -->
+        <section class="tab-panel" id="tab-classes" hidden><h2 class="section-title">ক্লাস ম্যানেজমেন্ট</h2><div id="classes-crud"></div></section>
+        <section class="tab-panel" id="tab-subjects" hidden><h2 class="section-title">বিষয় ম্যানেজমেন্ট</h2><div id="subjects-crud"></div></section>
+
+        <section class="tab-panel" id="tab-questionbank" hidden>
+          <h2 class="section-title">প্রশ্ন ব্যাংক / MCQ ইমপোর্ট</h2>
+          <div class="form-group"><label for="qb-exam">পরীক্ষা নির্বাচন</label><select id="qb-exam" class="form-input form-select"></select></div>
+          <div class="card">
+            <h3>পেস্ট করে ইমপোর্ট</h3>
+            <div class="form-group"><textarea id="qb-paste" class="form-input form-textarea" placeholder="প্রশ্ন&#10;A. অপশন&#10;B. অপশন&#10;C. অপশন&#10;D. অপশন&#10;সঠিক: B"></textarea></div>
+            <div class="row-actions"><button type="button" class="btn btn-secondary" id="qb-parse">Parse</button><button type="button" class="btn btn-small" id="qb-template">স্যাম্পল টেমপ্লেট</button></div>
+          </div>
+          <div class="card">
+            <h3>CSV/Excel আপলোড</h3>
+            <div class="form-group"><input type="file" id="qb-file" class="form-input" accept=".csv,text/csv"></div>
+          </div>
+          <div id="qb-preview"></div>
+          <button type="button" class="btn btn-block" id="qb-import">নিশ্চিত করে ইমপোর্ট করুন</button>
+          <h2 class="section-title" style="margin-top:1rem">বর্তমান প্রশ্ন</h2>
+          <div class="list" id="qb-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-results" hidden>
+          <h2 class="section-title">ফলাফল ও লিডারবোর্ড</h2>
+          <div class="form-group"><label for="res-exam">পরীক্ষা</label><select id="res-exam" class="form-input form-select"></select></div>
+          <p class="form-hint" id="res-analytics"></p>
+          <div class="table-wrap"><table class="table" id="res-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="res-export">এক্সেল/CSV</button><button type="button" class="btn btn-small btn-secondary" id="res-print">প্রিন্ট</button></div>
+        </section>
+
+        <section class="tab-panel" id="tab-materials" hidden><h2 class="section-title">স্টাডি ম্যাটেরিয়াল</h2><div id="materials-crud"></div></section>
+        <section class="tab-panel" id="tab-assignments" hidden><h2 class="section-title">অ্যাসাইনমেন্ট</h2><div id="assignments-crud"></div></section>
+        <section class="tab-panel" id="tab-routine" hidden><h2 class="section-title">ক্লাস রুটিন</h2><div id="routine-crud"></div></section>
+
+        <section class="tab-panel" id="tab-notifications" hidden>
+          <h2 class="section-title">নোটিফিকেশন পাঠান</h2>
+          <form id="notif-form" class="card">
+            <div class="form-row">
+              <div class="form-group"><label for="notif-type">ধরন</label><select id="notif-type" name="type" class="form-input form-select"><option>পরীক্ষা</option><option>ফলাফল</option><option>অ্যাসাইনমেন্ট</option><option>ফি রিমাইন্ডার</option><option>সাধারণ</option></select></div>
+              <div class="form-group"><label for="notif-target">কারা</label><select id="notif-target" name="target" class="form-input form-select"><option>সবাই</option><option>শিক্ষার্থী</option><option>শিক্ষক</option></select></div>
+            </div>
+            <div class="form-group"><label for="notif-title">বার্তা *</label><input id="notif-title" name="title" class="form-input" required></div>
+            <button type="submit" class="btn btn-block">পাঠান</button>
+          </form>
+          <div class="list" id="notif-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-analytics" hidden>
+          <h2 class="section-title">অ্যাকাডেমিক অ্যানালিটিক্স</h2>
+          <div class="stat-grid" id="analytics-cards"></div>
+          <div class="card" style="margin-top:1rem"><h3>ক্লাস পারফরম্যান্স</h3><div id="class-perf"></div></div>
+        </section>
+
+        <section class="tab-panel" id="tab-reports" hidden>
+          <h2 class="section-title">রিপোর্ট সেন্টার</h2>
+          <div class="form-group"><label for="report-type">রিপোর্ট</label><select id="report-type" class="form-input form-select"></select></div>
+          <div class="table-wrap"><table class="table" id="report-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="report-csv">এক্সেল/CSV</button><button type="button" class="btn btn-small btn-secondary" id="report-print">প্রিন্ট</button></div>
+        </section>
+
+        <section class="tab-panel" id="tab-users" hidden>
+          <h2 class="section-title">ইউজার ও অনুমতি</h2>
+          <div class="list" id="users-list"></div>
+          <h2 class="section-title" style="margin-top:1rem">অনুমতি ম্যাট্রিক্স</h2>
+          <div id="perm-matrix"></div>
+          <button type="button" class="btn btn-block" id="perm-save" style="margin-top:.75rem">অনুমতি সংরক্ষণ</button>
+        </section>
+
+        <section class="tab-panel" id="tab-activity" hidden>
+          <h2 class="section-title">অ্যাক্টিভিটি লগ</h2>
+          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…"></div>
+          <div class="table-wrap"><table class="table" id="activity-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+        </section>
+
+        <section class="tab-panel" id="tab-backup" hidden>
+          <h2 class="section-title">ব্যাকআপ ও রিস্টোর</h2>
+          <div class="card">
+            <button type="button" class="btn btn-block" id="backup-export">ব্যাকআপ ডাউনলোড করুন</button>
+            <div class="form-group" style="margin-top:.75rem"><label for="backup-import">ব্যাকআপ আপলোড</label><input type="file" id="backup-import" class="form-input" accept=".json,application/json"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-profile" hidden>
+          <h2 class="section-title">অ্যাডমিন প্রোফাইল</h2>
+          <form id="profile-form" class="card">
+            <div class="form-group"><label for="pf-name">নাম</label><input id="pf-name" name="name" class="form-input"></div>
+            <div class="form-group"><label for="pf-detail">বিবরণ</label><input id="pf-detail" name="detail" class="form-input"></div>
+            <button type="submit" class="btn btn-block">আপডেট</button>
+          </form>
+          <form id="password-form" class="card">
+            <div class="form-group"><label for="pw-current">বর্তমান পাসওয়ার্ড</label><input id="pw-current" name="current" type="password" class="form-input" required></div>
+            <div class="form-group"><label for="pw-next">নতুন পাসওয়ার্ড</label><input id="pw-next" name="next" type="password" class="form-input" required></div>
+            <button type="submit" class="btn btn-block">পাসওয়ার্ড পরিবর্তন</button>
+          </form>
         </section>
       </main>
     </div>
@@ -339,6 +456,7 @@
       import { db, CLASS_OPTIONS, CLASS_TO_NUMBER, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment } from './js/data.js';
       import { generateStudentId } from './js/firebase.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
+      import { mountExtraAdmin } from './js/admin-modules.js';
 
       const session = initApp({ roles: ['admin'] });
       if (!session) throw new Error('guard redirect');
@@ -750,6 +868,7 @@
         </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
 
       renderAll();
+      mountExtraAdmin(session);
     </script>
   </body>
 </html>

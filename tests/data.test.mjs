@@ -170,3 +170,34 @@ test('scoreExam grades answers correctly', async () => {
   exam.questions.forEach((q, i) => { wrong[i] = (q.answer + 1) % 4; });
   assert.equal(scoreExam(exam, wrong).score, 0);
 });
+
+test('parseMcqPaste parses blocks, drops invalid + duplicates', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const { parseMcqPaste } = await import('../js/data.js?page=7');
+  const text = [
+    '৫+৩=?\nA. ৮\nB. ১\nC. ১৬\nD. ১০\nসঠিক: B',
+    'ত্রিভুজের কোণের সমষ্টি?\nA. ৯০\nB. ১৮০\nC. ২৭০\nD. ৩৬০\nসঠিক: B',
+    'অসম্পূর্ণ', // invalid
+    '৫+৩=?\nA. ৮\nB. ১১\nC. ১৬\nD. ১০\nসঠিক: B' // duplicate
+  ].join('\n\n');
+  const { questions, duplicates } = parseMcqPaste(text);
+  assert.equal(questions.length, 2, 'two valid unique questions');
+  assert.equal(questions[0].answer, 1);
+  assert.equal(duplicates.length, 1, 'one duplicate detected');
+});
+
+test('backup export -> import round-trips collections', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const mod = await import('../js/data.js?page=8');
+  const { db, exportBackup, importBackup } = mod;
+  db.students.add({ id: '2026-09-999', name: 'ব্যাকআপ টেস্ট', className: 'নবম', roll: '৯', school: 'x', status: 'সক্রিয়' });
+  const backup = exportBackup();
+  db.students.remove('2026-09-999');
+  assert.equal(db.students.find('2026-09-999'), null);
+  const res = importBackup(backup);
+  assert.equal(res.ok, true);
+  assert.ok(db.students.find('2026-09-999'), 'record restored from backup');
+  assert.equal(importBackup('not json').ok, false, 'invalid rejected');
+});

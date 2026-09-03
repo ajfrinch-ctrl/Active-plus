@@ -361,6 +361,38 @@ export async function signOut({ redirect = true } = {}) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Profile: update details + change password (local store)             */
+/* ------------------------------------------------------------------ */
+export function updateProfile({ name, detail } = {}) {
+  const session = currentSession();
+  if (!session) return null;
+  if (name) session.name = name;
+  if (detail !== undefined) session.detail = detail;
+  storeSet(SESSION_KEY, JSON.stringify(session));
+  storeSet('activeplus_user', JSON.stringify(session));
+  const store = readJSON(USERS_KEY, { users: [] });
+  const user = (store.users || []).find((u) => u.uid === session.uid);
+  if (user) { if (name) user.name = name; if (detail !== undefined) user.detail = detail; writeJSON(USERS_KEY, store); }
+  return session;
+}
+
+export async function changePassword(current, next) {
+  const session = currentSession();
+  if (!session) throw new AuthError('no-session', 'আগে লগিন করুন।');
+  if (!next || next.length < 6) throw new AuthError('weak-password', 'কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।');
+  const store = readJSON(USERS_KEY, { users: [] });
+  const user = (store.users || []).find((u) => u.uid === session.uid);
+  if (!user) throw new AuthError('no-user', 'অ্যাকাউন্ট পাওয়া যায়নি।');
+  const currentHash = await hashPassword(current, user.salt);
+  if (currentHash !== user.passwordHash) throw new AuthError('wrong-password', 'বর্তমান পাসওয়ার্ড সঠিক নয়।');
+  const salt = randomSalt();
+  user.salt = salt;
+  user.passwordHash = await hashPassword(next, salt);
+  writeJSON(USERS_KEY, store);
+  return true;
+}
+
+/* ------------------------------------------------------------------ */
 /* Route guard for the dashboards                                      */
 /* ------------------------------------------------------------------ */
 /**

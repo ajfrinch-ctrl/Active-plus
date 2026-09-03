@@ -13,7 +13,7 @@
 import { readJSON, writeJSON } from './store.js';
 
 const DATA_KEY = 'activeplus_data';
-const DATA_VERSION = 5; // per-student fees, payments, suggestions, exams, class-targeted notices
+const DATA_VERSION = 6; // ERP: classes, subjects, materials, assignments, notifications, activity logs
 
 export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'একাদশ', 'দ্বাদশ'];
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };
@@ -26,7 +26,18 @@ const SEED = {
   settings: {
     orgName: 'Active Plus Coaching',
     address: '২য় তলা, মদিনা প্লাজা, মিরপুর-১০, ঢাকা',
-    monthlyFee: 1200
+    mobile: '০১৭০০-০০০০০০',
+    email: 'info@activeplus.edu',
+    website: 'activeplus.edu',
+    academicYear: '২০৬',
+    monthlyFee: 1200,
+    admissionFee: 500,
+    defaultExamDuration: 30,
+    passMark: 40,
+    negativeMarking: 0,
+    leaderboardEnabled: true,
+    autoPublishResult: false,
+    notificationsEnabled: true
   },
   students: [
     { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', roll: '০১', phone: '০১৭১১-০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়' },
@@ -51,11 +62,11 @@ const SEED = {
     { id: 'n-3', title: 'নবম শ্রেণির পদার্থবিজ্ঞান ক্লাস শনিবার সকাল ৮টায়', date: '২০২৬-০৮-২৫', audience: 'শিক্ষার্থী', className: 'নবম' }
   ],
   routine: [
-    { day: 'শনিবার', subject: 'গণিত', teacher: 'রাহেলা আক্তার', time: '০৮:০০ – ০৯:০০', room: 'কক্ষ ২০১' },
-    { day: 'রবিবার', subject: 'পদার্থবিজ্ঞান', teacher: 'কামরুল ইসলাম', time: '০৯:০০ – ১০:০০', room: 'কক্ষ ১০৫' },
-    { day: 'সোমবার', subject: 'রসায়ন', teacher: 'নুসরাত জাহান', time: '০৮:০০ – ০৯:০০', room: 'ল্যাব ১' },
-    { day: 'মঙ্গলবার', subject: 'ইংরেজি', teacher: 'সাদিয়া রহমান', time: '১০:০০ – ১১:০০', room: 'কক্ষ ৩০২' },
-    { day: 'বুধবার', subject: 'জীববিজ্ঞান', teacher: 'তানভীর আহমেদ', time: '০৯:০০ – ১০:০০', room: 'ল্যাব ২' }
+    { id: 'rt-1', day: 'শনিবার', subject: 'গণিত', teacher: 'রাহেলা আক্তার', time: '০৮:০০ – ০৯:০০', room: 'কক্ষ ২০১' },
+    { id: 'rt-2', day: 'রবিবার', subject: 'পদার্থবিজ্ঞান', teacher: 'কামরুল ইসলাম', time: '০৯:০০ – ১০:০০', room: 'কক্ষ ১০৫' },
+    { id: 'rt-3', day: 'সোমবার', subject: 'রসায়ন', teacher: 'নুসরাত জাহান', time: '০৮:০০ – ০৯:০০', room: 'ল্যাব ১' },
+    { id: 'rt-4', day: 'মঙ্গলবার', subject: 'ইংরেজি', teacher: 'সাদিয়া রহমান', time: '১০:০০ – ১১:০০', room: 'কক্ষ ৩০২' },
+    { id: 'rt-5', day: 'বুধবার', subject: 'জীববিজ্ঞান', teacher: 'তানভীর আহমেদ', time: '০৯:০০ – ১০:০০', room: 'ল্যাব ২' }
   ],
   attendance: [
     { date: '০২৬-০৯-০১', subject: 'গণিত', status: 'উপস্থিত' },
@@ -101,7 +112,31 @@ const SEED = {
       ]
     }
   ],
-  examResults: []
+  examResults: [],
+  classes: [
+    { id: 'c-8', name: 'অষ্টম', active: true },
+    { id: 'c-9', name: 'নবম', active: true },
+    { id: 'c-10', name: 'দশম', active: true }
+  ],
+  subjects: [
+    { id: 'sub-1', name: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম' },
+    { id: 'sub-2', name: 'পদার্থবিজ্ঞান', className: 'নবম', teacher: 'রাহেলা আক্তার' },
+    { id: 'sub-3', name: 'রসায়ন', className: 'নবম', teacher: 'নুসরাত জাহান' },
+    { id: 'sub-4', name: 'ইংরেজি', className: 'নবম', teacher: 'সাদিয়া রহমান' }
+  ],
+  materials: [
+    { id: 'mat-1', title: 'গণিত নোট — অধ্যায় ১', subject: 'গণিত', className: 'নবম', type: 'নোট', chapter: '১', description: 'স্বাভাবিক সংখ্যা ও ভগ্নাংশ', date: '২০২৬-০৯-০১', by: 'কামরুল ইসলাম', published: true }
+  ],
+  assignments: [
+    { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: '২০২৬-০৯-১০', marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
+  ],
+  submissions: [
+    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: '২০২৬-০-০৩', feedback: '' }
+  ],
+  notifications: [
+    { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০৬-০-০১', read: false }
+  ],
+  activityLogs: []
 };
 
 function clone(value) {
@@ -176,6 +211,13 @@ export const db = {
   suggestions: makeCollection('suggestions', { keyField: 'id' }),
   exams: makeCollection('exams', { keyField: 'id' }),
   examResults: makeCollection('examResults', { keyField: 'id' }),
+  classes: makeCollection('classes', { keyField: 'id' }),
+  subjects: makeCollection('subjects', { keyField: 'id' }),
+  materials: makeCollection('materials', { keyField: 'id' }),
+  assignments: makeCollection('assignments', { keyField: 'id' }),
+  submissions: makeCollection('submissions', { keyField: 'id' }),
+  notifications: makeCollection('notifications', { keyField: 'id' }),
+  activityLogs: makeCollection('activityLogs', { keyField: 'id' }),
 
   settings: {
     get() {
@@ -290,4 +332,168 @@ export function suggestionsFor(className) {
 
 export function examsFor(className) {
   return db.exams.list().filter((e) => !e.className || e.className === ALL_CLASSES || e.className === className);
+}
+/* ------------------------------------------------------------------ */
+/* ERP helpers: activity log, analytics, leaderboard, backup,          */
+/* MCQ paste parsing, CSV export, global search                        */
+/* ------------------------------------------------------------------ */
+
+export function logActivity({ user = 'system', role = 'system', action, target = '' }) {
+  db.activityLogs.add({
+    id: newId('log'), user, role, action, target,
+    timestamp: new Date().toISOString(), date: todayBn()
+  });
+}
+
+export function activityLogs() {
+  return [...db.activityLogs.list()].reverse();
+}
+
+/** Exam result summary: attempts, avg/highest/lowest, pass rate. */
+export function examSummary(examId) {
+  const exam = db.exams.find(examId);
+  const results = db.examResults.list().filter((r) => r.examId === examId);
+  if (!exam || !results.length) return null;
+  const passMarkPct = (db.settings.get().passMark || 40);
+  const scores = results.map((r) => r.score / r.total * 100);
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const pass = scores.filter((p) => p >= passMarkPct).length;
+  return {
+    exam, attempts: results.length,
+    avg, highest: Math.round(Math.max(...scores)), lowest: Math.round(Math.min(...scores)),
+    passRate: Math.round((pass / results.length) * 100),
+    failRate: 100 - Math.round((pass / results.length) * 100)
+  };
+}
+
+/** Class performance from exam results, joined via student class. */
+export function classPerformance() {
+  const byClass = {};
+  db.examResults.list().forEach((r) => {
+    const student = db.students.find(r.studentId);
+    const cls = student?.className || 'অজানা';
+    (byClass[cls] = byClass[cls] || (byClass[cls] = { name: cls, total: 0, count: 0 }));
+    byClass[cls].total += r.score / r.total * 100;
+    byClass[cls].count += 1;
+  });
+  return Object.values(byClass).map((c) => ({ name: c.name, avg: Math.round(c.total / c.count) }));
+}
+
+export function leaderboard(examId = null) {
+  let results = db.examResults.list();
+  if (examId) results = results.filter((r) => r.examId === examId);
+  const rows = results.map((r) => {
+    const student = db.students.find(r.studentId);
+    return { ...r, pct: Math.round(r.score / r.total * 100), className: student?.className || '—' };
+  }).sort((a, b) => b.pct - a.pct);
+  return rows.map((r, i) => ({ position: i + 1, ...r }));
+}
+
+/** Dashboard analytics rollup, all computed live from stored data. */
+export function analytics() {
+  const students = db.students.list();
+  const fees = db.fees.list();
+  const payments = db.payments.list();
+  const due = dueFees();
+  const today = todayBn();
+  const dueTotal = due.reduce((s, d) => s + Number(d.amount || 0), 0);
+  return {
+    totalStudents: students.length,
+    activeStudents: students.filter((s) => s.status === 'সক্রিয়').length,
+    inactiveStudents: students.filter((s) => s.status !== 'সক্রিয়').length,
+    totalTeachers: db.teachers.list().length,
+    activeBatches: db.batches.list().length,
+    totalSubjects: db.subjects.list().length,
+    upcomingExams: db.exams.list().length,
+    pendingAssignments: db.assignments.list().filter((a) => !a.checked).length,
+    publishedResults: db.examResults.list().length,
+    todayCollection: payments.filter((p) => p.date === today).reduce((s, p) => s + Number(p.amount || 0), 0),
+    monthlyCollection: payments.reduce((s, p) => s + Number(p.amount || 0), 0),
+    totalDue: dueTotal,
+    totalClasses: db.classes.list().filter((c) => c.active).length
+  };
+}
+
+/** Backup export as a JSON string. */
+export function exportBackup() {
+  return JSON.stringify({ app: 'active-plus', version: DATA_VERSION, exportedAt: new Date().toISOString(), collections: load().collections }, null, 2);
+}
+
+/** Import/restore from a JSON backup string. Validates before applying. */
+export function importBackup(text) {
+  let parsed;
+  try { parsed = JSON.parse(text); } catch (e) { return { ok: false, error: 'অবৈধ JSON ফাইল।' }; }
+  if (!parsed || parsed.app !== 'active-plus' || !parsed.collections) return { ok: false, error: 'এটি Active Plus ব্যাকআপ নয়।' };
+  const known = ['settings', 'students', 'teachers', 'batches', 'notices', 'routine', 'attendance', 'results', 'fees', 'payments', 'suggestions', 'exams', 'examResults', 'classes', 'subjects', 'materials', 'assignments', 'submissions', 'notifications', 'activityLogs'];
+  const collections = {};
+  for (const key of known) if (Array.isArray(parsed.collections[key]) || (key === 'settings' && parsed.collections[key])) collections[key] = parsed.collections[key];
+  const store = load();
+  store.collections = { ...store.collections, ...clone(collections) };
+  save(store);
+  return { ok: true, restored: Object.keys(collections).length };
+}
+
+/** Parse pasted MCQ blocks:  Question / A. B. C. D. / Correct. */
+export function parseMcqPaste(text) {
+  const blocks = String(text).trim().split(/\n\s*\n/);
+  const questions = [];
+  const errors = [];
+  blocks.forEach((block, bi) => {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    const q = lines[0].replace(/^Q(uestion)?[:.)]?\s*/i, '');
+    const opts = [];
+    let answer = -1;
+    for (const line of lines.slice(1)) {
+      const om = line.match(/^([A-Da-d১-৪])[:.)]?\s*(.+)$/);
+      const am = line.match(/^(?:সঠিক|Correct|Answer)[:.)]?\s*([A-Da-d১-৪])\b/i);
+      if (am) { answer = 'abcdABCD১২৩৪'.indexOf(am[1]) % 4; }
+      else if (om) opts.push(om[2]);
+    }
+    if (!q || opts.length < 2) { errors.push(`ব্লক ${bi + 1}: প্রশ্ন/অপশন অসম্পূর্ণ।`); return; }
+    if (answer < 0) answer = 0;
+    const key = 'abcdABCD১২৩৪'.indexOf; void key;
+    questions.push({ q, options: opts.slice(0, 4), answer });
+  });
+  const dupes = [];
+  const seen = new Set();
+  const clean = questions.filter((q) => {
+    const k = q.q.trim();
+    if (seen.has(k)) { dupes.push(k); return false; }
+    seen.add(k); return true;
+  });
+  return { questions: clean, errors, duplicates: dupes };
+}
+
+/** Export rows as CSV (for Excel/print workflows). */
+export function toCSV(columns, rows) {
+  const head = columns.map((c) => `"${String(c.label).replace(/"/g, '""')}"`).join(',');
+  const body = rows.map((row) => columns.map((c) => {
+    const value = c.render ? String(row[c.key] ?? '') : String(row[c.key] ?? '');
+    return `"${value.replace(/"/g, '""')}"`;
+  }).join(','));
+  return [head, ...body].join('\n');
+}
+
+export function downloadText(filename, text, mime = 'text/plain') {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Fast global search across key entities. */
+export function globalSearch(query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return { students: [], teachers: [], exams: [], payments: [], notices: [] };
+  const has = (v) => String(v || '').toLowerCase().includes(q);
+  return {
+    students: db.students.list().filter((s) => has(s.id) || has(s.name) || has(s.phone) || has(s.className)),
+    teachers: db.teachers.list().filter((t) => has(t.name) || has(t.subject)),
+    exams: db.exams.list().filter((e) => has(e.title) || has(e.subject)),
+    payments: db.payments.list().filter((p) => has(p.studentId) || has(p.month)),
+    notices: db.notices.list().filter((n) => has(n.title))
+  };
 }
