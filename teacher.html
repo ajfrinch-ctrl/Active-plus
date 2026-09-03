@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>শিক্ষক পোর্টাল · Active Plus</title>
+    <meta name="theme-color" content="#2d3748">
+    <meta name="color-scheme" content="dark">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  </head>
+
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-mark" id="user-initial" aria-hidden="true">T</div>
+          <div class="brand-text">
+            <strong id="user-name">শিক্ষক</strong>
+            <span id="user-role">লোড হচ্ছে…</span>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="logout-btn">লগআউট</button>
+      </header>
+
+      <nav class="top-tab-bar" role="tablist" aria-label="শিক্ষক মেনু">
+        <button type="button" data-tab="overview" aria-selected="true">সংক্ষেপ</button>
+        <button type="button" data-tab="batches">আমার ব্যাচ</button>
+        <button type="button" data-tab="routine">রুটিন</button>
+        <button type="button" data-tab="attendance">উপস্থিতি নিন</button>
+        <button type="button" data-tab="profile">প্রোফাইল</button>
+      </nav>
+
+      <main class="app-main">
+        <section class="tab-panel" id="tab-overview">
+          <div class="stat-grid" id="teacher-stats"></div>
+          <div class="section">
+            <h2 class="section-title">আজকের ক্লাস</h2>
+            <div class="list" id="today-classes"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-batches" hidden>
+          <h2 class="section-title">
+            ব্যাচসমূহ
+            <button type="button" class="btn btn-small" id="open-batch-modal">নতুন ব্যাচ</button>
+          </h2>
+          <div class="table-wrap">
+            <table class="table" id="batch-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-routine" hidden>
+          <h2 class="section-title">সাপ্তাহিক রুটিন</h2>
+          <div class="table-wrap">
+            <table class="table" id="routine-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-attendance" hidden>
+          <h2 class="section-title">উপস্থিতি</h2>
+          <div class="alert alert-info">শিক্ষার্থীর নামে ট্যাপ করে উপস্থিত/অনুপস্থিত নির্বাচন করুন।</div>
+          <div class="list" id="attendance-picker"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-profile" hidden>
+          <h2 class="section-title">প্রোফাইল</h2>
+          <div class="card"><div class="list" id="profile-list"></div></div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-overlay" id="batch-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="batch-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="batch-modal-title">নতুন ব্যাচ যোগ করুন</h2>
+        <form id="batch-form">
+          <div class="form-group">
+            <label for="batch-name">ব্যাচের নাম</label>
+            <input class="form-input" id="batch-name" name="name" placeholder="যেমন: দশম (বিজ্ঞান)" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="batch-time">সময়</label>
+              <input class="form-input" id="batch-time" name="time" placeholder="সকাল ৮টা">
+            </div>
+            <div class="form-group">
+              <label for="batch-count">শিক্ষার্থী সংখ্যা</label>
+              <input class="form-input" id="batch-count" name="students" type="number" min="0" value="0">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-block">সংরক্ষণ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script type="module">
+      import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast } from './js/app.js';
+
+      const session = initApp({ roles: ['teacher'] });
+      if (session) {
+        const myBatches = DEMO_DATA.batches;
+        const totalStudents = myBatches.reduce((sum, batch) => sum + batch.students, 0);
+
+        statGrid('#teacher-stats', [
+          { label: 'ব্যাচ', value: myBatches.length, tone: 'accent' },
+          { label: 'শিক্ষার্থী', value: totalStudents },
+          { label: 'সাপ্তাহিক ক্লাস', value: DEMO_DATA.routine.length, tone: 'success' },
+          { label: 'আজকের ক্লাস', value: 2, note: 'রুটিন অনুযায়ী' }
+        ]);
+
+        document.getElementById('today-classes').innerHTML = DEMO_DATA.routine.slice(0, 2).map((slot) => `
+          <div class="list-item">
+            <div class="li-main">
+              <div class="li-title">${escapeHtml(slot.subject)}</div>
+              <div class="li-sub">${escapeHtml(slot.time)} · ${escapeHtml(slot.room)}</div>
+            </div>
+            <span class="badge accent">${escapeHtml(slot.day)}</span>
+          </div>`).join('');
+
+        const renderBatches = () => renderTable('#batch-table', [
+          { key: 'name', label: 'ব্যাচ' },
+          { key: 'students', label: 'শিক্ষার্থী' },
+          { key: 'teacher', label: 'দায়িত্বপ্রাপ্ত' },
+          { key: 'time', label: 'সময়' }
+        ], myBatches);
+        renderBatches();
+
+        renderTable('#routine-table', [
+          { key: 'day', label: 'দিন' },
+          { key: 'time', label: 'সময়' },
+          { key: 'subject', label: 'বিষয়' },
+          { key: 'room', label: 'কক্ষ' }
+        ], DEMO_DATA.routine);
+
+        const picker = document.getElementById('attendance-picker');
+        picker.innerHTML = DEMO_DATA.students.map((student, index) => `
+          <div class="list-item">
+            <div class="li-main">
+              <div class="li-title">${escapeHtml(student.name)}</div>
+              <div class="li-sub">${escapeHtml(student.id)} · ${escapeHtml(student.className)} · রোল ${escapeHtml(student.roll)}</div>
+            </div>
+            <button type="button" class="btn btn-small btn-success" data-student="${index}" aria-pressed="true">উপস্থিত</button>
+          </div>`).join('');
+
+        picker.addEventListener('click', (event) => {
+          const button = event.target.closest('button[data-student]');
+          if (!button) return;
+          const present = button.getAttribute('aria-pressed') !== 'true';
+          button.setAttribute('aria-pressed', String(present));
+          button.textContent = present ? 'উপস্থিত' : 'অনুপস্থিত';
+          button.classList.toggle('btn-success', present);
+          button.classList.toggle('btn-error', !present);
+          const student = DEMO_DATA.students[Number(button.dataset.student)];
+          showToast(`${student.name} — ${present ? 'উপস্থিত' : 'অনুপস্থিত'}`, present ? 'success' : 'warning');
+        });
+
+        document.getElementById('open-batch-modal').addEventListener('click', () => openModal('batch-modal'));
+        document.getElementById('batch-form').addEventListener('submit', (event) => {
+          event.preventDefault();
+          const data = new FormData(event.target);
+          myBatches.push({
+            name: String(data.get('name') || 'নতুন ব্যাচ'),
+            time: String(data.get('time') || '—'),
+            students: Number(data.get('students')) || 0,
+            teacher: session.name
+          });
+          renderBatches();
+          event.target.reset();
+          closeModal('batch-modal');
+          showToast('ব্যাচ যোগ করা হয়েছে।', 'success');
+        });
+
+        document.getElementById('profile-list').innerHTML = [
+          ['নাম', session.name],
+          ['ইমেইল / আইডি', session.username],
+          ['বিষয়', session.detail || '—'],
+          ['লগিন সময়', new Date(session.loginTime).toLocaleString('bn-BD')]
+        ].map(([label, value]) => `
+          <div class="list-item">
+            <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
+          </div>`).join('');
+      }
+    </script>
+  </body>
+</html>

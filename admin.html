@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>অ্যাডমিন প্যানেল · Active Plus</title>
+    <meta name="theme-color" content="#2d3748">
+    <meta name="color-scheme" content="dark">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  </head>
+
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-mark" id="user-initial" aria-hidden="true">A</div>
+          <div class="brand-text">
+            <strong id="user-name">অ্যাডমিন</strong>
+            <span id="user-role">লোড হচ্ছে…</span>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="logout-btn">লগআউট</button>
+      </header>
+
+      <nav class="top-tab-bar" role="tablist" aria-label="অ্যাডমিন মেনু">
+        <button type="button" data-tab="overview" aria-selected="true">ড্যাশবোর্ড</button>
+        <button type="button" data-tab="students">শিক্ষার্থী</button>
+        <button type="button" data-tab="teachers">শিক্ষক</button>
+        <button type="button" data-tab="notices">নোটিশ</button>
+        <button type="button" data-tab="settings">সেটিংস</button>
+      </nav>
+
+      <main class="app-main">
+        <section class="tab-panel" id="tab-overview">
+          <div class="stat-grid" id="admin-stats"></div>
+          <div class="section card-grid">
+            <div class="card">
+              <h3>মাসিক আয়</h3>
+              <p id="income-summary">লোড হচ্ছে…</p>
+              <div class="progress-bar" style="margin-top:.75rem"><div class="progress-fill" id="income-bar" style="width:0%"></div></div>
+            </div>
+            <div class="card">
+              <h3>সাম্প্রতিক নোটিশ</h3>
+              <p id="latest-notice">—</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-students" hidden>
+          <h2 class="section-title">
+            শিক্ষার্থী তালিকা
+            <button type="button" class="btn btn-small" id="open-student-modal">নতুন শিক্ষার্থী</button>
+          </h2>
+          <div class="table-wrap">
+            <table class="table" id="student-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-teachers" hidden>
+          <h2 class="section-title">শিক্ষক তালিকা</h2>
+          <div class="table-wrap">
+            <table class="table" id="teacher-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-notices" hidden>
+          <h2 class="section-title">নোটিশ বোর্ড</h2>
+          <div class="list" id="notice-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-settings" hidden>
+          <h2 class="section-title">সেটিংস</h2>
+          <div class="card">
+            <h3>সিস্টেম অবস্থা</h3>
+            <div class="list" id="system-list"></div>
+          </div>
+          <div class="card">
+            <h3>রেজিস্টার্ড অ্যাকাউন্ট</h3>
+            <div class="list" id="account-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-overlay" id="student-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="student-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="student-modal-title">নতুন শিক্ষার্থী যোগ করুন</h2>
+        <form id="student-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-name">নাম</label>
+              <input class="form-input" id="student-name" name="name" required>
+            </div>
+            <div class="form-group">
+              <label for="student-phone">অভিভাবকের মোবাইল</label>
+              <input class="form-input" id="student-phone" name="phone" inputmode="tel">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-class">শ্রেণি</label>
+              <select class="form-input form-select" id="student-class" name="className">
+                <option value="অষ্টম">অষ্টম</option>
+                <option value="নবম">নবম</option>
+                <option value="দশম">দশম</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="student-roll">রোল</label>
+              <input class="form-input" id="student-roll" name="roll" type="number" min="1" value="1">
+            </div>
+          </div>
+          <p class="form-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।</p>
+          <button type="submit" class="btn btn-block">সংরক্ষণ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script type="module">
+      import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode } from './js/app.js';
+      import { listUsers } from './js/auth.js';
+      import { generateStudentId } from './js/firebase.js';
+
+      const session = initApp({ roles: ['admin'] });
+      if (session) {
+        const students = [...DEMO_DATA.students];
+        const teachers = DEMO_DATA.teachers;
+        const totalStudents = students.length + DEMO_DATA.batches.reduce((sum, batch) => sum + batch.students, 0);
+        const monthlyFee = 1200;
+        const collected = students.filter((student) => student.status === 'সক্রিয়').length * monthlyFee;
+        const expected = totalStudents * monthlyFee;
+
+        statGrid('#admin-stats', [
+          { label: 'মোট শিক্ষার্থী', value: totalStudents, tone: 'accent' },
+          { label: 'শিক্ষক', value: teachers.length },
+          { label: 'ব্যাচ', value: DEMO_DATA.batches.length, tone: 'success' },
+          { label: 'বকেয়া', value: `${expected - collected > 0 ? '৳' + (expected - collected) : 'নেই'}`, tone: expected - collected > 0 ? 'warning' : 'success' }
+        ]);
+
+        document.getElementById('income-summary').textContent =
+          `সংগৃহীত ৳${collected.toLocaleString('bn-BD')} / প্রত্যাশিত ৳${expected.toLocaleString('bn-BD')}`;
+        document.getElementById('income-bar').style.width = `${Math.min(100, Math.round((collected / expected) * 100))}%`;
+        document.getElementById('latest-notice').textContent = DEMO_DATA.notices[0]?.title || '—';
+
+        const renderStudents = () => renderTable('#student-table', [
+          { key: 'id', label: 'আইডি' },
+          { key: 'name', label: 'নাম' },
+          { key: 'className', label: 'শ্রেণি' },
+          { key: 'roll', label: 'রোল' },
+          { key: 'phone', label: 'মোবাইল' },
+          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'সক্রিয়' ? 'success' : 'warning'}">${escapeHtml(row.status)}</span>` }
+        ], students);
+        renderStudents();
+
+        renderTable('#teacher-table', [
+          { key: 'name', label: 'নাম' },
+          { key: 'subject', label: 'বিষয়' },
+          { key: 'phone', label: 'মোবাইল' },
+          { key: 'classes', label: 'ক্লাস/সপ্তাহ' }
+        ], teachers);
+
+        document.getElementById('notice-list').innerHTML = DEMO_DATA.notices.map((notice) => `
+          <div class="list-item">
+            <div class="li-main">
+              <div class="li-title">${escapeHtml(notice.title)}</div>
+              <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+            </div>
+          </div>`).join('');
+
+        document.getElementById('system-list').innerHTML = [
+          ['ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)'],
+          ['লগিন করা', session.name],
+          ['সেশন শুরু', new Date(session.loginTime).toLocaleString('bn-BD')]
+        ].map(([label, value]) => `
+          <div class="list-item">
+            <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
+          </div>`).join('');
+
+        document.getElementById('account-list').innerHTML = listUsers().map((user) => `
+          <div class="list-item">
+            <div class="li-main">
+              <div class="li-title">${escapeHtml(user.name)}</div>
+              <div class="li-sub">${escapeHtml(user.username)}</div>
+            </div>
+            <span class="badge accent">${escapeHtml(user.role)}</span>
+          </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
+
+        document.getElementById('open-student-modal').addEventListener('click', () => openModal('student-modal'));
+        document.getElementById('student-form').addEventListener('submit', (event) => {
+          event.preventDefault();
+          const data = new FormData(event.target);
+          const year = new Date().getFullYear();
+          const classNumber = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10 }[String(data.get('className'))] || 9;
+          students.push({
+            id: generateStudentId(year, classNumber, Number(data.get('roll')) || 1),
+            name: String(data.get('name') || 'নতুন শিক্ষার্থী'),
+            className: String(data.get('className')),
+            roll: String(data.get('roll') || '১'),
+            phone: String(data.get('phone') || '—'),
+            status: 'সক্রিয়'
+          });
+          renderStudents();
+          event.target.reset();
+          closeModal('student-modal');
+          showToast('শিক্ষার্থী যোগ করা হয়েছে।', 'success');
+        });
+      }
+    </script>
+  </body>
+</html>

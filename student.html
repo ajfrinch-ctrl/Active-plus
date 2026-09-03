@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>শিক্ষার্থী পোর্টাল · Active Plus</title>
+    <meta name="theme-color" content="#2d3748">
+    <meta name="color-scheme" content="dark">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  </head>
+
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-mark" id="user-initial" aria-hidden="true">A</div>
+          <div class="brand-text">
+            <strong id="user-name">শিক্ষার্থী</strong>
+            <span id="user-role">লোড হচ্ছে…</span>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="logout-btn">লগআউট</button>
+      </header>
+
+      <nav class="top-tab-bar" role="tablist" aria-label="শিক্ষার্থী মেনু">
+        <button type="button" data-tab="overview" aria-selected="true">সংক্ষেপ</button>
+        <button type="button" data-tab="routine">ক্লাস রুটিন</button>
+        <button type="button" data-tab="attendance">উপস্থিতি</button>
+        <button type="button" data-tab="results">ফলাফল</button>
+        <button type="button" data-tab="fees">বেতন</button>
+        <button type="button" data-tab="profile">প্রোফাইল</button>
+      </nav>
+
+      <main class="app-main">
+        <section class="tab-panel" id="tab-overview">
+          <div class="stat-grid" id="student-stats"></div>
+          <div class="section">
+            <h2 class="section-title">নোটিশ</h2>
+            <div class="list" id="notice-list"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-routine" hidden>
+          <h2 class="section-title">সাপ্তাহিক রুটিন</h2>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-attendance" hidden>
+          <h2 class="section-title">উপস্থিতি রেকর্ড</h2>
+          <div class="table-wrap">
+            <table class="table" id="attendance-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-results" hidden>
+          <h2 class="section-title">পরীক্ষার ফলাফল</h2>
+          <div class="table-wrap">
+            <table class="table" id="result-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-fees" hidden>
+          <h2 class="section-title">বেতন</h2>
+          <div class="list" id="fee-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-profile" hidden>
+          <h2 class="section-title">প্রোফাইল</h2>
+          <div class="card">
+            <div class="list" id="profile-list"></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-block" id="profile-logout">লগআউট করুন</button>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script type="module">
+      import { initApp, DEMO_DATA, renderTable, statGrid, escapeHtml, showToast } from './js/app.js';
+      import { signOut } from './js/auth.js';
+
+      const session = initApp({ roles: ['student'] });
+      if (session) {
+        const present = DEMO_DATA.attendance.filter((row) => row.status === 'উপস্থিত').length;
+        const rate = Math.round((present / DEMO_DATA.attendance.length) * 100);
+        const due = DEMO_DATA.fees.filter((row) => row.status === 'বকেয়া').length;
+        const avg = Math.round(DEMO_DATA.results.reduce((sum, row) => sum + row.marks, 0) / DEMO_DATA.results.length);
+
+        statGrid('#student-stats', [
+          { label: 'উপস্থিতি', value: `${rate}%`, tone: 'success', note: `${present}/${DEMO_DATA.attendance.length} দিন` },
+          { label: 'গড় নম্বর', value: avg, tone: 'accent', note: 'প্রথম সাময়িক' },
+          { label: 'বকেয়া বেতন', value: due ? `${due} মাস` : 'নেই', tone: due ? 'warning' : 'success' },
+          { label: 'ক্লাস', value: DEMO_DATA.routine.length, note: 'সাপ্তাহিক' }
+        ]);
+
+        document.getElementById('notice-list').innerHTML = DEMO_DATA.notices.map((notice) => `
+          <div class="list-item">
+            <div class="li-main">
+              <div class="li-title">${escapeHtml(notice.title)}</div>
+              <div class="li-sub">${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+            </div>
+            <span class="badge accent">নতুন</span>
+          </div>`).join('');
+
+        renderTable('#tab-routine table', [
+          { key: 'day', label: 'দিন' },
+          { key: 'time', label: 'সময়' },
+          { key: 'subject', label: 'বিষয়' },
+          { key: 'teacher', label: 'শিক্ষক' },
+          { key: 'room', label: 'কক্ষ' }
+        ], DEMO_DATA.routine);
+
+        renderTable('#attendance-table', [
+          { key: 'date', label: 'তারিখ' },
+          { key: 'subject', label: 'বিষয়' },
+          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'উপস্থিত' ? 'success' : 'error'}">${escapeHtml(row.status)}</span>` }
+        ], DEMO_DATA.attendance);
+
+        renderTable('#result-table', [
+          { key: 'exam', label: 'পরীক্ষা' },
+          { key: 'subject', label: 'বিষয়' },
+          { key: 'marks', label: 'নম্বর' },
+          { key: 'grade', label: 'গ্রেড', render: (row) => `<span class="badge accent">${escapeHtml(row.grade)}</span>` }
+        ], DEMO_DATA.results);
+
+        document.getElementById('fee-list').innerHTML = DEMO_DATA.fees.map((fee) => `
+          <div class="list-item">
+            <div class="li-main">
+              <div class="li-title">${escapeHtml(fee.month)}</div>
+              <div class="li-sub">৳ ${escapeHtml(fee.amount)} · ${escapeHtml(fee.date)}</div>
+            </div>
+            <span class="badge ${fee.status === 'পরিশোধিত' ? 'success' : 'warning'}">${escapeHtml(fee.status)}</span>
+          </div>`).join('');
+
+        document.getElementById('profile-list').innerHTML = [
+          ['নাম', session.name],
+          ['স্টুডেন্ট আইডি', session.username],
+          ['ভূমিকা', 'শিক্ষার্থী'],
+          ['শ্রেণি', session.detail || '—'],
+          ['লগিন সময়', new Date(session.loginTime).toLocaleString('bn-BD')],
+          ['ডেটা সোর্স', session.provider === 'firebase' ? 'Firebase' : 'এই ডিভাইস (লোকাল)']
+        ].map(([label, value]) => `
+          <div class="list-item">
+            <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
+          </div>`).join('');
+
+        document.getElementById('profile-logout').addEventListener('click', () => signOut({ redirect: true }));
+        showToast(`স্বাগতম, ${session.name}!`, 'success');
+      }
+    </script>
+  </body>
+</html>

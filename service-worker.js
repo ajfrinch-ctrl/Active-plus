@@ -1,57 +1,98 @@
 /**
- * Service Worker for Active Plus Coaching Management System
- * GitHub Pages compatible
+ * Service Worker for Active Plus Coaching Management System.
+ *
+ * Strategy:
+ *   - Navigations: network-first (fresh HTML wins), falling back to cache
+ *     so the app still opens offline.
+ *   - Same-origin static assets (css/js/png): cache-first, revalidating in
+ *     the background.
+ *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v1';
+const CACHE_NAME = 'active-plus-v2';
 const PRECACHE_URLS = [
+  './',
   'index.html',
+  'student.html',
+  'teacher.html',
+  'admin.html',
   'css/style.css',
   'js/firebase.js',
+  'js/auth.js',
+  'js/app.js',
   'manifest.json',
-  'service-worker.js',
+  'assets/icon-192.png',
+  'assets/icon-512.png',
+  'assets/icon-maskable-512.png',
+  'assets/favicon-32x32.png',
+  'assets/favicon-16x16.png',
+  'assets/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .catch((error) => console.warn('[SW] precache failed:', error.message))
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) return caches.delete(cache);
-        })
-      );
-    })
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  
-  const url = new URL(event.request.url);
-  
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return; // let fonts/Firebase fetch directly
+
+  // Fresh pages first so deploys are visible; cache keeps us usable offline.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then((cached) => cached || caches.match('index.html'))
+        )
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200) return networkResponse;
-        
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          if (url.pathname.endsWith('.html') || url.pathname.endsWith('.css') || 
-              url.pathname.endsWith('.js') || url.pathname.endsWith('.png')) {
-            cache.put(event.request, responseToCahce);
-          }
-        });
-        return networkResponse;
+    caches.match(request).then((cached) => {
+      if (cached) {
+        const revalidate = fetch(request)
+          .then((response) => {
+            if (response && response.ok) {
+              const copy = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            }
+          })
+          .catch(() => {});
+        event.waitUntil(revalidate);
+        return cached;
+      }
+      return fetch(request).then((response) => {
+        if (!response || !response.ok) return response;
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
       });
     })
   );

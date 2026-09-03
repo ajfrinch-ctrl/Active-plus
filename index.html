@@ -1,203 +1,265 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="bn" dir="ltr">
   <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Active Plus - Coaching Management System</title>
-    <meta name="description" content="Active Plus Coaching Management System">
-    <meta name="author" content="Senior Full-Stack Architect">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>লগিন · Active Plus Coaching Management System</title>
+    <meta name="description" content="Active Plus Coaching Management System — শিক্ষার্থী, শিক্ষক ও অ্যাডমিন পোর্টাল।">
+    <meta name="theme-color" content="#2d3748">
+    <meta name="color-scheme" content="dark">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Active Plus">
+
     <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskar&display=swap" rel="stylesheet">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-    
-    <style>
-      :root {
-        --primary: #2d3748;
-        --secondary: #4a5568;
-        --accent: #4299e1;
-        --success: #38a169;
-        --warning: #d69e2e;
-        --error: #e53e3e;
-        --light: #edf2f7;
-        --dark: #1a202c;
-        --white: #ffffff;
-      }
-
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-
-      body {
-        font-family: 'Noto Naskar', sans-serif, system-ui, -apple-system, sans-serif;
-        background: var(--primary);
-        color: var(--white);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-      }
-
-      .login-container {
-        width: 100%; max-width: 400px; padding: 2rem; text-align: center;
-      }
-
-      .logo { width: 80px; height: 80px; margin: 0 auto 2rem;
-        background: linear-gradient(135deg, #4299e1, #3182ce);
-        border-radius: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 2rem;
-      }
-      .logo-icon { width: 40px; height: 40px; background: white; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--primary); }
-
-      h1 { font-size: 1.75rem; margin-bottom: 0.5rem; font-weight: 600; }
-      .subtitle { color: #a0aec0; font-size: 0.875rem; margin-bottom: 2rem; }
-
-      .login-card {
-        background: rgba(255,255,255,0.05); backdrop-filter: blur(10px);
-        border-radius: 16px; padding: 2.5rem 2rem; margin: 1rem;
-        border: 1px solid rgba(255,255,255,0.1);
-      }
-
-      .form-group { margin-bottom: 1.5rem; text-align: left; }
-      .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; color: #cbd5e0; }
-      .form-group input {
-        width: 100%; padding: 0.875rem 1rem; background: rgba(255,255,255,0.1);
-        border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: var(--white);
-        font-size: 1rem; transition: all 0.2s ease;
-      }
-      .form-group input::placeholder { color: rgba(255,255,255,0.5); }
-      .form-group input:focus { outline: none; border-color: #4299e1; background: rgba(255,255,255,0.15); }
-
-      .btn-login {
-        width: 100%; padding: 1rem; background: var(--accent); color: var(--white);
-        border: none; border-radius: 8px; font-size: 1rem; font-weight: 500;
-        cursor: pointer; transition: background 0.2s ease; margin-top: 0.5rem;
-      }
-      .btn-login:hover { background: #2b6cb0; }
-
-      .status-bar {
-        margin-top: 1.5rem; font-size: 0.75rem; color: #718096;
-      }
-      .status-bar.connected { color: #38a169; }
-      .status-bar.disconnected { color: #e53e3e; }
-
-      .role-options { margin-top: 2rem; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
-      .role-option {
-        display: block; padding: 0.875rem 1rem; margin: 0.5rem 0;
-        background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 8px; color: #cbd5e0; text-decoration: none; font-size: 0.875rem;
-        transition: all 0.2s ease; cursor: pointer;
-      }
-      .role-option:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
-      .role-option.active { background: var(--accent); color: var(--white); border-color: var(--accent); }
-
-      .hint { margin-top: 2rem; font-size: 0.7rem; color: #718096; }
-    </style>
   </head>
-  <body>
-    <div class="login-container">
-      <div class="logo"><div class="logo-icon">📚</div></div>
-      <h1>Active Plus</h1>
-      <div class="subtitle">Coaching Management System</div>
-      <div class="login-card">
-        <div class="form-group"><label>Email or Student ID</label><input type="text" id="login-input" placeholder="Enter email or student ID" required></div>
-        <div class="form-group"><label>Password</label><input type="password" id="login-password" placeholder="Enter password" required></div>
-        <button class="btn-login" id="login-btn">Login</div>
-        <div class="status-bar" id="status-bar"><span id="status-text">Checking database connection...</span><span id="status-dot" style="display:none; margin-left: 0.5rem;">●</span></div>
-      </div>
-      <div class="role-options">
-        <div class="role-option active" data-role="student">Student</div>
-        <div class="role-option" data-role="teacher">Teacher</div>
-        <div class="role-option" data-role="admin">Admin</div>
-      </div>
-      <p class="hint">© 2026 Active Plus Coaching Management System</p>
-    </div>
+
+  <body class="auth-body">
+    <main class="auth-shell">
+      <header class="auth-head">
+        <div class="logo" aria-hidden="true"><div class="logo-icon">📚</div></div>
+        <h1>Active Plus</h1>
+        <p class="subtitle">Coaching Management System</p>
+      </header>
+
+      <section class="login-card" aria-labelledby="login-title">
+        <h2 id="login-title" class="sr-only">লগিন ফর্ম</h2>
+
+        <form id="login-form" novalidate>
+          <fieldset class="role-options">
+            <legend>আপনি কে?</legend>
+            <div class="role-grid">
+              <label class="role-option">
+                <input type="radio" name="role" value="student" checked>
+                <span class="role-emoji" aria-hidden="true">🎓</span>
+                <span>শিক্ষার্থী</span>
+              </label>
+              <label class="role-option">
+                <input type="radio" name="role" value="teacher">
+                <span class="role-emoji" aria-hidden="true">🧑‍🏫</span>
+                <span>শিক্ষক</span>
+              </label>
+              <label class="role-option">
+                <input type="radio" name="role" value="admin">
+                <span class="role-emoji" aria-hidden="true">🛡️</span>
+                <span>অ্যাডমিন</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="form-group">
+            <label for="login-input">ইমেইল অথবা স্টুডেন্ট আইডি</label>
+            <input
+              type="text"
+              id="login-input"
+              name="identifier"
+              placeholder="যেমন: 2026-09-001 অথবা name@example.com"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              inputmode="email"
+              required>
+          </div>
+
+          <div class="form-group">
+            <label for="login-password">পাসওয়ার্ড</label>
+            <div class="input-wrap">
+              <input
+                type="password"
+                id="login-password"
+                name="password"
+                placeholder="আপনার পাসওয়ার্ড"
+                autocomplete="current-password"
+                required>
+              <button type="button" class="toggle-password" id="toggle-password" aria-pressed="false" aria-label="পাসওয়ার্ড দেখান">
+                দেখুন
+              </button>
+            </div>
+          </div>
+
+          <p class="form-error" id="login-error" role="alert" aria-live="assertive"></p>
+
+          <button type="submit" class="btn-login" id="login-btn">লগিন করুন</button>
+        </form>
+
+        <div class="status-bar" id="status-bar" aria-live="polite">
+          <span id="status-text">সংযোগ পরীক্ষা করা হচ্ছে…</span>
+        </div>
+
+        <div class="demo-box" id="demo-box">
+          <h2>ডেমো অ্যাকাউন্ট</h2>
+          <ul id="demo-list"></ul>
+        </div>
+      </section>
+
+      <p class="hint">
+        © ২০২৬ Active Plus Coaching Management System<br>
+        মোবাইল, ট্যাব ও ডেস্কটপ — সব স্ক্রিনে কাজ করে।
+      </p>
+    </main>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <script type="module">
-      import { initFirebase, getDatabase, checkConnectionStatus,
-               isAuthenticated, signInWithEmailAndPassword, signOut,
-               firebaseConfig, dbRefs, showToast } from './js/firebase.js';
+      import { initFirebase, checkConnectionStatus, getAuthMode, showToast } from './js/firebase.js';
+      import { signIn, DEMO_ACCOUNTS, homeFor, ROLES, currentSession } from './js/auth.js';
 
-      document.addEventListener('DOMContentLoaded', async () => {
+      const ALLOWED_PAGES = ['student.html', 'teacher.html', 'admin.html'];
+
+      const form = document.getElementById('login-form');
+      const input = document.getElementById('login-input');
+      const password = document.getElementById('login-password');
+      const loginBtn = document.getElementById('login-btn');
+      const errorBox = document.getElementById('login-error');
+      const statusText = document.getElementById('status-text');
+      const statusBar = document.getElementById('status-bar');
+      const togglePassword = document.getElementById('toggle-password');
+
+      const selectedRole = () => form.elements.role?.value || 'student';
+
+      const setStatus = (message, tone = '') => {
+        statusText.textContent = message;
+        statusBar.className = `status-bar ${tone}`.trim();
+      };
+
+      const showError = (message) => {
+        errorBox.textContent = message || '';
+        errorBox.classList.toggle('visible', Boolean(message));
+      };
+
+      /** Keeps the "chosen" styling in sync without relying on :has(). */
+      const syncRoleOptions = () => {
+        document.querySelectorAll('.role-option').forEach((label) => {
+          const radio = label.querySelector('input[type="radio"]');
+          label.toggleAttribute('data-checked', Boolean(radio?.checked));
+        });
+      };
+
+      const setLoading = (isLoading) => {
+        loginBtn.disabled = isLoading;
+        loginBtn.innerHTML = isLoading
+          ? '<span class="spinner" aria-hidden="true"></span> লগিন হচ্ছে…'
+          : 'লগিন করুন';
+      };
+
+      /** Only allow redirects to our own dashboards. */
+      const safeNext = () => {
+        const next = new URLSearchParams(window.location.search).get('next');
+        return ALLOWED_PAGES.includes(next) ? next : null;
+      };
+
+      const renderDemoAccounts = () => {
+        const list = document.getElementById('demo-list');
+        list.innerHTML = '';
+        DEMO_ACCOUNTS.forEach((account) => {
+          const item = document.createElement('li');
+          const info = document.createElement('div');
+          info.innerHTML = `<strong>${account.label}</strong> · <code>${account.username}</code><br><code>${account.password}</code>`;
+          const fill = document.createElement('button');
+          fill.type = 'button';
+          fill.textContent = 'ব্যবহার করুন';
+          fill.addEventListener('click', () => {
+            input.value = account.username;
+            password.value = account.password;
+            const radio = form.elements.role?.value;
+            const target = form.querySelector(`input[name="role"][value="${account.role}"]`);
+            if (target) { target.checked = true; syncRoleOptions(); }
+            showError('');
+            password.focus();
+            void radio;
+          });
+          item.append(info, fill);
+          list.appendChild(item);
+        });
+      };
+
+      form.elements.role?.addEventListener?.('change', syncRoleOptions);
+      form.querySelectorAll('input[name="role"]').forEach((radio) => {
+        radio.addEventListener('change', () => { syncRoleOptions(); showError(''); });
+      });
+
+      togglePassword.addEventListener('click', () => {
+        const show = password.type === 'password';
+        password.type = show ? 'text' : 'password';
+        togglePassword.textContent = show ? 'লুকান' : 'দেখুন';
+        togglePassword.setAttribute('aria-pressed', String(show));
+        password.focus();
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        showError('');
+
+        const identifier = input.value.trim();
+        const secret = password.value;
+        const role = selectedRole();
+
+        if (!identifier || !secret) {
+          showError('ইউজারনেইম/স্টুডেন্ট আইডি এবং পাসওয়ার্ড দুটোই দিন।');
+          (!identifier ? input : password).focus();
+          return;
+        }
+        if (!ROLES.includes(role)) {
+          showError('একটি ভূমিকা নির্বাচন করুন।');
+          return;
+        }
+
+        setLoading(true);
         try {
-          await initFirebase();
-          const isConnected = await checkConnectionStatus();
-          updateConnectionUI(isConnected);
-
-          const user = isAuthenticated();
-          if (!user) {
-            setupLoginForm();
-          } else {
-            const userRole = getUserRole();
-            const redirectMap = { 'admin': 'admin.html', 'teacher': 'teacher.html', 'student': 'student.html' };
-            window.location.href = redirectMap[userRole] || 'index.html';
-          }
+          const session = await signIn(identifier, secret, role);
+          setStatus(`স্বাগতম, ${session.name}!`, 'connected');
+          showToast(`সফলভাবে লগিন হয়েছে — ${session.name}`, 'success');
+          window.location.replace(safeNext() || homeFor(session.role));
         } catch (error) {
-          showStatus('Error: ' + error.message, 'error');
+          console.warn('[Active Plus] Login failed:', error.code || '', error.message);
+          showError(error.message || 'লগিন করা যায়নি। আবার চেষ্টা করুন।');
+          setLoading(false);
+          password.select();
         }
       });
 
-      function setupLoginForm() {
-        const loginBtn = document.getElementById('login-btn');
-        const loginInput = document.getElementById('login-input');
-        const loginPassword = document.getElementById('login-password');
-        const statusBar = document.getElementById('status-bar');
-        const statusText = document.getElementById('status-text');
-        const roleOptions = document.querySelectorAll('.role-option');
+      const boot = async () => {
+        syncRoleOptions();
+        renderDemoAccounts();
 
-        roleOptions.forEach(opt => {
-          opt.addEventListener('click', () => {
-            roleOptions.forEach(o => o.classList.remove('active'));
-            opt.classList.add('active');
+        const session = currentSession();
+        if (session) {
+          setStatus(`আগে থেকেই লগিন করা আছে — ${session.name}`, 'connected');
+          window.location.replace(safeNext() || homeFor(session.role));
+          return;
+        }
+
+        try {
+          await initFirebase();
+          if (getAuthMode() === 'firebase') {
+            const connected = await checkConnectionStatus();
+            setStatus(connected ? 'ডেটাবেস সংযুক্ত ●' : 'ডেটাবেস সংযোগ পাওয়া যায়নি ●', connected ? 'connected' : 'disconnected');
+          } else {
+            setStatus('লোকাল মোড চালু — ডেটা এই ডিভাইসে সংরক্ষিত থাকবে ●', 'connected');
+          }
+        } catch (error) {
+          console.error('[Active Plus] init error:', error);
+          setStatus('লোকাল মোড চালু ●', 'disconnected');
+        }
+        input.focus({ preventScroll: true });
+      };
+
+      boot();
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('service-worker.js').catch((error) => {
+            console.warn('[Active Plus] Service worker registration failed:', error.message);
           });
         });
-
-        loginInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loginPassword.focus(); });
-        loginPassword.addEventListener('keypress', (e) => { if (e.key === 'Enter') loginBtn.click(); });
-
-        loginBtn.addEventListener('click', async () => {
-          const identifier = loginInput.value.trim();
-          const password = loginPassword.value.trim();
-          const selectedRole = document.querySelector('.role-option.active')?.dataset.role;
-
-          if (!identifier || !password || !selectedRole) {
-            showStatus('Please fill in all fields', 'error'); return;
-          }
-
-          showStatus('Logging in...', 'connected');
-
-          try {
-            const result = await signInWithEmailAndPassword(identifier, password);
-            if (result.user) {
-              setUserRole(selectedRole);
-              const redirectMap = { 'admin': 'admin.html', 'teacher': 'teacher.html', 'student': 'student.html' };
-              localStorage.setItem('activeplus_redirect', redirectMap[selectedRole]);
-              window.location.href = redirectMap[selectedRole];
-            }
-          } catch (loginError) {
-            performLogin(identifier, password, selectedRole);
-          }
-        });
-      }
-
-      function performLogin(identifier, password, role) {
-        const userSession = { role, identifier, loginTime: new Date().toISOString() };
-        saveUserSession(userSession);
-        setUserRole(role);
-
-        if (role === 'student' && validateStudentId(identifier)) {
-          const idSpan = document.createElement('span');
-          idSpan.className = 'student-id-format';
-          idSpan.textContent = identifier;
-          const statusBar = document.getElementById('status-bar');
-          if (statusBar && !document.querySelector('.student-id-format')) {
-            statusBar.insertAdjacentElement('afterend', idSpan);
-          }
-        }
       }
     </script>
   </body>
