@@ -12,7 +12,7 @@ import {
   challengeState, addChallengeProgress, performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
   recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial,
-  examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION
+  examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION, subscribeRemote
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
 
@@ -75,7 +75,10 @@ export function initStudentHome() {
     openModal('detail-modal');
   };
 
-  /* ---------------- Online / offline indicator ---------------- */
+  /* Live data: when Firebase backs the store, re-render on remote changes. */
+  subscribeRemote(() => { renderHomeSafe(); });
+
+
   const netChip = document.getElementById('net-chip');
   const paintNet = () => {
     if (!netChip) return;

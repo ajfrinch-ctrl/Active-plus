@@ -386,3 +386,19 @@ test('admin settings decide which profile fields a student may edit', async () =
   m.db.settings.update({ studentEditableFields: [] });
   assert.deepEqual(m.db.settings.get().studentEditableFields, [], 'admin can revoke permission');
 });
+
+test('the store mirrors to the remote backend when one is configured', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=h13');
+
+  const mirrored = [];
+  m._setRemoteTransport((payload) => mirrored.push(payload));
+  m.db.students.add({ id: '2026-09-888', name: 'Mirror Test', className: 'নবম', roll: '৮', school: 'x', status: 'সক্রিয়' });
+  assert.equal(mirrored.length, 1, 'a write is mirrored');
+  assert.ok(mirrored[0].collections.students.some((s) => s.id === '2026-09-888'), 'mirror carries the new row');
+  m._setRemoteTransport(null);
+
+  // Local mode (no backend) must not try to sync and still works.
+  assert.equal(m.subscribeRemote(() => {}), null, 'nothing to subscribe to without Firebase');
+});

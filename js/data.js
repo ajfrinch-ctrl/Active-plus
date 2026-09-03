@@ -11,6 +11,7 @@
  */
 
 import { readJSON, writeJSON } from './store.js';
+import { isFirebaseConfigured, ref as fbRef } from './firebase.js';
 
 const DATA_KEY = 'activeplus_data';
 export const DATA_VERSION = 7; // student home: tips, banners, study activity, daily challenge
@@ -166,8 +167,45 @@ function load() {
   return fresh;
 }
 
+let applyingRemote = false;
+let remoteTransport = null; // injectable (tests / alternate backends)
+
+/** Test/host hook: replace the remote transport. */
+export function _setRemoteTransport(fn) { remoteTransport = fn; }
+
+/** Mirror the single store to Firebase when it is configured (never a 2nd DB). */
+function pushRemote(store) {
+  if (applyingRemote) return;
+  const transport = remoteTransport || (isFirebaseConfigured()
+    ? (payload) => { const r = fbRef('activeplus/data'); return r?.set ? r.set(payload).catch(() => null) : null; }
+    : null);
+  if (!transport) return;
+  try { transport(store); } catch (e) { /* offline or blocked — local copy still works */ }
+}
+
 function save(store) {
   writeJSON(DATA_KEY, store);
+  pushRemote(store);
+}
+
+/**
+ * Live updates when Firebase is the backend. Returns an unsubscribe function,
+ * or null in local mode (nothing to subscribe to).
+ */
+export function subscribeRemote(onSnapshot) {
+  if (!isFirebaseConfigured()) return null;
+  const r = fbRef('activeplus/data');
+  if (!r || typeof r.on !== 'function') return null;
+  const handler = (snap) => {
+    const value = typeof snap?.val === 'function' ? snap.val() : snap;
+    if (!value || !value.collections) return;
+    applyingRemote = true;
+    writeJSON(DATA_KEY, value);
+    applyingRemote = false;
+    if (onSnapshot) onSnapshot(value);
+  };
+  r.on('value', handler);
+  return () => (typeof r.off === 'function' ? r.off('value', handler) : undefined);
 }
 
 function makeCollection(name, { keyField = null } = {}) {
