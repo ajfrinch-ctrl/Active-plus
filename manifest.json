@@ -1,0 +1,14 @@
+{
+  "name": "Active Plus Coaching Management System",
+  "short_name": "Active Plus",
+  "start_url": "index.html?utm_source=pwa_install",
+  "display": "standalone",
+  "theme_color": "#2d3748",
+  "background_color": "#edf2f7",
+  "orientation": "portrait-primary",
+  "description": "Coaching Center Management System - Admin, Teacher, Student",
+  "icons": [
+    { "src": "assets/favicon-32x32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "assets/favicon-16x32.png", "sizes": "16x16", "type": "image/png" }
+  ]
+}
