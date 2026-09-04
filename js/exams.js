@@ -4,7 +4,7 @@
  * students take exams and read suggestions (mountExamTaker / suggestion list).
  */
 
-import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity, examWindow, getDbStatus } from './data.js';
+import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity, examWindow, getDbStatus, assertCan, teacherCanAccessClass } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 
 // Spec 51: never report a saved record that could not be saved.
@@ -18,7 +18,7 @@ export function classOptionsHtml(selected = ALL_CLASSES, { allowAll = true } = {
 /* ------------------------------------------------------------------ */
 /* Suggestions (authoring, used by teacher + admin)                    */
 /* ------------------------------------------------------------------ */
-export function mountSuggestionAuthoring({ author }) {
+export function mountSuggestionAuthoring({ author, session = null }) {
   const list = document.getElementById('suggestion-list');
   const render = () => {
     // Newest 50; every student suggestion lands here forever (spec 62).
@@ -56,14 +56,21 @@ export function mountSuggestionAuthoring({ author }) {
 
   document.getElementById('suggestion-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!onlineFor('সাজেশন সংরক্ষণ')) return;
     const d = new FormData(e.target);
     const title = String(d.get('title') || '').trim();
     const content = String(d.get('content') || '').trim();
     if (!title || !content) { showToast('শিরোনাম ও বিষয়বস্তু দুটোই দিন।', 'error'); return; }
+    const className = String(d.get('className'));
+    if (!onlineFor('সাজেশন সংরক্ষণ')) return;
+    // Enforced here, not just by narrowing the picker (spec 8).
+    try { assertCan(session, 'manageQuestions', 'সাজেশন প্রকাশ'); }
+    catch (err) { showToast(err.message, 'error'); return; }
+    if (session && !teacherCanAccessClass(session, className)) {
+      showToast('অনুমোদিত ক্লাস নয়।', 'error'); return;
+    }
     db.suggestions.add({
       id: newId('sug'), title, content,
-      className: String(d.get('className')),
+      className,
       subject: String(d.get('subject') || '').trim(),
       author, date: todayBn()
     });
@@ -78,7 +85,7 @@ export function mountSuggestionAuthoring({ author }) {
 /* ------------------------------------------------------------------ */
 /* MCQ exams (authoring, used by teacher + admin)                      */
 /* ------------------------------------------------------------------ */
-export function mountExamAuthoring() {
+export function mountExamAuthoring({ session = null } = {}) {
   const list = document.getElementById('exam-list');
   let staged = [];
 
@@ -161,17 +168,24 @@ export function mountExamAuthoring() {
 
   document.getElementById('exam-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!onlineFor('পরীক্ষা সংরক্ষণ')) return;
     const d = new FormData(e.target);
     const title = String(d.get('title') || '').trim();
     if (!title) { showToast('পরীক্ষার শিরোনাম দিন।', 'error'); return; }
     if (!staged.length) { showToast('কমপক্ষে একটি প্রশ্ন যোগ করুন।', 'error'); return; }
+    const className = String(d.get('className'));
+    if (!onlineFor('পরীক্ষা সংরক্ষণ')) return;
+    // A hand-edited select must not reach a class outside the assignment (spec 8).
+    try { assertCan(session, 'manageExams', 'পরীক্ষা তৈরি'); }
+    catch (err) { showToast(err.message, 'error'); return; }
+    if (session && !teacherCanAccessClass(session, className)) {
+      showToast('অনুমোদিত ক্লাস নয়।', 'error'); return;
+    }
     const startDate = String(d.get('startDate') || '').trim();
     const endDate = String(d.get('endDate') || '').trim();
     const toBnDate = (iso) => (iso ? iso.replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[Number(x)]) : '');
     db.exams.add({
       id: newId('exam'), title,
-      className: String(d.get('className')),
+      className,
       subject: String(d.get('subject') || '').trim(),
       author: window.__examAuthor || '',
       date: String(d.get('date') || '').trim() || todayBn(),

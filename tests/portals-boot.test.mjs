@@ -597,3 +597,58 @@ test('the question bank import flow validates, previews and really imports', asy
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
+
+test('a teacher cannot author exams or suggestions for a class they do not teach', async () => {
+  const out = await bootPage('teacher.html', {
+    username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'scope'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  // রাহেলা আক্তার teaches নবম only.
+  assert.deepEqual(data.teacherProfile('রাহেলা আক্তার').classNames, ['নবম']);
+
+  // The pickers must not even offer a class this teacher does not own.
+  const examOpts = [...doc.getElementById('exam-class').options].map((o) => o.value || o.textContent);
+  assert.ok(!examOpts.includes('দশম'), `exam class picker offers only assigned classes, got ${examOpts}`);
+  const sugOpts = [...doc.getElementById('sug-class').options].map((o) => o.value || o.textContent);
+  assert.ok(!sugOpts.includes('দশম'), `suggestion class picker offers only assigned classes, got ${sugOpts}`);
+
+  // Defence in depth: a hand-edited select must still be refused by the handler.
+  const examsBefore = data.db.exams.list().length;
+  const examSel = doc.getElementById('exam-class');
+  examSel.innerHTML = '<option value="দশম">দশম</option>';
+  examSel.value = 'দশম';
+  doc.getElementById('exam-title').value = 'অনুমোদিত নয় পরীক্ষা';
+  doc.getElementById('q-text').value = '১+১=?';
+  ['২', '৩', '৪', '৫'].forEach((v, i) => { doc.getElementById(`q-opt${i}`).value = v; });
+  doc.getElementById('add-question').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.exams.list().length, examsBefore,
+    'no exam is written for a class outside the teacher assignment');
+
+  const sugBefore = data.db.suggestions.list().length;
+  const sugSel = doc.getElementById('sug-class');
+  sugSel.innerHTML = '<option value="দশম">দশম</option>';
+  sugSel.value = 'দশম';
+  doc.getElementById('sug-title').value = 'অনুমোদিত নয় সাজেশন';
+  doc.getElementById('sug-content').value = 'বিষয়বস্তু';
+  doc.getElementById('suggestion-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.suggestions.list().length, sugBefore,
+    'no suggestion is written for a class outside the teacher assignment');
+
+  // The teacher own class still works, so the guard is not a blanket block.
+  examSel.innerHTML = '<option value="নবম">নবম</option>';
+  examSel.value = 'নবম';
+  doc.getElementById('exam-title').value = 'অনুমোদিত পরীক্ষা';
+  doc.getElementById('q-text').value = '২+২=?';
+  ['৩', '৪', '৫', '৬'].forEach((v, i) => { doc.getElementById(`q-opt${i}`).value = v; });
+  doc.getElementById('add-question').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.exams.list().length, examsBefore + 1, 'an exam for their own class is still created');
+  assert.equal(data.db.exams.list().at(-1).className, 'নবম');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});

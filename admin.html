@@ -1128,8 +1128,8 @@
       document.getElementById('sug-class').innerHTML = classOptionsHtml('নবম', { allowAll: false });
       document.getElementById('exam-class').innerHTML = classOptionsHtml('নবম', { allowAll: false });
       setExamAuthor(session.name);
-      mountSuggestionAuthoring({ author: session.name });
-      mountExamAuthoring();
+      mountSuggestionAuthoring({ author: session.name, session });
+      mountExamAuthoring({ session });
 
       /* ------------------------------------------------------------ */
       /* Settings                                                      */

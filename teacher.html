@@ -397,8 +397,9 @@
         // A teacher may only address their own classes, so the picker must not
         // offer "সব" — that option could never pass the class check below.
         document.getElementById('teacher-notice-class').innerHTML = myClassOptions;
-        document.getElementById('sug-class').innerHTML = classOptionsHtml('নবম');
-        document.getElementById('exam-class').innerHTML = classOptionsHtml('নবম');
+        // Only the classes this teacher actually owns (spec 8).
+        document.getElementById('sug-class').innerHTML = myClassOptions;
+        document.getElementById('exam-class').innerHTML = myClassOptions;
 
         const renderOverview = () => {
           const batches = db.batches.list();
@@ -614,8 +615,8 @@
 
         /* -------- Suggestions + MCQ authoring -------- */
         setExamAuthor(session.name);
-        mountSuggestionAuthoring({ author: session.name });
-        mountExamAuthoring();
+        mountSuggestionAuthoring({ author: session.name, session });
+        mountExamAuthoring({ session });
 
         /* ================= App-style home ================= */
         const teacherHome = initTeacherHome({
