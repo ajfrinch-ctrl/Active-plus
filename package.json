@@ -1,0 +1,16 @@
+{
+  "name": "active-plus",
+  "version": "1.0.0",
+  "description": "Active Plus Coaching Management System - mobile-first PWA with Student/Teacher/Admin portals.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test \"tests/*.test.mjs\"",
+    "icons": "python3 tools/generate-icons.py",
+    "icons:check": "python3 tools/generate-icons.py --check",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

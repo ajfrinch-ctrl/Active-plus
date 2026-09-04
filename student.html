@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Active Plus · হোম</title>
+    <meta name="theme-color" content="#2d3748">
+    <meta name="color-scheme" content="dark">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  </head>
+
+  <body class="home-body">
+    <main class="home">
+      <!-- Header -->
+      <header class="home-header">
+        <div class="avatar" id="avatar" aria-hidden="true">A</div>
+        <div class="who">
+          <div class="greet" id="greet">…</div>
+          <div class="name" id="student-name">…</div>
+          <div class="meta" id="student-meta">…</div>
+        </div>
+        <button type="button" class="icon-btn" id="profile-btn" aria-label="প্রোফাইল">👤</button>
+        <span class="net-chip" id="net-chip" role="status" aria-live="polite">…</span>
+        <button type="button" class="bell" id="bell" aria-label="নোটিফিকেশন">🔔<span class="badge-dot" id="bell-count" hidden>0</span></button>
+      </header>
+
+      <!-- HOME view -->
+      <section id="view-home" class="home-view">
+        <div id="home-skeleton" aria-busy="true" aria-live="polite">
+          <div class="hcard skeleton"><div class="sk-line" style="width:40%"></div><div class="sk-line" style="width:70%"></div></div>
+          <div class="hcard skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:80%"></div></div>
+        </div>
+        <div id="home-content" hidden></div>
+      </section>
+
+      <!-- STUDY view -->
+      <section id="view-study" class="home-view" hidden>
+        <h2 class="section-title">স্টাডি ম্যাটেরিয়াল</h2>
+        <div id="material-list"></div>
+        <h2 class="section-title">সাজেশন</h2>
+        <div id="student-suggestion-list"></div>
+      </section>
+
+      <!-- EXAM view -->
+      <section id="view-exam" class="home-view" hidden>
+        <h2 class="section-title">MCQ পরীক্ষা</h2>
+        <div class="list" id="student-exam-list"></div>
+        <div id="exam-player" hidden></div>
+      </section>
+
+      <!-- RESULT view -->
+      <section id="view-result" class="home-view" hidden>
+        <div id="result-content"></div>
+      </section>
+
+      <!-- MORE view -->
+      <section id="view-more" class="home-view" hidden>
+        <div id="more-content"></div>
+      </section>
+    </main>
+
+    <!-- Notification center modal -->
+    <div class="modal-overlay" id="notif-center" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2>নোটিফিকেশন</h2>
+        <div class="list" id="notif-list"></div>
+      </div>
+    </div>
+
+    <!-- Bottom navigation -->
+    <nav class="bottom-nav" aria-label="মূল নেভিগেশন">
+      <div class="inner">
+        <button type="button" data-view="home" aria-current="true"><span class="ico">🏠</span>হোম</button>
+        <button type="button" data-view="study"><span class="ico">📚</span>স্টাডি</button>
+        <button type="button" data-view="exam"><span class="ico">📝</span>পরীক্ষা</button>
+        <button type="button" data-view="result"><span class="ico">🏆</span>ফলাফল</button>
+        <button type="button" data-view="more"><span class="ico">☰</span>আরও</button>
+      </div>
+    </nav>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script type="module">
+      import { initStudentHome } from './js/student-home.js';
+      initStudentHome();
+    </script>
+  </body>
+</html>

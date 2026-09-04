@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="bn" dir="ltr">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>অ্যাডমিন প্যানেল · Active Plus</title>
+    <meta name="theme-color" content="#2d3748">
+    <meta name="color-scheme" content="dark">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+  </head>
+
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-mark" id="user-initial" aria-hidden="true">A</div>
+          <div class="brand-text">
+            <strong id="user-name">অ্যাডমিন</strong>
+            <span id="user-role">লোড হচ্ছে…</span>
+          </div>
+        </div>
+        <input type="search" id="global-search" class="form-input" placeholder="🔍 খুঁজুন…" style="max-width:160px;flex:1 1 auto" aria-label="গ্লোবাল সার্চ">
+        <button type="button" class="icon-btn notif-btn" id="admin-bell" data-tab="activity" aria-label="নোটিফিকেশন">🔔<span class="notif-badge" id="admin-bell-count" hidden>০</span></button>
+        <button type="button" class="icon-btn" id="logout-btn">লগআউট</button>
+      </header>
+      <div id="global-results" class="container" style="position:absolute;top:56px;right:.5rem;z-index:60;max-width:320px"></div>
+
+      <nav class="top-tab-bar" role="tablist" aria-label="অ্যাডমিন মেনু">
+        <button type="button" data-tab="home" aria-selected="true">🏠 হোম</button>
+        <button type="button" data-tab="overview">ড্যাশবোর্ড</button>
+        <button type="button" data-tab="batches">ব্যাচ</button>
+        <button type="button" data-tab="students">শিক্ষার্থী</button>
+        <button type="button" data-tab="dues">বকেয়া ও পেমেন্ট</button>
+        <button type="button" data-tab="teachers">শিক্ষক</button>
+        <button type="button" data-tab="notices">নোটিশ</button>
+        <button type="button" data-tab="suggestion">সাজেশন</button>
+        <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
+        <button type="button" data-tab="classes">ক্লাস</button>
+        <button type="button" data-tab="subjects">বিষয়</button>
+        <button type="button" data-tab="questionbank">প্রশ্ন ব্যাংক</button>
+        <button type="button" data-tab="results">ফলাফল</button>
+        <button type="button" data-tab="materials">ম্যাটেরিয়াল</button>
+        <button type="button" data-tab="assignments">অ্যাসাইনমেন্ট</button>
+        <button type="button" data-tab="submissions">জমাকৃত কাজ</button>
+        <button type="button" data-tab="routine">রুটিন</button>
+        <button type="button" data-tab="notifications">নোটিফিকেশন</button>
+        <button type="button" data-tab="analytics">অ্যানালিটিক্স</button>
+        <button type="button" data-tab="reports">রিপোর্ট</button>
+        <button type="button" data-tab="users">ইউজার</button>
+        <button type="button" data-tab="activity">অ্যাক্টিভিটি লগ</button>
+        <button type="button" data-tab="backup">ব্যাকআপ</button>
+        <button type="button" data-tab="tips">💡 টিপ</button>
+        <button type="button" data-tab="banners">📢 ব্যানার</button>
+        <button type="button" data-tab="profile">প্রোফাইল</button>
+        <button type="button" data-tab="settings">সেটিংস</button>
+      </nav>
+
+      <main class="app-main">
+        <!-- ============ App-style Admin Home ============ -->
+        <section class="tab-panel" id="tab-home">
+          <div id="admin-home" class="home-shell"></div>
+        </section>
+
+        <!-- ============ Batch management ============ -->
+        <section class="tab-panel" id="tab-batches" hidden>
+          <div class="card">
+            <h2>ব্যাচ ব্যবস্থাপনা</h2>
+            <div id="batches-crud"></div>
+          </div>
+        </section>
+
+        <!-- ======================= Dashboard ======================= -->
+        <section class="tab-panel" id="tab-overview" hidden>
+          <div class="stat-grid" id="admin-stats"></div>
+          <div class="section">
+            <h2 class="section-title">কুইক অ্যাকশন</h2>
+            <div class="row-actions" id="quick-actions"></div>
+          </div>
+          <div id="overview-extra"></div>
+          <div class="section card-grid">
+            <div class="card">
+              <h3>মাসিক আয়</h3>
+              <p id="income-summary">লোড হচ্ছে…</p>
+              <div class="progress-bar" style="margin-top:.75rem"><div class="progress-fill" id="income-bar" style="width:0%"></div></div>
+            </div>
+            <div class="card">
+              <h3>সাম্প্রতিক নোটিশ</h3>
+              <p id="latest-notice">—</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================= Students ======================= -->
+        <section class="tab-panel" id="tab-students" hidden>
+          <h2 class="section-title">
+            শিক্ষার্থী তালিকা (<span id="student-count">০</span>)
+            <button type="button" class="btn btn-small" id="open-student-modal">+ নতুন ভর্তি</button>
+          </h2>
+          <div class="form-group" style="max-width:240px">
+            <label for="class-filter">ক্লাস ফিল্টার</label>
+            <select id="class-filter" class="form-input form-select"></select>
+          </div>
+          <div class="table-wrap">
+            <table class="table" id="student-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ======================= Dues & Payments ======================= -->
+        <section class="tab-panel" id="tab-dues" hidden>
+          <h2 class="section-title">বকেয়া তালিকা (<span id="due-count">০</span>)</h2>
+          <div class="table-wrap">
+            <table class="table" id="due-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <h2 class="section-title" style="margin-top:1.25rem">সাম্প্রতিক পেমেন্ট</h2>
+          <div class="list" id="payment-list"></div>
+        </section>
+
+        <!-- ======================= Suggestions ======================= -->
+        <section class="tab-panel" id="tab-suggestion" hidden>
+          <h2 class="section-title">
+            সাজেশন
+            <button type="button" class="btn btn-small" id="open-suggestion-modal">+ সাজেশন</button>
+          </h2>
+          <div class="list" id="suggestion-list"></div>
+        </section>
+
+        <!-- ======================= Exams ======================= -->
+        <section class="tab-panel" id="tab-exam" hidden>
+          <h2 class="section-title">
+            MCQ পরীক্ষা
+            <button type="button" class="btn btn-small" id="open-exam-modal">+ পরীক্ষা</button>
+          </h2>
+          <div class="list" id="exam-list"></div>
+        </section>
+
+        <!-- ======================= Teachers ======================= -->
+        <section class="tab-panel" id="tab-teachers" hidden>
+          <h2 class="section-title">
+            শিক্ষক তালিকা
+            <button type="button" class="btn btn-small" id="open-teacher-modal">+ নতুন শিক্ষক</button>
+          </h2>
+          <div class="table-wrap">
+            <table class="table" id="teacher-table">
+              <thead><tr></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ======================= Notices ======================= -->
+        <section class="tab-panel" id="tab-notices" hidden>
+          <h2 class="section-title">
+            নোটিশ বোর্ড
+            <button type="button" class="btn btn-small" id="open-notice-modal">+ নতুন নোটিশ</button>
+          </h2>
+          <div class="list" id="notice-list"></div>
+        </section>
+
+        <!-- ======================= Settings ======================= -->
+        <section class="tab-panel" id="tab-settings" hidden>
+          <h2 class="section-title">প্রতিষ্ঠান সেটিংস</h2>
+          <form id="settings-form" class="card">
+            <div class="form-group">
+              <label for="set-org">প্রতিষ্ঠানের নাম</label>
+              <input class="form-input" id="set-org" name="orgName" required>
+            </div>
+            <div class="form-group">
+              <label for="set-address">ঠিকানা</label>
+              <input class="form-input" id="set-address" name="address">
+            </div>
+            <div class="form-group">
+              <label for="set-fee">মাসিক ফি (৳)</label>
+              <input class="form-input" id="set-fee" name="monthlyFee" type="number" min="0">
+            </div>
+            <div class="form-group">
+              <label>শিক্ষার্থী হোমে কোন কার্ড দেখানো হবে</label>
+            <div class="form-group">
+              <label for="set-challenge">ডেইলি চ্যালেঞ্জের প্রশ্ন সংখ্যা</label>
+              <input class="form-input" id="set-challenge" name="dailyChallengeTarget" type="number" min="1" max="50">
+            </div>
+            <div class="form-group">
+              <label>শিক্ষার্থী নিজে কোন প্রোফাইল ফিল্ড সম্পাদনা করতে পারবে</label>
+              <div class="check-grid" id="student-editable">
+                <label class="check"><input type="checkbox" name="edit_phone" value="1"> মোবাইল</label>
+                <label class="check"><input type="checkbox" name="edit_guardianPhone" value="1"> অভিভাবকের মোবাইল</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>শিক্ষার্থীর "আরও দেখুন" তালিকায় কোন ফিচার থাকবে</label>
+              <div class="check-grid" id="home-features">
+                <label class="check"><input type="checkbox" name="feat_questionbank" value="1"> প্রশ্ন ব্যাংক</label>
+                <label class="check"><input type="checkbox" name="feat_progress" value="1"> আমার প্রগ্রেস</label>
+                <label class="check"><input type="checkbox" name="feat_achievements" value="1"> অর্জন</label>
+                <label class="check"><input type="checkbox" name="feat_certificates" value="1"> সনদ</label>
+                <label class="check"><input type="checkbox" name="feat_downloads" value="1"> ডাউনলোড</label>
+                <label class="check"><input type="checkbox" name="feat_query" value="1"> শিক্ষক প্রশ্ন</label>
+                <label class="check"><input type="checkbox" name="feat_streak" value="1"> স্ট্রিক</label>
+                <label class="check"><input type="checkbox" name="feat_profile" value="1"> প্রোফাইল</label>
+                <label class="check"><input type="checkbox" name="feat_settings" value="1"> সেটিংস</label>
+                <label class="check"><input type="checkbox" name="feat_help" value="1"> সহায়তা</label>
+              </div>
+            </div>
+              <div class="check-grid" id="home-cards">
+              <label class="check"><input type="checkbox" name="home_progress" value="1"> আজকের প্রগ্রেস</label>
+              <label class="check"><input type="checkbox" name="home_nextClass" value="1"> পরবর্তী ক্লাস</label>
+              <label class="check"><input type="checkbox" name="home_exam" value="1"> আসন্ন পরীক্ষা</label>
+              <label class="check"><input type="checkbox" name="home_challenge" value="1"> ডেইলি চ্যালেঞ্জ</label>
+              <label class="check"><input type="checkbox" name="home_materials" value="1"> স্টাডি ম্যাটেরিয়াল</label>
+              <label class="check"><input type="checkbox" name="home_assignments" value="1"> অ্যাসাইনমেন্ট</label>
+              <label class="check"><input type="checkbox" name="home_performance" value="1"> পারফরম্যান্স</label>
+              <label class="check"><input type="checkbox" name="home_achievements" value="1"> অর্জন</label>
+              <label class="check"><input type="checkbox" name="home_fee" value="1"> ফি স্ট্যাটাস</label>
+              <label class="check"><input type="checkbox" name="home_banners" value="1"> ব্যানার</label>
+              <label class="check"><input type="checkbox" name="home_tip" value="1"> শিক্ষকের টিপ</label>
+              <label class="check"><input type="checkbox" name="home_notices" value="1"> নোটিশ</label>
+              <label class="check"><input type="checkbox" name="home_leaderboard" value="1"> লিডারবোর্ড</label>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-block">সংরক্ষণ করুন</button>
+          </form>
+
+          <h2 class="section-title">সিস্টেম</h2>
+          <div class="card">
+            <div class="list" id="system-list"></div>
+          </div>
+          <div class="card">
+            <h3>রেজিস্টার্ড অ্যাকাউন্ট</h3>
+            <div class="list" id="account-list"></div>
+          </div>
+          <div class="card">
+            <h3>ডেঞ্জার জোন</h3>
+            <p style="margin-bottom:.75rem">ডেমো ডেটা মুছে প্রথম অবস্থায় ফিরে যাবে।</p>
+            <button type="button" class="btn btn-error btn-block" id="reset-data">ডেটা রিসেট করুন</button>
+          </div>
+        </section>
+
+        <!-- ===== New ERP tabs ===== -->
+        <section class="tab-panel" id="tab-classes" hidden><h2 class="section-title">ক্লাস ম্যানেজমেন্ট</h2><div id="classes-crud"></div></section>
+        <section class="tab-panel" id="tab-subjects" hidden><h2 class="section-title">বিষয় ম্যানেজমেন্ট</h2><div id="subjects-crud"></div></section>
+
+        <section class="tab-panel" id="tab-questionbank" hidden>
+          <h2 class="section-title">প্রশ্ন ব্যাংক / MCQ ইমপোর্ট</h2>
+          <div class="form-group"><label for="qb-exam">পরীক্ষা নির্বাচন</label><select id="qb-exam" class="form-input form-select"></select></div>
+          <div class="card">
+            <h3>পেস্ট করে ইমপোর্ট</h3>
+            <div class="form-group"><textarea id="qb-paste" class="form-input form-textarea" placeholder="প্রশ্ন&#10;A. অপশন&#10;B. অপশন&#10;C. অপশন&#10;D. অপশন&#10;সঠিক: B"></textarea></div>
+            <div class="row-actions"><button type="button" class="btn btn-secondary" id="qb-parse">Parse</button><button type="button" class="btn btn-small" id="qb-template">স্যাম্পল টেমপ্লেট</button></div>
+          </div>
+          <div class="card">
+            <h3>CSV/Excel আপলোড</h3>
+            <div class="form-group"><input type="file" id="qb-file" class="form-input" accept=".csv,text/csv"></div>
+          </div>
+          <div id="qb-preview"></div>
+          <button type="button" class="btn btn-block" id="qb-import">নিশ্চিত করে ইমপোর্ট করুন</button>
+          <h2 class="section-title" style="margin-top:1rem">বর্তমান প্রশ্ন</h2>
+          <div class="list" id="qb-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-results" hidden>
+          <h2 class="section-title">ফলাফল ও লিডারবোর্ড</h2>
+          <div class="form-group"><label for="res-exam">পরীক্ষা</label><select id="res-exam" class="form-input form-select"></select></div>
+          <p class="form-hint" id="res-analytics"></p>
+          <div class="table-wrap"><table class="table" id="res-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="res-export">এক্সেল/CSV</button><button type="button" class="btn btn-small btn-secondary" id="res-print">প্রিন্ট</button></div>
+        </section>
+
+        <section class="tab-panel" id="tab-materials" hidden><h2 class="section-title">স্টাডি ম্যাটেরিয়াল</h2><div id="materials-crud"></div></section>
+        <section class="tab-panel" id="tab-assignments" hidden><h2 class="section-title">অ্যাসাইনমেন্ট</h2><div id="assignments-crud"></div></section>
+        <section class="tab-panel" id="tab-routine" hidden><h2 class="section-title">ক্লাস রুটিন</h2><div id="routine-crud"></div></section>
+
+        <section class="tab-panel" id="tab-notifications" hidden>
+          <h2 class="section-title">নোটিফিকেশন পাঠান</h2>
+          <form id="notif-form" class="card">
+            <div class="form-row">
+              <div class="form-group"><label for="notif-type">ধরন</label><select id="notif-type" name="type" class="form-input form-select"><option>পরীক্ষা</option><option>ফলাফল</option><option>অ্যাসাইনমেন্ট</option><option>ফি রিমাইন্ডার</option><option>সাধারণ</option></select></div>
+              <div class="form-group"><label for="notif-target">কারা</label><select id="notif-target" name="target" class="form-input form-select"><option>সবাই</option><option>শিক্ষার্থী</option><option>শিক্ষক</option></select></div>
+            </div>
+            <div class="form-group"><label for="notif-title">বার্তা *</label><input id="notif-title" name="title" class="form-input" required></div>
+            <button type="submit" class="btn btn-block">পাঠান</button>
+          </form>
+          <div class="list" id="notif-list"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-analytics" hidden>
+          <h2 class="section-title">অ্যাকাডেমিক অ্যানালিটিক্স</h2>
+          <div class="stat-grid" id="analytics-cards"></div>
+          <div class="card" style="margin-top:1rem"><h3>শিক্ষার্থী বৃদ্ধি (ভর্তি ট্রেন্ড)</h3><div id="chart-admissions"></div></div>
+          <div class="card" style="margin-top:1rem"><h3>ফি সংগ্রহ ট্রেন্ড</h3><div id="chart-collection"></div></div>
+          <div class="card" style="margin-top:1rem"><h3>বকেয়া ট্রেন্ড</h3><div id="chart-due"></div></div>
+          <div class="card" style="margin-top:1rem"><h3>পাসের হার</h3><div id="chart-passrate"></div></div>
+          <div class="card" style="margin-top:1rem"><h3>ক্লাস পারফরম্যান্স</h3><div id="class-perf"></div></div>
+          <div class="card" style="margin-top:1rem"><h3>বিষয়ভিত্তিক পারফরম্যান্স</h3><div id="subject-perf"></div></div>
+        </section>
+
+        <section class="tab-panel" id="tab-reports" hidden>
+          <h2 class="section-title">রিপোর্ট সেন্টার</h2>
+          <div class="form-group"><label for="report-type">রিপোর্ট</label><select id="report-type" class="form-input form-select"></select></div>
+          <div class="table-wrap"><table class="table" id="report-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="report-csv">এক্সেল/CSV</button><button type="button" class="btn btn-small btn-secondary" id="report-print">প্রিন্ট</button></div>
+        </section>
+
+        <section class="tab-panel" id="tab-users" hidden>
+          <h2 class="section-title">ইউজার ও অনুমতি</h2>
+          <div class="list" id="users-list"></div>
+          <h2 class="section-title" style="margin-top:1rem">অনুমতি ম্যাট্রিক্স</h2>
+          <div id="perm-matrix"></div>
+          <button type="button" class="btn btn-block" id="perm-save" style="margin-top:.75rem">অনুমতি সংরক্ষণ</button>
+        </section>
+
+        <section class="tab-panel" id="tab-activity" hidden>
+          <h2 class="section-title">অ্যাক্টিভিটি লগ</h2>
+          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…"></div>
+          <div class="table-wrap"><table class="table" id="activity-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+        </section>
+
+        <section class="tab-panel" id="tab-backup" hidden>
+          <h2 class="section-title">ব্যাকআপ ও রিস্টোর</h2>
+          <div class="card">
+            <button type="button" class="btn btn-block" id="backup-export">ব্যাকআপ ডাউনলোড করুন</button>
+            <div class="form-group" style="margin-top:.75rem"><label for="backup-import">ব্যাকআপ আপলোড</label><input type="file" id="backup-import" class="form-input" accept=".json,application/json"></div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="tab-submissions" hidden>
+          <h2 class="section-title">জমাকৃত অ্যাসাইনমেন্ট</h2>
+          <div id="submissions-crud"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-tips" hidden>
+          <h2 class="section-title">শিক্ষকের টিপ</h2>
+          <div id="tips-crud"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-banners" hidden>
+          <h2 class="section-title">ব্যানার / নোটিশ</h2>
+          <div id="banners-crud"></div>
+        </section>
+
+        <section class="tab-panel" id="tab-profile" hidden>
+          <h2 class="section-title">অ্যাডমিন প্রোফাইল</h2>
+          <form id="profile-form" class="card">
+            <div class="form-group"><label for="pf-name">নাম</label><input id="pf-name" name="name" class="form-input"></div>
+            <div class="form-group"><label for="pf-detail">বিবরণ</label><input id="pf-detail" name="detail" class="form-input"></div>
+            <button type="submit" class="btn btn-block">আপডেট</button>
+          </form>
+          <form id="password-form" class="card">
+            <div class="form-group"><label for="pw-current">বর্তমান পাসওয়ার্ড</label><input id="pw-current" name="current" type="password" class="form-input" required></div>
+            <div class="form-group"><label for="pw-next">নতুন পাসওয়ার্ড</label><input id="pw-next" name="next" type="password" class="form-input" required></div>
+            <button type="submit" class="btn btn-block">পাসওয়ার্ড পরিবর্তন</button>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <!-- Student add/edit modal -->
+    <div class="modal-overlay" id="student-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="student-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="student-modal-title">নতুন শিক্ষার্থী ভর্তি</h2>
+        <form id="student-form">
+          <input type="hidden" id="student-edit-id" name="editId" value="">
+          <div class="form-group">
+            <label for="student-name">নাম *</label>
+            <input class="form-input" id="student-name" name="name" required>
+          </div>
+          <div class="form-group">
+            <label for="student-school">স্কুল / কলেজের নাম</label>
+            <input class="form-input" id="student-school" name="school" placeholder="যেমন: মিরপুর বেঙ্গল উচ্চ বিদ্যালয়">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-class">শ্রেণি</label>
+              <select class="form-input form-select" id="student-class" name="className"></select>
+            </div>
+            <div class="form-group">
+              <label for="student-roll">রোল *</label>
+              <input class="form-input" id="student-roll" name="roll" type="number" min="1" value="1" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="student-photo">প্রোফাইল ছবির লিংক (ঐচ্ছিক)</label>
+            <input class="form-input" id="student-photo" name="photo" placeholder="https://…">
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="student-section">শাখা</label><input class="form-input" id="student-section" name="section" placeholder="A"></div>
+            <div class="form-group"><label for="student-batch">ব্যাচ</label><input class="form-input" id="student-batch" name="batch" placeholder="A"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="student-guardian">অভিভাবকের নাম</label><input class="form-input" id="student-guardian" name="guardian"></div>
+            <div class="form-group"><label for="student-admission">ভর্তির তারিখ</label><input class="form-input" id="student-admission" name="admissionDate" type="date"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-phone">অভিভাবকের মোবাইল</label>
+              <input class="form-input" id="student-phone" name="phone" inputmode="tel" placeholder="০১XXXXXXXXX">
+            </div>
+            <div class="form-group">
+              <label for="student-status">অবস্থা</label>
+              <select class="form-input form-select" id="student-status" name="status">
+                <option value="সক্রিয়">সক্রিয়</option>
+                <option value="বকেয়া">বকেয়া</option>
+              </select>
+            </div>
+          </div>
+          <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।</p>
+          <button type="submit" class="btn btn-block" id="student-save">ভর্তি করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Teacher add/edit modal -->
+    <div class="modal-overlay" id="teacher-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="teacher-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="teacher-modal-title">নতুন শিক্ষক</h2>
+        <form id="teacher-form">
+          <input type="hidden" id="teacher-edit-name" name="editName" value="">
+          <div class="form-group">
+            <label for="teacher-name">নাম *</label>
+            <input class="form-input" id="teacher-name" name="name" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="teacher-subject">বিষয় *</label>
+              <input class="form-input" id="teacher-subject" name="subject" required>
+            </div>
+            <div class="form-group">
+              <label for="teacher-classes">ক্লাস / সপ্তাহ</label>
+              <input class="form-input" id="teacher-classes" name="classes" type="number" min="0" value="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="teacher-phone">মোবাইল</label>
+            <input class="form-input" id="teacher-phone" name="phone" inputmode="tel">
+          </div>
+          <button type="submit" class="btn btn-block" id="teacher-save">সংরক্ষণ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Notice add/edit modal -->
+    <div class="modal-overlay" id="notice-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="notice-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="notice-modal-title">নতুন নোটিশ</h2>
+        <form id="notice-form">
+          <input type="hidden" id="notice-edit-index" name="editIndex" value="">
+          <div class="form-group">
+            <label for="notice-title">শিরোনাম *</label>
+            <input class="form-input" id="notice-title" name="title" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="notice-class">ক্লাস</label>
+              <select class="form-input form-select" id="notice-class" name="className"></select>
+            </div>
+            <div class="form-group">
+              <label for="notice-audience">কাদের জন্য</label>
+              <select class="form-input form-select" id="notice-audience" name="audience">
+                <option>সবাই</option>
+                <option>শিক্ষার্থী</option>
+                <option>অভিভাবক</option>
+                <option>শিক্ষক</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-block" id="notice-save">প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Suggestion modal -->
+    <!-- Payment capture with method/reference/remarks (spec 40) -->
+    <div class="modal-overlay" id="payment-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="payment-modal-title">পেমেন্ট গ্রহণ</h2>
+        <form id="payment-form">
+          <input type="hidden" name="feeId" id="pay-fee-id">
+          <div class="form-group"><label for="pay-student">শিক্ষার্থী</label><input class="form-input" id="pay-student" readonly></div>
+          <div class="form-group"><label for="pay-month">মাস</label><input class="form-input" id="pay-month" readonly></div>
+          <div class="form-group"><label for="pay-amount">পরিমাণ *</label><input class="form-input" id="pay-amount" name="amount" type="number" min="1" required></div>
+          <div class="form-group"><label for="pay-date">তারিখ *</label><input class="form-input" id="pay-date" name="date" required></div>
+          <div class="form-group"><label for="pay-method">মাধ্যম</label>
+            <select class="form-input" id="pay-method" name="method">
+              <option>নগদ</option><option>বিকাশ</option><option>নগদ (মোবাইল)</option><option>ব্যাংক</option><option>কার্ড</option>
+            </select></div>
+          <div class="form-group"><label for="pay-reference">রেফারেন্স / ট্রান্সেকশন নম্বর</label><input class="form-input" id="pay-reference" name="reference"></div>
+          <div class="form-group"><label for="pay-remarks">মন্তব্য</label><textarea class="form-input" id="pay-remarks" name="remarks"></textarea></div>
+          <button type="submit" class="btn btn-block">পেমেন্ট নিশ্চিত করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Printable receipt (spec 40) -->
+    <div class="modal-overlay" id="receipt-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="receipt-title">পেমেন্ট রিসিট</h2>
+        <div id="receipt-body"></div>
+        <button type="button" class="btn btn-block" id="receipt-print" style="margin-top:.75rem">রিসিট প্রিন্ট করুন</button>
+      </div>
+    </div>
+
+    <!-- Student profile: ID card, fee ledger, results (spec 29) -->
+    <div class="modal-overlay" id="student-detail-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="student-detail-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="student-detail-title">শিক্ষার্থী প্রোফাইল</h2>
+        <div id="student-detail-body"></div>
+        <div class="row-actions" style="margin-top:.75rem">
+          <button type="button" class="btn btn-small" id="print-idcard">আইডি কার্ড প্রিন্ট</button>
+          <button type="button" class="btn btn-small btn-secondary" id="print-ledger">লেজার প্রিন্ট</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="suggestion-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="suggestion-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="suggestion-modal-title">নতুন সাজেশন</h2>
+        <form id="suggestion-form">
+          <div class="form-group"><label for="sug-title">শিরোনাম *</label><input class="form-input" id="sug-title" name="title" required></div>
+          <div class="form-row">
+            <div class="form-group"><label for="sug-class">ক্লাস</label><select class="form-input form-select" id="sug-class" name="className"></select></div>
+            <div class="form-group"><label for="sug-subject">বিষয়</label><input class="form-input" id="sug-subject" name="subject"></div>
+          </div>
+          <div class="form-group"><label for="sug-content">বিষয়বস্তু *</label><textarea class="form-input form-textarea" id="sug-content" name="content" required></textarea></div>
+          <button type="submit" class="btn btn-block">প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Exam builder modal -->
+    <div class="modal-overlay" id="exam-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exam-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="exam-modal-title">নতুন MCQ পরীক্ষা</h2>
+        <form id="exam-form">
+          <div class="form-group"><label for="exam-title">শিরোনাম *</label><input class="form-input" id="exam-title" name="title" required></div>
+          <div class="form-row">
+            <div class="form-group"><label for="exam-class">ক্লাস</label><select class="form-input form-select" id="exam-class" name="className"></select></div>
+            <div class="form-group"><label for="exam-subject">বিষয়</label><input class="form-input" id="exam-subject" name="subject"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="exam-date">তারিখ</label><input class="form-input" id="exam-date" name="date" placeholder="২০২৬-০৯-১০"></div>
+            <div class="form-group"><label for="exam-time">সময়</label><input class="form-input" id="exam-time" name="time" placeholder="১৭:০০"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="exam-duration">সময়কাল (মিনিট)</label><input class="form-input" id="exam-duration" name="duration" type="number" min="1" value="30"></div>
+            <div class="form-group"><label for="exam-start">শুরু (YYYY-MM-DD)</label><input class="form-input" id="exam-start" name="startDate" type="date"></div>
+          </div>
+          <div class="form-group"><label for="exam-end">শেষ (YYYY-MM-DD)</label><input class="form-input" id="exam-end" name="endDate" type="date"></div>
+          <div class="card" style="margin:.75rem 0">
+            <h3>প্রশ্ন যোগ করুন</h3>
+            <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
+            <div class="form-row">
+              <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
+              <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
+              <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+            </div>
+            <div class="form-group">
+              <label for="q-answer">সঠিক উত্তর</label>
+              <select class="form-input form-select" id="q-answer">
+                <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
+                <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
+          </div>
+          <div class="form-group"><label>যুক্ত প্রশ্ন</label><div class="list" id="exam-staged"></div></div>
+          <button type="submit" class="btn btn-block" id="exam-save">পরীক্ষা প্রকাশ করুন</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Exam results modal -->
+    <div class="modal-overlay" id="exam-results-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="exam-results-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="exam-results-title">পরীক্ষার ফলাফল</h2>
+        <div class="list" id="exam-results"></div>
+      </div>
+    </div>
+
+    <nav class="bottom-nav" aria-label="মূল নেভিগেশন">
+      <div class="inner">
+        <button type="button" data-tab="home" aria-current="true"><span class="ico">🏠</span>হোম</button>
+        <button type="button" data-tab="students"><span class="ico">👥</span>শিক্ষার্থী</button>
+        <button type="button" data-tab="exam"><span class="ico">📚</span>একাডেমিক</button>
+        <button type="button" data-tab="dues"><span class="ico">💰</span>ফিন্যান্স</button>
+        <button type="button" data-tab="more"><span class="ico">☰</span>আরও</button>
+      </div>
+    </nav>
+
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script type="module">
+      import { initApp, activeTabs, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode, requireOnline } from './js/app.js';
+      import { mountCrud } from './js/crud.js';
+      import { initAdminHome } from './js/admin-home.js';
+      import { listUsers, seedUsers } from './js/auth.js';
+      import { db, CLASS_OPTIONS, CLASS_TO_NUMBER, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus } from './js/data.js';
+      import { generateStudentId } from './js/firebase.js';
+      import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
+      import { mountExtraAdmin } from './js/admin-modules.js';
+
+      const session = initApp({ roles: ['admin'] });
+      if (!session) throw new Error('guard redirect');
+
+      const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+
+      // Spec 51: never report a saved record that could not be saved.
+      const onlineFor = (action) => requireOnline(action, getDbStatus);
+
+      /* ------------------------------------------------------------ */
+      /* Dashboard                                                     */
+      /* ------------------------------------------------------------ */
+      const renderOverview = () => {
+        const students = db.students.list();
+        const teachers = db.teachers.list();
+        const batches = db.batches.list();
+        const settings = db.settings.get();
+        const batchStudents = batches.reduce((sum, b) => sum + Number(b.students || 0), 0);
+        const totalStudents = students.length + batchStudents;
+        const fees = db.fees.list();
+        const dueCount = dueFees().length;
+        const collected = fees.filter((f) => f.status === 'পরিশোধিত').reduce((s, f) => s + Number(f.amount || 0), 0);
+        const expected = fees.reduce((s, f) => s + Number(f.amount || 0), 0) + batchStudents * settings.monthlyFee;
+
+        statGrid('#admin-stats', [
+          { label: 'মোট শিক্ষার্থী', value: bn(totalStudents), tone: 'accent' },
+          { label: 'শিক্ষক', value: bn(teachers.length) },
+          { label: 'ব্যাচ', value: bn(batches.length), tone: 'success' },
+          { label: 'বকেয়া', value: dueCount ? `${bn(dueCount)} জন` : 'নেই', tone: dueCount ? 'warning' : 'success' }
+        ]);
+
+        document.getElementById('income-summary').textContent =
+          `সংগৃহীত ৳${bn(collected.toLocaleString('en-US'))} / প্রত্যাশিত ৳${bn(expected.toLocaleString('en-US'))}`;
+        document.getElementById('income-bar').style.width = `${expected ? Math.min(100, Math.round((collected / expected) * 100)) : 0}%`;
+        document.getElementById('latest-notice').textContent = db.notices.list()[0]?.title || '—';
+        document.getElementById('student-count').textContent = bn(students.length);
+        refreshAdminBell();
+      };
+
+      /* ------------------------------------------------------------ */
+      /* Students CRUD                                                 */
+      /* ------------------------------------------------------------ */
+      const classFilter = document.getElementById('class-filter');
+      classFilter.innerHTML = classOptionsHtml(ALL_CLASSES);
+
+      const renderStudents = () => {
+        const rows = studentsOfClass(classFilter.value || ALL_CLASSES);
+        renderTable('#student-table', [
+          { key: 'id', label: 'আইডি' },
+          { key: 'name', label: 'নাম' },
+          { key: 'className', label: 'শ্রেণি' },
+          { key: 'school', label: 'স্কুল / কলেজ' },
+          { key: 'phone', label: 'মোবাইল' },
+          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'সক্রিয়' ? 'success' : 'warning'}">${escapeHtml(row.status)}</span>` },
+          { key: '_actions', label: 'অ্যাকশন', render: (row) => `
+            <span class="row-actions">
+              <button type="button" class="btn btn-small" data-profile-student="${escapeHtml(row.id)}">প্রোফাইল</button>
+              <button type="button" class="btn btn-small btn-secondary" data-edit-student="${escapeHtml(row.id)}">সম্পাদনা</button>
+              <button type="button" class="btn btn-small btn-error" data-delete-student="${escapeHtml(row.id)}">মুছুন</button>
+            </span>` }
+        ], rows);
+        document.getElementById('student-count').textContent = bn(rows.length);
+      };
+
+      classFilter.addEventListener('change', renderStudents);
+
+      const studentForm = document.getElementById('student-form');
+      const classSelect = document.getElementById('student-class');
+      classSelect.innerHTML = CLASS_OPTIONS.map((c) => `<option>${c}</option>`).join('');
+
+      const openStudentModal = (editId = null) => {
+        studentForm.reset();
+        document.getElementById('student-edit-id').value = '';
+        if (editId) {
+          const student = db.students.find(editId);
+          if (!student) return;
+          document.getElementById('student-modal-title').textContent = 'শিক্ষার্থী সম্পাদনা';
+          document.getElementById('student-save').textContent = 'আপডেট করুন';
+          document.getElementById('student-id-hint').textContent = `আইডি: ${student.id}`;
+          document.getElementById('student-edit-id').value = student.id;
+          studentForm.elements.name.value = student.name || '';
+          studentForm.elements.school.value = student.school || '';
+          studentForm.elements.className.value = student.className || 'নবম';
+          studentForm.elements.roll.value = parseInt(student.roll, 10) || 1;
+          studentForm.elements.phone.value = student.phone || '';
+          studentForm.elements.section.value = student.section || '';
+          studentForm.elements.batch.value = student.batch || '';
+          studentForm.elements.guardian.value = student.guardian || '';
+          studentForm.elements.admissionDate.value = student.admissionDate || '';
+          studentForm.elements.photo.value = student.photo || '';
+          studentForm.elements.status.value = student.status || 'সক্রিয়';
+        } else {
+          document.getElementById('student-modal-title').textContent = 'নতুন শিক্ষার্থী ভর্তি';
+          document.getElementById('student-save').textContent = 'ভর্তি করুন';
+          document.getElementById('student-id-hint').textContent = 'স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।';
+        }
+        openModal('student-modal');
+      };
+
+      document.getElementById('open-student-modal').addEventListener('click', () => openStudentModal());
+
+      studentForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!onlineFor('শিক্ষার্থী সংরক্ষণ')) return;
+        const data = new FormData(studentForm);
+        const editId = String(data.get('editId') || '');
+        const className = String(data.get('className'));
+        const roll = Number(data.get('roll')) || 1;
+        const record = {
+          name: String(data.get('name') || '').trim(),
+          school: String(data.get('school') || '').trim(),
+          className,
+          section: String(data.get('section') || '').trim(),
+          batch: String(data.get('batch') || '').trim(),
+          guardian: String(data.get('guardian') || '').trim(),
+          admissionDate: String(data.get('admissionDate') || '').trim(),
+          photo: String(data.get('photo') || '').trim(),
+          roll: String(data.get('roll')),
+          phone: String(data.get('phone') || '—').trim(),
+          status: String(data.get('status'))
+        };
+        if (!record.name) { showToast('নাম লিখুন।', 'error'); return; }
+
+        if (editId) {
+          db.students.update(editId, record);
+          showToast('শিক্ষার্থীর তথ্য আপডেট হয়েছে।', 'success');
+        } else {
+          const id = generateStudentId(new Date().getFullYear(), CLASS_TO_NUMBER[className] || 9, roll);
+          if (db.students.find(id)) { showToast('এই আইডি আগে থেকেই আছে — রোল বদলান।', 'error'); return; }
+          db.students.add({ id, ...record });
+          showToast(`ভর্তি সম্পন্ন — আইডি ${id}`, 'success');
+        }
+        closeModal('student-modal');
+        renderStudents();
+        renderOverview();
+      });
+
+      /* -------- Student profile: ID card, ledger, results (spec 29) -------- */
+      let profileStudentId = null;
+      const openStudentProfile = (id) => {
+        const st = db.students.find(id);
+        if (!st) { showToast('শিক্ষার্থী পাওয়া যায়নি।', 'error'); return; }
+        profileStudentId = id;
+        const settings = db.settings.get();
+        const paid = db.payments.list().filter((p) => p.studentId === id);
+        const dues = dueFees().filter((d) => d.studentId === id);
+        const paidTotal = paid.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const dueTotal = dues.reduce((s, d) => s + Number(d.amount || 0), 0);
+        const results = db.examResults.list().filter((r) => r.studentId === id);
+        const perf = performanceFor(st);
+        const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(String(value ?? '—'))}</span></div>`;
+
+        document.getElementById('student-detail-body').innerHTML = `
+          <div class="card" data-idcard style="border:2px solid var(--accent);text-align:center">
+            <div style="font-size:.75rem;letter-spacing:.06em">${escapeHtml(settings.orgName || 'Active Plus')}</div>
+            <div style="font-weight:700;font-size:1.125rem;margin-top:.25rem">${escapeHtml(st.name)}</div>
+            <div class="meta">${escapeHtml(st.id)}</div>
+            <div class="meta">${escapeHtml(st.className || '')}${st.section ? ` · ${escapeHtml(st.section)}` : ''}${st.roll ? ` · রোল ${escapeHtml(st.roll)}` : ''}</div>
+            <div class="meta">${escapeHtml(st.phone || '')}</div>
+            <div class="meta">ভর্তি: ${escapeHtml(st.admissionDate || '—')} · ${escapeHtml(st.status || '')}</div>
+          </div>
+
+          <h3 style="margin-top:1rem">অভিভাবক তথ্য</h3>
+          ${row('অভিভাবক', st.guardian)}${row('অভিভাবকের মোবাইল', st.guardianPhone)}
+          ${row('স্কুল / কলেজ', st.school)}${row('ঠিকানা', st.address)}
+
+          <h3 style="margin-top:1rem">ফি লেজার</h3>
+          ${row('পরিশোধিত', `৳${bn(paidTotal)}`)}${row('বকেয়া', `৳${bn(dueTotal)}`)}
+          ${paid.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>তারিখ</th><th>পরিমাণ</th><th>মাধ্যম</th></tr></thead><tbody>${
+            paid.map((p) => `<tr><td>${escapeHtml(p.date || '')}</td><td>৳${bn(p.amount || 0)}</td><td>${escapeHtml(p.method || '—')}</td></tr>`).join('')
+          }</tbody></table></div>` : '<div class="empty-state">কোনো পেমেন্ট রেকর্ড নেই।</div>'}
+          ${dues.length ? `<div class="table-wrap" style="margin-top:.5rem"><table class="table"><thead><tr><th>মাস</th><th>বকেয়া</th></tr></thead><tbody>${
+            dues.map((d) => `<tr><td>${escapeHtml(d.month || '')}</td><td>৳${bn(d.amount || 0)}</td></tr>`).join('')
+          }</tbody></table></div>` : ''}
+
+          <h3 style="margin-top:1rem">একাডেমিক অগ্রগতি</h3>
+          ${perf ? `${row('গড়', perf.avg + '%')}${row('সেরা', perf.best + '%')}${row('টেস্ট', perf.tests)}${row('র‍্যাঙ্ক', '#' + perf.rank)}` : '<p>এখনো কোনো ফলাফল নেই।</p>'}
+          ${results.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>পরীক্ষা</th><th>নম্বর</th><th>%</th></tr></thead><tbody>${
+            results.map((r) => { const ex = db.exams.find(r.examId); const pc = Math.round(r.score / r.total * 100);
+              return `<tr><td>${escapeHtml(ex?.title || r.examId)}</td><td>${escapeHtml(`${r.score}/${r.total}`)}</td><td>${bn(pc)}%</td></tr>`; }).join('')
+          }</tbody></table></div>` : ''}`;
+        openModal('student-detail-modal');
+      };
+
+      document.getElementById('print-idcard')?.addEventListener('click', () => {
+        // The card is rendered on demand, so query it at click time.
+        if (!document.querySelector('#student-detail-body [data-idcard]')) {
+          showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error');
+          return;
+        }
+        logActivity({ user: session.name, role: session.role, action: 'printed ID card', target: profileStudentId || '' });
+        window.print();
+      });
+      document.getElementById('print-ledger')?.addEventListener('click', () => {
+        logActivity({ user: session.name, role: session.role, action: 'printed fee ledger', target: profileStudentId || '' });
+        window.print();
+      });
+
+      document.querySelector('#tab-students').addEventListener('click', (event) => {
+        const editBtn = event.target.closest('[data-edit-student]');
+        const delBtn = event.target.closest('[data-delete-student]');
+        const profileBtn = event.target.closest('[data-profile-student]');
+        if (profileBtn) { openStudentProfile(profileBtn.dataset.profileStudent); return; }
+        if (editBtn) { openStudentModal(editBtn.dataset.editStudent); return; }
+        if (delBtn) {
+          const id = delBtn.dataset.deleteStudent;
+          if (!onlineFor('শিক্ষার্থী মুছে ফেলা')) return;
+          const student = db.students.find(id);
+          if (window.confirm(`"${student?.name}" কে মুছে ফেলবেন?`)) {
+            db.students.remove(id);
+            showToast('শিক্ষার্থী মুছে ফেলা হয়েছে।', 'warning');
+            renderStudents();
+            renderOverview();
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Teachers CRUD                                                 */
+      /* ------------------------------------------------------------ */
+      const renderTeachers = () => {
+        renderTable('#teacher-table', [
+          { key: 'name', label: 'নাম' },
+          { key: 'subject', label: 'বিষয়' },
+          { key: 'phone', label: 'মোবাইল' },
+          { key: 'classes', label: 'ক্লাস/সপ্তাহ' },
+          { key: '_actions', label: 'অ্যাকশন', render: (row) => `
+            <span class="row-actions">
+              <button type="button" class="btn btn-small btn-secondary" data-edit-teacher="${escapeHtml(row.name)}">সম্পাদনা</button>
+              <button type="button" class="btn btn-small btn-error" data-delete-teacher="${escapeHtml(row.name)}">মুছুন</button>
+            </span>` }
+        ], db.teachers.list());
+      };
+
+      const teacherForm = document.getElementById('teacher-form');
+      const openTeacherModal = (editName = null) => {
+        teacherForm.reset();
+        document.getElementById('teacher-edit-name').value = '';
+        if (editName) {
+          const teacher = db.teachers.find(editName);
+          if (!teacher) return;
+          document.getElementById('teacher-modal-title').textContent = 'শিক্ষক সম্পাদনা';
+          document.getElementById('teacher-save').textContent = 'আপডেট করুন';
+          document.getElementById('teacher-edit-name').value = teacher.name;
+          teacherForm.elements.name.value = teacher.name || '';
+          teacherForm.elements.subject.value = teacher.subject || '';
+          teacherForm.elements.classes.value = Number(teacher.classes) || 0;
+          teacherForm.elements.phone.value = teacher.phone || '';
+        } else {
+          document.getElementById('teacher-modal-title').textContent = 'নতুন শিক্ষক';
+          document.getElementById('teacher-save').textContent = 'সংরক্ষণ করুন';
+        }
+        openModal('teacher-modal');
+      };
+
+      document.getElementById('open-teacher-modal').addEventListener('click', () => openTeacherModal());
+
+      teacherForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!onlineFor('শিক্ষক সংরক্ষণ')) return;
+        const data = new FormData(teacherForm);
+        const editName = String(data.get('editName') || '');
+        const record = {
+          name: String(data.get('name') || '').trim(),
+          subject: String(data.get('subject') || '').trim(),
+          classes: Number(data.get('classes')) || 0,
+          phone: String(data.get('phone') || '—').trim()
+        };
+        if (!record.name || !record.subject) { showToast('নাম ও বিষয় দুটোই দিন।', 'error'); return; }
+        if (editName && editName !== record.name && db.teachers.find(record.name)) {
+          showToast('এই নামে আরেকজন শিক্ষক আছেন।', 'error'); return;
+        }
+        if (editName) {
+          db.teachers.remove(editName);
+          db.teachers.add(record);
+          showToast('শিক্ষকের তথ্য আপডেট হয়েছে।', 'success');
+        } else {
+          if (db.teachers.find(record.name)) { showToast('এই নামে শিক্ষক আগে থেকেই আছেন।', 'error'); return; }
+          db.teachers.add(record);
+          showToast('শিক্ষক যোগ করা হয়েছে।', 'success');
+        }
+        closeModal('teacher-modal');
+        renderTeachers();
+        renderOverview();
+      });
+
+      document.querySelector('#tab-teachers').addEventListener('click', (event) => {
+        const editBtn = event.target.closest('[data-edit-teacher]');
+        const delBtn = event.target.closest('[data-delete-teacher]');
+        if (editBtn) { openTeacherModal(editBtn.dataset.editTeacher); return; }
+        if (delBtn) {
+          if (!onlineFor('শিক্ষক মুছে ফেলা')) return;
+          const name = delBtn.dataset.deleteTeacher;
+          if (window.confirm(`"${name}" কে মুছে ফেলবেন?`)) {
+            db.teachers.remove(name);
+            showToast('শিক্ষক মুছে ফেলা হয়েছে।', 'warning');
+            renderTeachers();
+            renderOverview();
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Notices CRUD                                                  */
+      /* ------------------------------------------------------------ */
+      const renderNotices = () => {
+        const list = db.notices.list();
+        document.getElementById('notice-list').innerHTML = list.length
+          ? list.map((notice) => `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(notice.title)}</div>
+                <div class="li-sub">ক্লাস: ${escapeHtml(notice.className || 'সব')} · ${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+              </div>
+              <span class="row-actions">
+                <button type="button" class="btn btn-small btn-secondary" data-edit-notice="${escapeHtml(notice.id)}">সম্পাদনা</button>
+                <button type="button" class="btn btn-small btn-error" data-delete-notice="${escapeHtml(notice.id)}">মুছুন</button>
+              </span>
+            </div>`).join('')
+          : '<div class="empty-state">কোনো নোটিশ নেই।</div>';
+      };
+
+      const noticeForm = document.getElementById('notice-form');
+      document.getElementById('notice-class').innerHTML = classOptionsHtml(ALL_CLASSES);
+      const openNoticeModal = (editId = null) => {
+        noticeForm.reset();
+        document.getElementById('notice-edit-index').value = '';
+        if (editId) {
+          const notice = db.notices.find(editId);
+          if (!notice) return;
+          document.getElementById('notice-modal-title').textContent = 'নোটিশ সম্পাদনা';
+          document.getElementById('notice-save').textContent = 'আপডেট করুন';
+          document.getElementById('notice-edit-index').value = notice.id;
+          noticeForm.elements.title.value = notice.title || '';
+          noticeForm.elements.audience.value = notice.audience || 'সবাই';
+          noticeForm.elements.className.value = notice.className || ALL_CLASSES;
+        } else {
+          document.getElementById('notice-modal-title').textContent = 'নতুন নোটিশ';
+          document.getElementById('notice-save').textContent = 'প্রকাশ করুন';
+        }
+        openModal('notice-modal');
+      };
+
+      document.getElementById('open-notice-modal').addEventListener('click', () => openNoticeModal());
+
+      noticeForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!onlineFor('নোটিশ সংরক্ষণ')) return;
+        const data = new FormData(noticeForm);
+        const editId = String(data.get('editIndex') || '');
+        const title = String(data.get('title') || '').trim();
+        if (!title) { showToast('শিরোনাম লিখুন।', 'error'); return; }
+        const className = String(data.get('className') || ALL_CLASSES);
+        if (editId) {
+          db.notices.update(editId, { title, audience: String(data.get('audience')), className });
+          showToast('নোটিশ আপডেট হয়েছে।', 'success');
+        } else {
+          db.notices.add({ id: newId('n'), title, audience: String(data.get('audience')), className, date: todayBn() });
+          showToast('নোটিশ প্রকাশিত হয়েছে।', 'success');
+        }
+        closeModal('notice-modal');
+        renderNotices();
+        renderOverview();
+      });
+
+      document.querySelector('#tab-notices').addEventListener('click', (event) => {
+        const editBtn = event.target.closest('[data-edit-notice]');
+        const delBtn = event.target.closest('[data-delete-notice]');
+        if (editBtn) { openNoticeModal(editBtn.dataset.editNotice); return; }
+        if (delBtn) {
+          if (!onlineFor('নোটিশ মুছে ফেলা')) return;
+          const notice = db.notices.find(delBtn.dataset.deleteNotice);
+          if (notice && window.confirm(`"${notice.title}" মুছে ফেলবেন?`)) {
+            db.notices.remove(notice.id);
+            showToast('নোটিশ মুছে ফেলা হয়েছে।', 'warning');
+            renderNotices();
+            renderOverview();
+          }
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Dues & Payments                                               */
+      /* ------------------------------------------------------------ */
+      const renderDues = () => {
+        const dues = dueFees();
+        document.getElementById('due-count').textContent = bn(dues.length);
+        renderTable('#due-table', [
+          { key: 'studentId', label: 'আইডি' },
+          { key: 'student', label: 'নাম', render: (row) => escapeHtml(row.student?.name || '—') },
+          { key: 'className', label: 'শ্রেণি', render: (row) => escapeHtml(row.student?.className || '—') },
+          { key: 'month', label: 'মাস' },
+          { key: 'amount', label: 'পরিমাণ' },
+          { key: '_pay', label: 'অ্যাকশন', render: (row) => `<button type="button" class="btn btn-small btn-success" data-pay="${escapeHtml(row.id)}">পেমেন্ট নিন</button>` }
+        ], dues, 'সব বকেয়া পরিশোধিত 🎉');
+
+        const payments = [...db.payments.list()].reverse();
+        document.getElementById('payment-list').innerHTML = payments.length
+          ? payments.slice(0, 8).map((p) => {
+            const st = db.students.find(p.studentId);
+            return `
+            <div class="list-item">
+              <div class="li-main">
+                <div class="li-title">${escapeHtml(st?.name || p.studentId)}</div>
+                <div class="li-sub">${escapeHtml(p.month)} · ৳${bn(p.amount)} · ${escapeHtml(p.date)}${p.method ? ` · ${escapeHtml(p.method)}` : ''}</div>
+                ${p.receiptNo ? `<div class="li-sub">${escapeHtml(p.receiptNo)}</div>` : ''}
+              </div>
+              <button type="button" class="btn btn-small" data-receipt="${escapeHtml(p.id)}">রিসিট</button>
+            </div>`;
+          }).join('')
+          : '<div class="empty-state">কোনো পেমেন্ট নেই।</div>';
+      };
+
+      document.querySelector('#tab-dues').addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-pay]');
+        if (btn) { openPaymentModal(btn.dataset.pay); return; }
+        const receiptBtn = event.target.closest('[data-receipt]');
+        if (receiptBtn) { openReceipt(receiptBtn.dataset.receipt); }
+      });
+
+      /* -------- Payment capture + printable receipt (spec 40) -------- */
+      const paymentForm = document.getElementById('payment-form');
+      const openPaymentModal = (feeId) => {
+        const fee = db.fees.find(feeId);
+        if (!fee) { showToast('বকেয়া রেকর্ড পাওয়া যায়নি।', 'error'); return; }
+        const student = db.students.find(fee.studentId);
+        document.getElementById('pay-fee-id').value = fee.id;
+        document.getElementById('pay-student').value = `${student?.name || fee.studentId} (${fee.studentId})`;
+        document.getElementById('pay-month').value = fee.month || '';
+        document.getElementById('pay-amount').value = fee.amount || '';
+        document.getElementById('pay-date').value = todayBn();
+        document.getElementById('pay-reference').value = '';
+        document.getElementById('pay-remarks').value = '';
+        openModal('payment-modal');
+      };
+
+      paymentForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!onlineFor('পেমেন্ট সংরক্ষণ')) return;
+        const d = new FormData(paymentForm);
+        const feeId = String(d.get('feeId') || '');
+        const amount = Number(d.get('amount'));
+        const date = String(d.get('date') || '').trim();
+        if (!feeId) { showToast('বকেয়া নির্বাচন করুন।', 'error'); return; }
+        if (!Number.isFinite(amount) || amount <= 0) { showToast('সঠিক পরিমাণ লিখুন।', 'error'); return; }
+        if (!date) { showToast('তারিখ দিন।', 'error'); return; }
+
+        const result = receivePayment(feeId, session.name);
+        if (!result) { showToast('এই বকেয়া ইতিমধ্যে পরিশোধিত।', 'error'); return; }
+        // enrich the payment with the captured details + a receipt number
+        const receiptNo = `RCP-${Date.now().toString().slice(-6)}`;
+        db.payments.update(result.payment.id, {
+          amount, date,
+          method: String(d.get('method') || 'নগদ'),
+          reference: String(d.get('reference') || ''),
+          remarks: String(d.get('remarks') || ''),
+          receiptNo
+        });
+        logActivity({ user: session.name, role: session.role, action: 'recorded payment', target: `${result.payment.studentId} ৳${amount}` });
+        closeModal('payment-modal');
+        showToast('পেমেন্ট গৃহীত হয়েছে। শিক্ষার্থীকে নোটিশ পাঠানো হয়েছে।', 'success');
+        renderDues(); renderStudents(); renderOverview();
+        openReceipt(result.payment.id);
+      });
+
+      const openReceipt = (paymentId) => {
+        const pay = db.payments.find(paymentId);
+        if (!pay) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
+        const student = db.students.find(pay.studentId);
+        const settings = db.settings.get();
+        const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(String(value ?? '—'))}</span></div>`;
+        document.getElementById('receipt-body').innerHTML = `
+          <div data-receipt-sheet style="border:2px solid var(--accent);border-radius:12px;padding:1rem">
+            <div style="text-align:center">
+              <div style="font-weight:700">${escapeHtml(settings.orgName || 'Active Plus')}</div>
+              <div class="meta">${escapeHtml(settings.address || '')}</div>
+              <div class="meta">${escapeHtml(settings.mobile || '')}</div>
+              <div style="margin-top:.5rem;font-weight:700">পেমেন্ট রিসিট</div>
+            </div>
+            ${row('রিসিট নম্বর', pay.receiptNo || pay.id)}
+            ${row('তারিখ', pay.date)}
+            ${row('শিক্ষার্থী', student?.name || pay.studentId)}
+            ${row('আইডি', pay.studentId)}
+            ${row('শ্রেণি', student?.className || '—')}
+            ${row('মাস', pay.month)}
+            ${row('পরিমাণ', `৳${bn(pay.amount || 0)}`)}
+            ${row('মাধ্যম', pay.method)}
+            ${row('রেফারেন্স', pay.reference)}
+            ${row('মন্তব্য', pay.remarks)}
+            ${row('গ্রহণকারী', pay.receivedBy)}
+          </div>`;
+        openModal('receipt-modal');
+      };
+
+      document.getElementById('receipt-print')?.addEventListener('click', () => {
+        if (!document.querySelector('#receipt-body [data-receipt-sheet]')) {
+          showToast('রিসিট তৈরি হয়নি।', 'error');
+          return;
+        }
+        logActivity({ user: session.name, role: session.role, action: 'printed receipt' });
+        window.print();
+      });
+
+      /* ------------------------------------------------------------ */
+      /* Suggestions + MCQ authoring (admin)                           */
+      /* ------------------------------------------------------------ */
+      document.getElementById('sug-class').innerHTML = classOptionsHtml('নবম', { allowAll: false });
+      document.getElementById('exam-class').innerHTML = classOptionsHtml('নবম', { allowAll: false });
+      setExamAuthor(session.name);
+      mountSuggestionAuthoring({ author: session.name });
+      mountExamAuthoring();
+
+      /* ------------------------------------------------------------ */
+      /* Settings                                                      */
+      /* ------------------------------------------------------------ */
+      const renderSettings = () => {
+        const settings = db.settings.get();
+        document.getElementById('set-org').value = settings.orgName || '';
+        document.getElementById('set-address').value = settings.address || '';
+        document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
+        document.getElementById('set-challenge').value = settings.dailyChallengeTarget ?? 10;
+        const editableFields = settings.studentEditableFields || [];
+        document.querySelectorAll('#student-editable input').forEach((input) => {
+          input.checked = editableFields.includes(input.name.slice(5));
+        });
+        const enabledFeatures = settings.homeFeatures || [];
+        document.querySelectorAll('#home-features input').forEach((input) => {
+          input.checked = enabledFeatures.includes(input.name.slice(5));
+        });
+        const cards = homeCards();
+        document.querySelectorAll('#home-cards input[name^="home_"]').forEach((input) => {
+          input.checked = cards[input.name.slice(5)] !== false;
+        });
+        document.getElementById('system-list').innerHTML = [
+          ['ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)'],
+          ['লগিন করা', session.name],
+          ['সেশন শুরু', new Date(session.loginTime).toLocaleString('bn-BD')]
+        ].map(([label, value]) => `
+          <div class="list-item">
+            <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
+          </div>`).join('');
+      };
+
+      document.getElementById('settings-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (!onlineFor('সেটিংস সংরক্ষণ')) return;
+        const data = new FormData(event.target);
+        db.settings.update({
+          orgName: String(data.get('orgName') || '').trim(),
+          address: String(data.get('address') || '').trim(),
+          monthlyFee: Number(data.get('monthlyFee')) || 0
+        });
+        db.settings.update({
+          dailyChallengeTarget: Math.max(1, Number(data.get('dailyChallengeTarget')) || 10),
+          studentEditableFields: [...event.target.querySelectorAll('#student-editable input:checked')]
+            .map((input) => input.name.slice(5))
+        });
+        setHomeFeatures([...event.target.querySelectorAll('#home-features input:checked')].map((i) => i.name.slice(5)));
+        setHomeCards(Object.fromEntries(
+          [...event.target.querySelectorAll('input[name^="home_"]')]
+            .map((input) => [input.name.slice(5), input.checked])
+        ));
+        showToast('সেটিংস সংরক্ষিত হয়েছে।', 'success');
+        renderOverview();
+      });
+
+      document.getElementById('reset-data').addEventListener('click', () => {
+        if (window.confirm('সব ডেটা মুছে ডেমো অবস্থায় ফিরে যাবেন?')) {
+          db.reset();
+          renderAll();
+          showToast('ডেটা রিসেট হয়েছে।', 'warning');
+        }
+      });
+
+      /* ------------------------------------------------------------ */
+      /* ---- Notification bell: unread admin alerts (spec 43) ---- */
+      const SEEN_KEY = 'activeplus_activity_seen';
+      function refreshAdminBell() {
+        const badge = document.getElementById('admin-bell-count');
+        const bell = document.getElementById('admin-bell');
+        if (!badge || !bell) return;
+        const fresh = adminAlerts(Number(localStorage.getItem(SEEN_KEY) || 0)).length;
+        badge.textContent = bn(fresh);
+        badge.hidden = fresh === 0;
+        bell.setAttribute('aria-label', fresh ? `${bn(fresh)}টি নতুন নোটিফিকেশন` : 'নোটিফিকেশন');
+      }
+      document.getElementById('admin-bell')?.addEventListener('click', () => {
+        localStorage.setItem(SEEN_KEY, String(Date.now()));
+        refreshAdminBell();
+      });
+
+      const renderAll = () => {
+        renderOverview();
+        renderStudents();
+        renderDues();
+        renderTeachers();
+        renderNotices();
+        renderSettings();
+      };
+
+      await seedUsers();
+      document.getElementById('account-list').innerHTML = listUsers().map((user) => `
+        <div class="list-item">
+          <div class="li-main">
+            <div class="li-title">${escapeHtml(user.name)}</div>
+            <div class="li-sub">${escapeHtml(user.username)}</div>
+          </div>
+          <span class="badge accent">${escapeHtml(user.role)}</span>
+        </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
+
+      renderAll();
+      mountExtraAdmin(session);
+
+      /* ================= Batch management ================= */
+      mountCrud({
+        container: 'batches-crud', collection: 'batches', keyField: 'name', singular: 'ব্যাচ',
+        columns: [
+          { key: 'name', label: 'ব্যাচ' }, { key: 'className', label: 'ক্লাস' },
+          { key: 'section', label: 'শাখা' }, { key: 'time', label: 'সময়' },
+          { key: 'room', label: 'কক্ষ' }, { key: 'teacher', label: 'শিক্ষক' },
+          { key: 'studentLimit', label: 'আসন' }, { key: 'status', label: 'অবস্থা' }
+        ],
+        fields: [
+          { name: 'name', label: 'ব্যাচের নাম', required: true },
+          { name: 'className', label: 'ক্লাস', type: 'select', options: CLASS_OPTIONS, required: true },
+          { name: 'section', label: 'শাখা' },
+          { name: 'time', label: 'সময়' },
+          { name: 'room', label: 'কক্ষ' },
+          { name: 'teacher', label: 'দায়িত্বপ্রাপ্ত শিক্ষক' },
+          { name: 'subjects', label: 'বিষয় (কমা দিয়ে)' },
+          { name: 'studentLimit', label: 'আসন সংখ্যা', type: 'number' },
+          { name: 'status', label: 'অবস্থা', type: 'select', options: ['সক্রিয়', 'বন্ধ'] }
+        ],
+        searchKeys: ['name', 'className', 'teacher'],
+        idPrefix: 'batch',
+        session
+      });
+
+      /* ================= App-style admin home ================= */
+      const tabs = activeTabs();
+      const adminHome = initAdminHome({
+        session, tabs, openModal, showToast,
+        onLogout: () => document.getElementById('logout-btn')?.click()
+      });
+      document.querySelectorAll('.bottom-nav button[data-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.tab;
+          if (key === 'more') { tabs?.activate?.('home'); adminHome?.openMore(); return; }
+          tabs?.activate?.(key);
+        });
+      });
+      const syncAdminNav = () => {
+        const current = document.querySelector('.top-tab-bar button[aria-selected="true"]')?.dataset.tab;
+        document.querySelectorAll('.bottom-nav button[data-tab]').forEach((b) => {
+          b.setAttribute('aria-current', String(b.dataset.tab === current));
+        });
+        refreshAdminBell();
+      };
+      document.querySelector('.top-tab-bar')?.addEventListener('click', syncAdminNav);
+    </script>
+  </body>
+</html>
