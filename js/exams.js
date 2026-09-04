@@ -21,7 +21,8 @@ export function classOptionsHtml(selected = ALL_CLASSES, { allowAll = true } = {
 export function mountSuggestionAuthoring({ author }) {
   const list = document.getElementById('suggestion-list');
   const render = () => {
-    const rows = db.suggestions.list();
+    // Newest 50; every student suggestion lands here forever (spec 62).
+    const rows = db.suggestions.list().slice(0, 50);
     list.innerHTML = rows.length
       ? rows.map((s) => `
         <div class="list-item">

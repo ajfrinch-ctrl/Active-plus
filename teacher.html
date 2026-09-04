@@ -516,7 +516,8 @@
         /* -------- Class-targeted notices -------- */
         const noticeList = document.getElementById('teacher-notice-list');
         const renderNotices = () => {
-          const rows = db.notices.list();
+          // Newest 50; notices accumulate for the life of the centre (spec 62).
+          const rows = db.notices.list().slice(0, 50);
           noticeList.innerHTML = rows.length
             ? rows.map((n) => `
               <div class="list-item">
@@ -572,8 +573,10 @@
           // Only queries from this teacher's own students, plus notices sent
           // to teachers generally (those carry no studentId).
           const ownIds = new Set(teacherStudents(session.name).map((s) => s.id));
+          // Newest 50; every student query lands here forever (spec 62).
           const rows = db.notifications.list()
-            .filter((n) => n.target === 'শিক্ষক' && (!n.studentId || ownIds.has(n.studentId)));
+            .filter((n) => n.target === 'শিক্ষক' && (!n.studentId || ownIds.has(n.studentId)))
+            .slice(0, 50);
           queryList.innerHTML = rows.length
             ? rows.map((n) => `
               <div class="list-item" style="display:block">

@@ -492,3 +492,49 @@ test('the report centre exports the selected report as CSV', async () => {
     win.HTMLAnchorElement.prototype.click = originalClick;
   }
 });
+
+test('the submissions review table paginates instead of painting every row', async () => {
+  const out = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'paginate'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  // Grow the collection well past one page.
+  const asg = data.db.assignments.list()[0];
+  const students = data.db.students.list();
+  for (let i = 0; i < 30; i++) {
+    const st = students[i % students.length];
+    data.db.submissions.add({
+      id: `sub-page-${i}`, assignmentId: asg.id, studentId: st.id,
+      studentName: `${st.name} ${i}`, status: 'জমা হয়েছে', date: '০১/০৯', feedback: ''
+    });
+  }
+  const total = data.db.submissions.list().length;
+  assert.ok(total > 25, `collection is bigger than one page (has ${total})`);
+
+  doc.querySelector('[data-tab="submissions"]')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  // Checking one submission re-renders the table; that render must paginate.
+  win.prompt = () => 'চমৎকার কাজ';
+  const checkBtn = doc.querySelector('#submissions-table [data-check]');
+  assert.ok(checkBtn, 'a submission can be checked');
+  checkBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  const table = doc.getElementById('submissions-table');
+  const firstPage = table.querySelectorAll('tbody tr').length;
+  assert.ok(firstPage <= 26, `only one page painted at a time, got ${firstPage} rows`);
+  assert.ok(firstPage < total, `not every row was painted (${firstPage} of ${total})`);
+
+  const more = table.querySelector('[data-load-more]');
+  assert.ok(more, 'a load-more control is offered');
+  assert.match(more.textContent, /বাকি/, 'says how many remain');
+
+  more.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.ok(table.querySelectorAll('tbody tr').length > firstPage, 'load-more reveals the next page');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});

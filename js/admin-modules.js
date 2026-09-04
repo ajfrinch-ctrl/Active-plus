@@ -204,26 +204,21 @@ function mountSubmissions(session) {
   const host = document.getElementById('submissions-crud');
   if (!host) return;
 
+  // Static shell; renderTable fills it 25 rows at a time (spec 62), so a centre
+  // with thousands of submissions never builds every row in one pass.
+  host.innerHTML = `<div class="table-wrap"><table class="table" id="submissions-table">
+    <thead><tr></tr></thead><tbody></tbody></table></div>`;
+
   const render = () => {
-    const rows = db.submissions.list();
-    host.innerHTML = `
-      <div class="table-wrap"><table class="table" id="submissions-table">
-        <thead><tr><th>শিক্ষার্থী</th><th>অ্যাসাইনমেন্ট</th><th>জমার তারিখ</th><th>অবস্থা</th><th></th></tr></thead>
-        <tbody>
-          ${rows.length ? rows.map((r) => {
-            const asg = db.assignments.find(r.assignmentId);
-            return `<tr>
-              <td>${escapeHtml(r.studentName || r.studentId)}</td>
-              <td>${escapeHtml(asg?.title || r.assignmentId)}</td>
-              <td>${escapeHtml(r.date || '—')}</td>
-              <td>${escapeHtml(r.status)}</td>
-              <td>${r.status === 'চেক হয়েছে'
-                ? `<span class="badge success">✓ ${escapeHtml(r.feedback || '')}</span>`
-                : `<button type="button" class="btn btn-small" data-check="${escapeHtml(r.id)}">চেক করুন</button>`}</td>
-            </tr>`;
-          }).join('') : '<tr><td colspan="5">এখনো কোনো কাজ জমা পড়েনি।</td></tr>'}
-        </tbody>
-      </table></div>`;
+    renderTable('#submissions-table', [
+      { key: 'studentName', label: 'শিক্ষার্থী', render: (r) => escapeHtml(r.studentName || r.studentId) },
+      { key: 'assignmentId', label: 'অ্যাসাইনমেন্ট', render: (r) => escapeHtml(db.assignments.find(r.assignmentId)?.title || r.assignmentId) },
+      { key: 'date', label: 'জমার তারিখ', render: (r) => escapeHtml(r.date || '—') },
+      { key: 'status', label: 'অবস্থা', render: (r) => escapeHtml(r.status) },
+      { key: '_a', label: '', render: (r) => r.status === 'চেক হয়েছে'
+        ? `<span class="badge success">✓ ${escapeHtml(r.feedback || '')}</span>`
+        : `<button type="button" class="btn btn-small" data-check="${escapeHtml(r.id)}">চেক করুন</button>` }
+    ], db.submissions.list(), 'এখনো কোনো কাজ জমা পড়েনি।');
   };
 
   host.addEventListener('click', (e) => {
@@ -404,10 +399,17 @@ function mountResults(session) {
 function mountNotifications(session) {
   const list = document.getElementById('notif-list');
   const render = () => {
-    list.innerHTML = db.notifications.list().map((n) => `
+    // Newest 50 only; this collection grows for the life of the centre (spec 62).
+    const all = db.notifications.list();
+    const rows = all.slice(0, 50);
+    const html = rows.map((n) => `
       <div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(n.title)}</div>
       <div class="li-sub">${escapeHtml(n.type)} · ${escapeHtml(n.target)} · ${escapeHtml(n.date)}</div></div>
-      <span class="badge ${n.read ? 'success' : 'warning'}">${n.read ? 'পঠিত' : 'অপঠিত'}</span></div>`).join('') || '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
+      <span class="badge ${n.read ? 'success' : 'warning'}">${n.read ? 'পঠিত' : 'অপঠিত'}</span></div>`).join('');
+    list.innerHTML = (html
+      + (all.length > rows.length
+        ? `<p class="meta">সর্বশেষ ${bn(rows.length)}টি দেখানো হচ্ছে — মোট ${bn(all.length)}টি।</p>` : ''))
+      || '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
   };
   document.getElementById('notif-form').addEventListener('submit', (e) => {
     if (!onlineFor('নোটিফিকেশন পাঠানো')) return;
