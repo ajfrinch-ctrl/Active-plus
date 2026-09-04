@@ -652,3 +652,89 @@ test('a teacher cannot author exams or suggestions for a class they do not teach
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
+
+test('teacher assignment and material publishing write, notify and stay scoped', async () => {
+  const out = await bootPage('teacher.html', {
+    username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'writflows'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  /* ---------------- assignments (tab-tasks) ---------------- */
+  doc.querySelector('[data-tab="tasks"]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  const asgBefore = data.db.assignments.list().length;
+  const ntfBefore = data.db.notifications.list().length;
+  const form = doc.getElementById('teacher-assignment-form');
+  form.querySelector('[name="title"]').value = 'অধ্যায় ৩ অনুশীলন';
+  form.querySelector('[name="className"]').value = 'নবম';
+  form.querySelector('[name="description"]').value = 'পাঠ্যবইয়ের অনুশীলন ৩.১–৩.৪';
+  form.querySelector('[name="marks"]').value = '20';   // type="number" yields ASCII
+  form.querySelector('[name="dueDate"]').value = '২০২৬-০৯-২০';
+  form.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+
+  const created = data.db.assignments.list().filter((a) => a.title === 'অধ্যায় ৩ অনুশীলন');
+  assert.equal(created.length, 1, 'the assignment was written');
+  assert.equal(created[0].className, 'নবম');
+  assert.equal(created[0].marks, 20, 'marks parsed to a number, not left as text');
+  assert.equal(created[0].teacher, 'রাহেলা আক্তার', 'author recorded from the session');
+
+  // The deadline must land under the key every consumer reads, so the student
+  // sees a date and overdue detection works.
+  assert.equal(created[0].deadline, '২০২৬-০৯-২০', 'deadline written under the key consumers read');
+  const learner = data.db.students.list().find((s) => s.className === 'নবম');
+  const status = data.assignmentStatus(created[0], learner);
+  assert.ok(status.daysLeft !== null, 'the deadline parses, so days-remaining is computed');
+
+  // spec 57: the class is told, not left to notice on their own
+  assert.equal(data.db.notifications.list().length, ntfBefore + 1, 'a student notification was posted');
+  const note = data.db.notifications.list().at(-1);
+  assert.equal(note.target, 'শিক্ষার্থী');
+  assert.equal(note.className, 'নবম', 'the notice is scoped to the assigned class');
+
+  // a hand-edited class outside the assignment must be refused
+  const asgSel = form.querySelector('[name="className"]');
+  asgSel.innerHTML = '<option value="দশম">দশম</option>';
+  asgSel.value = 'দশম';
+  form.querySelector('[name="title"]').value = 'অনুমোদিত নয় কাজ';
+  form.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.assignments.list().length, asgBefore + 1,
+    'no assignment is written for a class outside the assignment');
+
+  /* ---------------- materials (tab-materials) ---------------- */
+  doc.querySelector('[data-tab="materials"]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  const matBefore = data.db.materials.list().length;
+  const mform = doc.getElementById('teacher-material-form');
+  mform.querySelector('[name="title"]').value = 'গতি অধ্যায়ের নোট';
+  mform.querySelector('[name="className"]').value = 'নবম';
+  mform.querySelector('[name="subject"]').value = 'পদার্থবিজ্ঞান';
+  mform.querySelector('[name="chapter"]').value = 'গতি';
+  mform.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+
+  const mats = data.db.materials.list().filter((m) => m.title === 'গতি অধ্যায়ের নোট');
+  assert.equal(mats.length, 1, 'the material was published');
+  assert.equal(mats[0].className, 'নবম');
+  assert.equal(mats[0].teacher, 'রাহেলা আক্তার');
+
+  const matSel = mform.querySelector('[name="className"]');
+  matSel.innerHTML = '<option value="দশম">দশম</option>';
+  matSel.value = 'দশম';
+  mform.querySelector('[name="title"]').value = 'অনুমোদিত নয় নোট';
+  mform.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.materials.list().length, matBefore + 1,
+    'no material is published to a class outside the assignment');
+
+  // The published material must reach students of that class. This mirrors the
+  // filter the student home itself uses (js/student-home.js:401).
+  const visibleTo = (className) => data.db.materials.list()
+    .filter((m) => !m.className || m.className === className);
+  assert.ok(visibleTo('নবম').some((m) => m.title === 'গতি অধ্যায়ের নোট'),
+    'a নবম student can see the material their teacher published');
+  assert.ok(!visibleTo('দশম').some((m) => m.title === 'গতি অধ্যায়ের নোট'),
+    'a দশম student cannot see material scoped to another class');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});

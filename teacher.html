@@ -695,7 +695,10 @@
           const id = newId('asg');
           db.assignments.add({
             id, title, className, description: String(d.get('description') || ''),
-            dueDate: String(d.get('dueDate') || ''), marks: Number(d.get('marks')) || 10,
+            // Every consumer reads `deadline` (status, due label, student view,
+            // admin table); writing `dueDate` here left the deadline blank and
+            // stopped overdue detection from ever firing.
+            deadline: String(d.get('dueDate') || ''), marks: Number(d.get('marks')) || 10,
             teacher: session.name, createdAt: new Date().toISOString()
           });
           db.notifications.add({
