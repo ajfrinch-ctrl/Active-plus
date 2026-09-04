@@ -35,7 +35,9 @@ export function mountHeader(session = currentSession()) {
     const labels = { student: 'শিক্ষার্থী', teacher: 'শিক্ষক', admin: 'অ্যাডমিন' };
     role.textContent = `${labels[session.role] || session.role}${session.detail ? ' · ' + session.detail : ''}`;
   }
-  if (avatar) avatar.textContent = (session.name || 'A').trim().charAt(0).toUpperCase();
+  // The brand-mark shows the organisation logo (an <img>) or, when it is still
+  // the plain initials tile, the user's first initial. Never overwrite an image.
+  if (avatar && !avatar.querySelector('img')) avatar.textContent = (session.name || 'A').trim().charAt(0).toUpperCase();
   if (pageRole) pageRole.textContent = session.role;
   document.body.dataset.role = session.role || '';
   return session;

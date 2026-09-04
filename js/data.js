@@ -56,10 +56,10 @@ const SEED = {
     { id: '2026-08-007', name: 'তাসনিম জাহান', className: 'অষ্টম', section: 'A', batch: 'A', roll: '০৭', phone: '০১৭১১-০০০০০৭', school: 'লালমাটিয়া বালিকা বিদ্যালয়', status: 'সক্রিয়', guardian: 'জাহান আলম', guardianPhone: '০১৮১১-০০০০০৭', admissionDate: '২০২৬-০১-১০', photo: '' }
   ],
   teachers: [
-    { name: 'রাহেলা আক্তার', subject: 'পদার্থবিজ্ঞান', phone: '০১৮১১-১১১১১১', classes: 6 },
-    { name: 'কামরুল ইসলাম', subject: 'গণিত', phone: '০১১১-২২২২২২', classes: 8 },
-    { name: 'নুসরাত জাহান', subject: 'রসায়ন', phone: '০১১১-৩৩৩৩৩৩', classes: 5 },
-    { name: 'সাদিয়া রহমান', subject: 'ইংরেজি', phone: '০১১১-৪৪৪৪৪', classes: 4 }
+    { id: 'রাহেলা১১', name: 'রাহেলা আক্তার', subject: 'পদার্থবিজ্ঞান', phone: '০১৮১১-১১১১১১', classes: 6 },
+    { id: 'কামরুল২২', name: 'কামরুল ইসলাম', subject: 'গণিত', phone: '০১১১-২২২২২২', classes: 8 },
+    { id: 'নুসরাত৩৩', name: 'নুসরাত জাহান', subject: 'রসায়ন', phone: '০১১১-৩৩৩৩৩৩', classes: 5 },
+    { id: 'সাদিয়া৪৪', name: 'সাদিয়া রহমান', subject: 'ইংরেজি', phone: '০১১১-৪৪৪৪৪', classes: 4 }
   ],
   batches: [
     { name: 'নবম (বিজ্ঞান)', students: 42, teacher: 'রাহেলা আক্তার', time: 'সকাল ৮টা' },
@@ -346,6 +346,38 @@ export function todayBn() {
 export function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Auto-generated IDs                                                  */
+/* ------------------------------------------------------------------ */
+
+/** Last two digits of the admission year, e.g. 2026 -> '26', 2099 -> '99'. */
+export function nextStudentId({ year = new Date().getFullYear(), className } = {}) {
+  const yearStr = String(Number(year) % 100).padStart(2, '0');
+  const classNo = Number(CLASS_TO_NUMBER[className]) || Number(String(className).replace(/\D/g, '')) || 9;
+  const classStr = String(classNo).padStart(2, '0');
+  const prefix = `${yearStr}${classStr}`;
+  let max = 0;
+  for (const s of db.students.list()) {
+    const m = String(s.id || '').match(new RegExp(`^${prefix}(\\d{3})$`));
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `${prefix}${String(max + 1).padStart(3, '0')}`;
+}
+
+/** Teacher ID: first word of the name + last two digits of the mobile. */
+export function nextTeacherId({ name, phone } = {}) {
+  const first = String(name || '').trim().split(/\s+/)[0] || 'T';
+  const digits = String(phone || '').replace(/[^\d\u09E6-\u09EF]/g, '');
+  const lastTwo = digits.slice(-2) || '00';
+  const base = `${first}${lastTwo}`;
+  const taken = new Set(db.teachers.list().map((t) => String(t.id || '')));
+  let candidate = base;
+  let n = 1;
+  while (taken.has(candidate)) { n += 1; candidate = `${base}${n}`; }
+  return candidate;
+}
+
 
 /** Students filtered by class ('সব' = everyone). */
 export function studentsOfClass(className) {

@@ -9,7 +9,7 @@
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v6';
+const CACHE_NAME = 'active-plus-v7';
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -30,6 +30,8 @@ const PRECACHE_URLS = [
   'js/teacher-home.js',
   'js/admin-home.js',
   'manifest.json',
+  'assets/logo.png',
+  'assets/logo-transparent.png',
   'assets/icon-192.png',
   'assets/icon-512.png',
   'assets/icon-maskable-512.png',
