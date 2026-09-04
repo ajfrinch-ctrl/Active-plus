@@ -538,3 +538,62 @@ test('the submissions review table paginates instead of painting every row', asy
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
+
+test('the question bank import flow validates, previews and really imports', async () => {
+  const out = await bootPage('teacher.html', {
+    username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'qbimport'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  doc.querySelector('[data-tab="questions"]')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  const examSel = doc.getElementById('tqb-exam');
+  assert.ok(examSel, 'exam picker rendered');
+  assert.equal(examSel.value, 'exam-1', 'the teacher own exam is selected by default');
+
+  const before = data.db.exams.find('exam-1').questions.length;
+
+  // Two valid blocks, one duplicate of the first, one incomplete block.
+  doc.getElementById('tqb-paste').value = [
+    'প্রশ্ন: ৫+৩=?', 'A. ৬', 'B. ৭', 'C. ৮', 'D. ৯', 'সঠিক: C',
+    '',
+    'প্রশ্ন: ২*৪=?', 'A. ৬', 'B. ৭', 'C. ৮', 'D. ৯', 'সঠিক: C',
+    '',
+    'প্রশ্ন: ৫+৩=?', 'A. ৬', 'B. ৭', 'C. ৮', 'D. ৯', 'সঠিক: C',
+    '',
+    'প্রশ্ন: অসম্পূর্ণ ব্লক'
+  ].join('\n');
+
+  doc.getElementById('tqb-parse').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  const report = doc.getElementById('tqb-report');
+  assert.match(report.textContent, /ডুপ্লিকেট/, 'duplicate rows are reported before import');
+  assert.match(report.textContent, /অসম্পূর্ণ/, 'incomplete blocks are reported before import');
+
+  const preview = doc.getElementById('tqb-preview');
+  assert.match(preview.textContent, /২টি প্রশ্ন/, 'only the two valid, unique questions are staged');
+  assert.ok(preview.textContent.includes('৫+৩=?'), 'the question text is shown for review');
+
+  // Nothing has been written yet — parsing alone must not touch the exam.
+  assert.equal(data.db.exams.find('exam-1').questions.length, before,
+    'parsing stages questions without writing them');
+
+  doc.getElementById('tqb-import').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(data.db.exams.find('exam-1').questions.length, before + 2,
+    'confirming the import writes the two questions');
+
+  // Re-importing the same text must not duplicate what is already there.
+  doc.getElementById('tqb-paste').value = [
+    'প্রশ্ন: ৫+৩=?', 'A. ৬', 'B. ৭', 'C. ৮', 'D. ৯', 'সঠিক: C'
+  ].join('\n');
+  doc.getElementById('tqb-parse').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  doc.getElementById('tqb-import').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(data.db.exams.find('exam-1').questions.length, before + 2,
+    'a question already on the exam is not added twice');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
