@@ -534,3 +534,145 @@ test('toCSV exports computed columns, not just raw keys', async () => {
   const quoted = toCSV([{ key: 't', label: 'শিরোনাম' }], [{ t: 'তিনি বললেন "ভালো"' }]);
   assert.equal(quoted.split('\n')[1], '"তিনি বললেন ""ভালো"""');
 });
+
+/* ------------------------------------------------------------------ */
+/* Teacher dashboard helpers (spec 2, 4, 16) — previously untested     */
+/* ------------------------------------------------------------------ */
+
+const TEACHER = 'রাহেলা আক্তার';
+
+async function teacherModule(page) {
+  const storage = makeLocalStorage();
+  installWindow(storage);
+  (await import('../js/store.js'))._clearMemoryStore();
+  return import(`../js/data.js?page=${page}`);
+}
+
+test('todayTeaching computes every hero number from real data', async () => {
+  const m = await teacherModule('t1');
+
+  const hero = m.todayTeaching(TEACHER);
+  assert.deepEqual(Object.keys(hero).sort(),
+    ['assignments', 'classes', 'exams', 'results', 'students']);
+
+  // Each figure must equal the helper behind it, not a hard-coded constant.
+  assert.equal(hero.students, m.teacherStudents(TEACHER).length);
+  assert.equal(hero.classes, m.teacherDayClasses(TEACHER).length);
+  assert.equal(hero.assignments, m.teacherPendingAssignments(TEACHER).length);
+  assert.equal(hero.exams, m.teacherExams(TEACHER).length);
+  assert.equal(hero.results, m.teacherPendingResults(TEACHER).length);
+
+  // The seed teacher owns নবম, which has two students and one exam.
+  assert.equal(hero.students, 2);
+  assert.equal(hero.exams, 1);
+
+  // An unknown teacher sees nothing rather than someone else's numbers.
+  assert.deepEqual(m.todayTeaching('নেই এমন শিক্ষক'),
+    { classes: 0, students: 0, assignments: 0, exams: 0, results: 0 });
+});
+
+test('teacherDayClasses returns only that teacher slots, sorted by time', async () => {
+  const m = await teacherModule('t2');
+
+  const sat = m.teacherDayClasses(TEACHER, 'শনিবার');
+  assert.equal(sat.length, 1, 'the seed gives this teacher one Saturday class');
+  assert.equal(sat[0].teacher, TEACHER);
+
+  // Other teachers' rows for the same day must not leak in.
+  m.db.routine.add({ id: 'rt-other', day: 'শনিবার', time: '০৭:০০ – ০৮:০০', teacher: 'কামরুল ইসলাম' });
+  assert.equal(m.teacherDayClasses(TEACHER, 'শনিবার').length, 1);
+
+  // Sorting is by start time, earliest first.
+  m.db.routine.add({ id: 'rt-late', day: 'শনিবার', time: '২০:০০ – ২১:০০', teacher: TEACHER });
+  const times = m.teacherDayClasses(TEACHER, 'শনিবার').map((r) => r.id);
+  assert.deepEqual(times, ['rt-1', 'rt-late']);
+
+  assert.deepEqual(m.teacherDayClasses(TEACHER, 'রবিবার'), []);
+});
+
+test('teacherNextClass skips finished classes instead of always naming one', async () => {
+  const m = await teacherModule('t3');
+  const today = m.DAY_BN[new Date().getDay()];
+
+  // A class that ended hours ago must not be offered as "next".
+  m.db.routine.add({ id: 'rt-done', day: today, time: '০১:০০ – ০২:০০', teacher: TEACHER });
+  assert.equal(m.teacherNextClass(TEACHER), null,
+    'a finished class is not reported as upcoming');
+
+  // A class still ahead today must be found.
+  m.db.routine.add({ id: 'rt-later', day: today, time: '২৩:৫৮ – ২৩:৫৯', teacher: TEACHER });
+  const next = m.teacherNextClass(TEACHER);
+  assert.equal(next && next.id, 'rt-later', 'the remaining class today is returned');
+
+  // With no routine at all the card can honestly say the day is finished.
+  assert.equal(m.teacherNextClass('নেই এমন শিক্ষক'), null);
+});
+
+test('teacherPerformance aggregates only the teacher own students', async () => {
+  const m = await teacherModule('t4');
+
+  // No results yet: null, so the UI shows an empty state rather than fake zeros.
+  assert.equal(m.teacherPerformance(TEACHER), null);
+
+  const exam = m.teacherExams(TEACHER)[0];
+  m.db.examResults.add({ id: 'er-1', examId: exam.id, studentId: '2026-09-001', score: 80, total: 100 });
+  m.db.examResults.add({ id: 'er-2', examId: exam.id, studentId: '2026-09-002', score: 30, total: 100 });
+  // A student in another class must never enter this teacher's analytics.
+  m.db.examResults.add({ id: 'er-3', examId: exam.id, studentId: '2026-10-014', score: 100, total: 100 });
+
+  const p = m.teacherPerformance(TEACHER);
+  assert.equal(p.tests, 2, 'only the two own students count');
+  assert.equal(p.avg, 55, '(80 + 30) / 2');
+  assert.equal(p.best, 80);
+  assert.equal(p.lowest, 30);
+  assert.equal(p.passRate, 50, 'passMark is 40, so one of two passed');
+  assert.equal(p.failRate, 50);
+  assert.equal(p.examParticipation, 100, 'both own students have a result');
+});
+
+test('teacher notifications: unread count and mark-read', async () => {
+  const m = await teacherModule('t5');
+
+  assert.equal(m.teacherUnreadCount(), 1, 'the seed notice targets সবাই and is unread');
+
+  m.db.notifications.add({ id: 'ntf-t', target: 'শিক্ষক', read: false, title: 'প্রশ্ন', date: '২০২৬-০৯-০৪' });
+  assert.equal(m.teacherUnreadCount(), 2);
+
+  // A student-directed notice must not inflate the teacher badge.
+  m.db.notifications.add({ id: 'ntf-s', target: 'শিক্ষার্থী', read: false, title: 'x', date: '২০২৬-০৯-০৪' });
+  assert.equal(m.teacherUnreadCount(), 2);
+
+  m.markTeacherNotificationsRead();
+  assert.equal(m.teacherUnreadCount(), 0);
+  assert.equal(m.db.notifications.list().filter((n) => n.target === 'শিক্ষার্থী' && !n.read).length, 1,
+    'marking teacher notices read leaves student notices alone');
+});
+
+test('parseMcqCsv validates rows, reports line numbers and drops duplicates', async () => {
+  const m = await teacherModule('t6');
+
+  const csv = [
+    'Question,A,B,C,D,Correct',
+    '৫+৩=?,৬,৭,৮,৯,B',
+    'only two cells,here',
+    '৫+৩=?,৬,৭,৮,৯,B'
+  ].join('\n');
+
+  const { questions, invalidRows, duplicates } = m.parseMcqCsv(csv);
+  assert.equal(questions.length, 1, 'the duplicate row is dropped');
+  assert.equal(questions[0].answer, 1, 'B maps to option index 1');
+  assert.deepEqual(questions[0].options, ['৬', '৭', '৮', '৯']);
+  assert.deepEqual(invalidRows, [3], 'the short row is reported by its real line number');
+  assert.deepEqual(duplicates, ['৫+৩=?']);
+
+  // A header is optional, and an unknown answer letter invalidates the row.
+  const noHeader = m.parseMcqCsv('২+২=?,৩,৪,৫,৬,Z');
+  assert.equal(noHeader.questions.length, 0);
+  assert.deepEqual(noHeader.invalidRows, [1]);
+});
+
+test('classesInBatch derives class names from a batch label', async () => {
+  const m = await teacherModule('t7');
+  assert.deepEqual(m.classesInBatch('নবম (বিজ্ঞান)'), ['নবম']);
+  assert.deepEqual(m.classesInBatch(''), []);
+});

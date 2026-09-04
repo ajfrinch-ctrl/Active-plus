@@ -856,8 +856,17 @@ export function activeBanners() {
 
 /* ---------------- Home: exam window + assignment status ---------------- */
 
+/**
+ * Bengali digits to ASCII digits, so a time written as ০৮:০০ can be compared
+ * with a clock value. Comparing them raw is always true — U+09E6 outranks the
+ * ASCII digits — which made every finished class look upcoming.
+ */
+function bnDigitsToAscii(text) {
+  return String(text || '').replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6));
+}
+
 function bnToIso(text) {
-  const ascii = String(text || '').replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6));
+  const ascii = bnDigitsToAscii(text);
   const m = ascii.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (!m) return null;
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
@@ -1127,7 +1136,7 @@ export function teacherNextClass(name) {
   const now = new Date();
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const upcoming = slots.find((slot) => {
-    const start = String(slot.time || '').split(/[–-]/)[0].trim().replace('.', ':');
+    const start = bnDigitsToAscii(String(slot.time || '').split(/[–-]/)[0].trim().replace('.', ':'));
     return start >= hhmm;
   });
   return upcoming || null;
