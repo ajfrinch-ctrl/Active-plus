@@ -458,6 +458,7 @@ export function initStudentHome() {
     if (!badge) return;
     showDetail('🎓 সনদ', `
       <div id="certificate-sheet" style="text-align:center;padding:1rem;border:2px dashed var(--accent);border-radius:16px">
+        <img src="assets/logo.png" alt="" class="doc-logo" style="width:64px;height:64px">
         <div style="font-size:.75rem;letter-spacing:.08em">${escapeHtml(db.settings.get().orgName || 'Active Plus')}</div>
         <div style="font-size:1.5rem;margin:.5rem 0">${badge.icon}</div>
         <div style="font-weight:700;font-size:1.125rem">${escapeHtml(badge.name)}</div>

@@ -34,6 +34,16 @@ Open `http://localhost:8080` and log in.
 The login screen lists these with a one-tap "ব্যবহার করুন" fill button, so the
 app can always be signed into even before Firebase is configured.
 
+## Auto-generated IDs
+
+- **Student** — a unique ID is generated automatically on admission as
+  `YY + class-number + serial`, e.g. a 2026 admission to নবম (class 09) with
+  the 1st serial becomes `2609001`; the next becomes `2609002` and so on. The
+  legacy demo ID `2026-09-001` still signs in.
+- **Teacher** — auto-generated from the first word of the name plus the last
+  two digits of the mobile number, e.g. `রাহেলা আক্তার` + mobile ending `১১`
+  → `রাহেলা১১`. If that would collide, a numeric suffix is appended.
+
 ## Structure
 
 ```
@@ -139,6 +149,19 @@ Beyond CRUD for every collection, the panel includes:
 - **Analytics** — admission, collection and due trends, pass rate, class-wise
   and subject-wise performance, rendered as accessible charts.
 - **Student profile sheet** — ID card, fee ledger and results, printable.
+- **Printable admission form (PDF)** — the \"ভর্তি সম্পন্ন\" confirmation and the
+  student profile sheet both offer an \"এডমিশন ফরম PDF\" button. It renders an
+  admission form with the institution logo and full name (from Settings) plus
+  the student's details (name, unique ID, class/section/roll/batch, school,
+  guardian, mobile, admission date, status) and a signature area, then opens
+  the browser print dialog so the admin can save it as a PDF. Print reuses the
+  shared letterhead; the logo prints once.
+- **WhatsApp admission** — after admitting a student the admin gets a
+  "ভর্তি সম্পন্ন" confirmation with a one-tap button that opens WhatsApp
+  pre-filled with the admission details including the auto-generated unique
+  ID, addressed to the guardian's mobile. Each student row and the profile
+  sheet also carry a "হোয়াটসঅ্যাপে পাঠান" button (uses the `wa.me` deep link,
+  no API key/backend).
 - **Users & permissions** — a 24-key permission matrix per role.
 - **Activity log** — who did what, when. Ordinary users cannot delete entries.
 - **Backup / restore** — export and import with validation and an explicit
@@ -182,7 +205,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 116 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 129 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, all 17 reports, the analytics charts, the payment and receipt

@@ -16,10 +16,20 @@
   </head>
 
   <body>
+    <!-- Official report letterhead for printing/exporting PDFs (hidden on screen). -->
+    <div class="print-header" aria-hidden="true">
+      <img src="assets/logo.png" alt="">
+      <div>
+        <div class="ph-title" id="ph-org">Active Plus</div>
+        <div class="ph-sub" id="ph-addr"></div>
+      </div>
+      <div class="ph-right"><strong id="ph-date"></strong><span id="ph-label">রিপোর্ট</span></div>
+    </div>
+
     <div class="app">
       <header class="app-header">
         <div class="brand">
-          <div class="brand-mark" id="user-initial" aria-hidden="true">A</div>
+          <div class="brand-mark brand-logo" id="user-initial" aria-hidden="true"><img src="assets/logo.png" alt="Active Plus"></div>
           <div class="brand-text">
             <strong id="user-name">অ্যাডমিন</strong>
             <span id="user-role">লোড হচ্ছে…</span>
@@ -185,8 +195,6 @@
               <input class="form-input" id="set-fee" name="monthlyFee" type="number" min="0">
             </div>
             <div class="form-group">
-              <label>শিক্ষার্থী হোমে কোন কার্ড দেখানো হবে</label>
-            <div class="form-group">
               <label for="set-challenge">ডেইলি চ্যালেঞ্জের প্রশ্ন সংখ্যা</label>
               <input class="form-input" id="set-challenge" name="dailyChallengeTarget" type="number" min="1" max="50">
             </div>
@@ -212,6 +220,8 @@
                 <label class="check"><input type="checkbox" name="feat_help" value="1"> সহায়তা</label>
               </div>
             </div>
+            <div class="form-group">
+              <label>শিক্ষার্থী হোমে কোন কার্ড দেখানো হবে</label>
               <div class="check-grid" id="home-cards">
               <label class="check"><input type="checkbox" name="home_progress" value="1"> আজকের প্রগ্রেস</label>
               <label class="check"><input type="checkbox" name="home_nextClass" value="1"> পরবর্তী ক্লাস</label>
@@ -364,6 +374,35 @@
       </main>
     </div>
 
+    <!-- Admission done: confirm + send admission info (with unique ID) to WhatsApp -->
+    <div class="modal-overlay" id="admission-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="admission-modal-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="admission-modal-title">🎉 ভর্তি সম্পন্ন</h2>
+        <div id="admission-summary" class="list"></div>
+        <div class="row-actions" style="margin-top:.75rem">
+          <button type="button" class="btn btn-success" id="admission-wa">হোয়াটসঅ্যাপে পাঠান</button>
+          <button type="button" class="btn" id="admission-form">এডমিশন ফরম PDF</button>
+          <button type="button" class="btn btn-secondary" id="admission-close">বন্ধ করুন</button>
+        </div>
+        <p class="form-hint" style="margin-top:.5rem">হোয়াটসঅ্যাপ বাটনটি অভিভাবকের মোবাইল নম্বরে ইউনিক আইডিসহ ভর্তির তথ্যসহ চ্যাট খুলবে। এডমিশন ফরম PDF বাটনটি প্রতিষ্ঠানের নাম ও লোগোসহ ফরম ডাউনলোড করবে।</p>
+      </div>
+    </div>
+
+    <!-- Printable Admission Form (logo + institution header). Shows as a page
+         when printing/saving to PDF; the modal shell is dropped in print. -->
+    <div class="modal-overlay" id="admission-form-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="admission-form-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <h2 id="admission-form-title">ভর্তি ফরম</h2>
+        <div id="admission-form-body"></div>
+        <div class="row-actions" style="margin-top:.75rem">
+          <button type="button" class="btn" id="admission-form-pdf">PDF ডাউনলোড করুন</button>
+          <button type="button" class="btn btn-secondary" id="admission-form-close">বন্ধ করুন</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Student add/edit modal -->
     <div class="modal-overlay" id="student-modal" aria-hidden="true">
       <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="student-modal-title">
@@ -414,7 +453,7 @@
               </select>
             </div>
           </div>
-          <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।</p>
+          <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001</p>
           <button type="submit" class="btn btn-block" id="student-save">ভর্তি করুন</button>
         </form>
       </div>
@@ -445,6 +484,7 @@
             <label for="teacher-phone">মোবাইল</label>
             <input class="form-input" id="teacher-phone" name="phone" inputmode="tel">
           </div>
+          <p class="form-hint">শিক্ষক আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে — নামের প্রথম অংশ + মোবাইলের শেষ ২ ডিজিট (যেমন: রাহেলা আক্তার + ...১১ → রাহেলা১১)।</p>
           <button type="submit" class="btn btn-block" id="teacher-save">সংরক্ষণ করুন</button>
         </form>
       </div>
@@ -521,6 +561,8 @@
         <h2 id="student-detail-title">শিক্ষার্থী প্রোফাইল</h2>
         <div id="student-detail-body"></div>
         <div class="row-actions" style="margin-top:.75rem">
+          <button type="button" class="btn btn-small btn-success" id="wa-profile">হোয়াটসঅ্যাপে পাঠান</button>
+          <button type="button" class="btn btn-small" id="admission-form-profile">এডমিশন ফরম PDF</button>
           <button type="button" class="btn btn-small" id="print-idcard">আইডি কার্ড প্রিন্ট</button>
           <button type="button" class="btn btn-small btn-secondary" id="print-ledger">লেজার প্রিন্ট</button>
         </div>
@@ -615,8 +657,7 @@
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, CLASS_TO_NUMBER, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus } from './js/data.js';
-      import { generateStudentId } from './js/firebase.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
 
@@ -625,13 +666,67 @@
 
       const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 
+      /* ------------------------------------------------------------ */
+      /* WhatsApp: share the admission info (with the unique ID) to    */
+      /* the guardian's number. Uses the wa.me deep link, so no API    */
+      /* key or backend is needed — it just opens the chat pre-filled. */
+      /* ------------------------------------------------------------ */
+      const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
+      const waToEn = (s) => String(s || '').replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)));
+      const waNumber = (phone) => {
+        const digits = waToEn(phone).replace(/[^\d]/g, '');
+        if (!digits) return '';
+        if (digits.startsWith('880')) return digits;
+        if (digits.startsWith('0')) return '880' + digits.slice(1);
+        if (digits.length === 10) return '880' + digits;
+        return digits;
+      };
+      const waLink = (phone, text) => `https://wa.me/${waNumber(phone)}?text=${encodeURIComponent(text)}`;
+      const admissionMessage = (st) => {
+        const s = db.settings.get();
+        const org = s.orgName || 'Active Plus';
+        const lines = [
+          `প্রিয় অভিভাবক,`,
+          ``,
+          `${org}-এ আপনার সন্তানের ভর্তি সম্পন্ন হয়েছে।`,
+          ``,
+          `👤 নাম: ${st.name}`,
+          `🆔 স্টুডেন্ট আইডি: ${st.id}`,
+          `📚 শ্রেণি: ${st.className || '—'}${st.section ? ` (শাখা ${st.section})` : ''}${st.roll ? ` · রোল: ${st.roll}` : ''}`,
+        ];
+        if (st.school) lines.push(`🏫 স্কুল/কলেজ: ${st.school}`);
+        if (st.guardian) lines.push(`👨‍👩‍👧 অভিভাবক: ${st.guardian}`);
+        if (st.admissionDate) lines.push(`📅 ভর্তির তারিখ: ${st.admissionDate}`);
+        lines.push(``, `এই আইডিটি দিয়ে শিক্ষার্থী অ্যাপে লগইন করতে পারবে। ধন্যবাদ।`);
+        return lines.join('\n');
+      };
+      const openWhatsApp = (st) => {
+        const phone = st.phone || st.guardianPhone;
+        if (!waNumber(phone)) { showToast('মোবাইল নম্বর পাওয়া যায়নি।', 'error'); return; }
+        const url = waLink(phone, admissionMessage(st));
+        window.open(url, '_blank', 'noopener');
+        logActivity({ user: session.name, role: session.role, action: 'sent admission info via WhatsApp', target: `${st.id} ${st.name}` });
+      };
+
       // Spec 51: never report a saved record that could not be saved.
       const onlineFor = (action) => requireOnline(action, getDbStatus);
+
+      /* ------------------------------------------------------------ */
+      /* Report letterhead: logo + organisation name for every print.  */
+      /* Hidden on screen; shown when printing/exporting a PDF.       */
+      /* ------------------------------------------------------------ */
+      const ensurePrintHeader = (settings = {}) => {
+        const orgEl = document.getElementById('ph-org');
+        const addrEl = document.getElementById('ph-addr');
+        if (orgEl) orgEl.textContent = settings.orgName || 'Active Plus';
+        if (addrEl) addrEl.textContent = settings.address || '';
+      };
 
       /* ------------------------------------------------------------ */
       /* Dashboard                                                     */
       /* ------------------------------------------------------------ */
       const renderOverview = () => {
+        ensurePrintHeader(db.settings.get());
         const students = db.students.list();
         const teachers = db.teachers.list();
         const batches = db.batches.list();
@@ -676,6 +771,7 @@
           { key: '_actions', label: 'অ্যাকশন', render: (row) => `
             <span class="row-actions">
               <button type="button" class="btn btn-small" data-profile-student="${escapeHtml(row.id)}">প্রোফাইল</button>
+              <button type="button" class="btn btn-small btn-success" data-wa-student="${escapeHtml(row.id)}">হোয়াটসঅ্যাপ</button>
               <button type="button" class="btn btn-small btn-secondary" data-edit-student="${escapeHtml(row.id)}">সম্পাদনা</button>
               <button type="button" class="btn btn-small btn-error" data-delete-student="${escapeHtml(row.id)}">মুছুন</button>
             </span>` }
@@ -713,7 +809,7 @@
         } else {
           document.getElementById('student-modal-title').textContent = 'নতুন শিক্ষার্থী ভর্তি';
           document.getElementById('student-save').textContent = 'ভর্তি করুন';
-          document.getElementById('student-id-hint').textContent = 'স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (সাল-শ্রেণি-রোল)।';
+          document.getElementById('student-id-hint').textContent = 'স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001';
         }
         openModal('student-modal');
       };
@@ -726,7 +822,6 @@
         const data = new FormData(studentForm);
         const editId = String(data.get('editId') || '');
         const className = String(data.get('className'));
-        const roll = Number(data.get('roll')) || 1;
         const record = {
           name: String(data.get('name') || '').trim(),
           school: String(data.get('school') || '').trim(),
@@ -745,15 +840,111 @@
         if (editId) {
           db.students.update(editId, record);
           showToast('শিক্ষার্থীর তথ্য আপডেট হয়েছে।', 'success');
+          closeModal('student-modal');
+          renderStudents();
+          renderOverview();
         } else {
-          const id = generateStudentId(new Date().getFullYear(), CLASS_TO_NUMBER[className] || 9, roll);
-          if (db.students.find(id)) { showToast('এই আইডি আগে থেকেই আছে — রোল বদলান।', 'error'); return; }
-          db.students.add({ id, ...record });
-          showToast(`ভর্তি সম্পন্ন — আইডি ${id}`, 'success');
+          const id = nextStudentId({ year: new Date().getFullYear(), className });
+          const saved = { id, ...record };
+          db.students.add(saved);
+          closeModal('student-modal');
+          renderStudents();
+          renderOverview();
+          showAdmissionDone(saved); // confirm + WhatsApp send with the unique ID
         }
-        closeModal('student-modal');
-        renderStudents();
-        renderOverview();
+      });
+
+      /* -------- Admission done modal: confirm + WhatsApp share -------- */
+      let admissionStudentId = null;
+      const showAdmissionDone = (student) => {
+        admissionStudentId = student.id;
+        const s = db.settings.get();
+        const info = (label, value) => `<div class="list-item"><div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(String(value ?? '—'))}</div></div></div>`;
+        document.getElementById('admission-summary').innerHTML = `
+          <div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(s.orgName || 'Active Plus')}</div><div class="li-sub">ভর্তি নিশ্চিতকরণ</div></div></div>
+          ${info('নাম', student.name)}
+          ${info('স্টুডেন্ট আইডি', student.id)}
+          ${info('শ্রেণি', `${student.className || '—'}${student.section ? ` · ${student.section}` : ''}${student.roll ? ` · রোল ${student.roll}` : ''}`)}
+          ${student.school ? info('স্কুল/কলেজ', student.school) : ''}
+          ${student.guardian ? info('অভিভাবক', student.guardian) : ''}
+          ${info('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}`;
+        openModal('admission-modal');
+      };
+      document.getElementById('admission-wa')?.addEventListener('click', () => {
+        const st = db.students.find(admissionStudentId);
+        if (st) openWhatsApp(st);
+      });
+      document.getElementById('admission-close')?.addEventListener('click', () => closeModal('admission-modal'));
+
+      /* -------- Printable Admission Form: institution logo + name -------- */
+      const fillAdmissionForm = (student) => {
+        const s = db.settings.get();
+        const field = (label, value) => `
+          <div class="admission-field">
+            <div class="af-label">${escapeHtml(label)}</div>
+            <div class="af-value">${escapeHtml(String(value ?? '—'))}</div>
+          </div>`;
+        document.getElementById('admission-form-body').innerHTML = `
+          <div class="admission-sheet">
+            <div class="af-head">
+              <img src="assets/logo.png" alt="">
+              <div>
+                <div class="af-org">${escapeHtml(s.orgName || 'Active Plus')}</div>
+                <div class="af-addr">${escapeHtml(s.address || '')}</div>
+                <div class="af-addr">${escapeHtml(s.mobile || '')}${s.email ? ' · ' + escapeHtml(s.email) : ''}</div>
+              </div>
+            </div>
+            <div class="af-title">ভর্তি ফরম / Admission Form</div>
+            <div class="af-grid">
+              ${field('শিক্ষার্থীর নাম', student.name)}
+              ${field('স্টুডেন্ট আইডি', student.id)}
+              ${field('শ্রেণি', student.className || '—')}
+              ${field('শাখা (Section)', student.section || '—')}
+              ${field('রোল', student.roll || '—')}
+              ${field('ব্যাচ', student.batch || '—')}
+              ${field('স্কুল / কলেজ', student.school || '—')}
+              ${field('অভিভাবকের নাম', student.guardian || '—')}
+              ${field('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}
+              ${field('ভর্তির তারিখ', student.admissionDate || '—')}
+              ${field('অবস্থা', student.status || '—')}
+            </div>
+            <div class="af-sign">
+              <div class="af-sign-col"><div class="af-line"></div><div>অভিভাবকের স্বাক্ষর</div></div>
+              <div class="af-sign-col"><div class="af-line"></div><div>প্রতিষ্ঠানের স্বাক্ষর</div></div>
+            </div>
+          </div>`;
+      };
+      let admissionFormId = null;
+      const openAdmissionForm = (student) => {
+        admissionFormId = student.id;
+        fillAdmissionForm(student);
+        document.body.classList.add('print-admission-form');
+        // Only the admission form should print/show — close any other modal
+        // (the done confirmation or the profile sheet) that opened it.
+        document.querySelectorAll('.modal-overlay.active').forEach((m) => {
+          if (m.id !== 'admission-form-modal') closeModal(m.id);
+        });
+        openModal('admission-form-modal');
+      };
+      const closeAdmissionForm = () => {
+        document.body.classList.remove('print-admission-form');
+        closeModal('admission-form-modal');
+      };
+      document.getElementById('admission-form')?.addEventListener('click', () => {
+        const st = db.students.find(admissionStudentId);
+        if (st) openAdmissionForm(st);
+      });
+      document.getElementById('admission-form-close')?.addEventListener('click', closeAdmissionForm);
+      document.getElementById('admission-form-pdf')?.addEventListener('click', () => {
+        const st = db.students.find(admissionFormId);
+        if (!st) return;
+        ensurePrintHeader(db.settings.get());
+        const phLabel = document.getElementById('ph-label');
+        if (phLabel) phLabel.textContent = 'এডমিশন ফরম';
+        const phDate = document.getElementById('ph-date');
+        if (phDate) phDate.textContent = todayBn();
+        logActivity({ user: session.name, role: session.role, action: 'downloaded admission form', target: `${st.id} ${st.name}` });
+        window.print();
       });
 
       /* -------- Student profile: ID card, ledger, results (spec 29) -------- */
@@ -773,6 +964,7 @@
 
         document.getElementById('student-detail-body').innerHTML = `
           <div class="card" data-idcard style="border:2px solid var(--accent);text-align:center">
+            <img src="assets/logo.png" alt="" class="doc-logo" style="width:56px;height:56px;margin-bottom:.25rem">
             <div style="font-size:.75rem;letter-spacing:.06em">${escapeHtml(settings.orgName || 'Active Plus')}</div>
             <div style="font-weight:700;font-size:1.125rem;margin-top:.25rem">${escapeHtml(st.name)}</div>
             <div class="meta">${escapeHtml(st.id)}</div>
@@ -803,16 +995,37 @@
         openModal('student-detail-modal');
       };
 
+      document.getElementById('wa-profile')?.addEventListener('click', () => {
+        if (!profileStudentId) { showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error'); return; }
+        const st = db.students.find(profileStudentId);
+        if (st) openWhatsApp(st);
+      });
+      document.getElementById('admission-form-profile')?.addEventListener('click', () => {
+        if (!profileStudentId) { showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error'); return; }
+        const st = db.students.find(profileStudentId);
+        if (st) openAdmissionForm(st);
+      });
+
       document.getElementById('print-idcard')?.addEventListener('click', () => {
         // The card is rendered on demand, so query it at click time.
         if (!document.querySelector('#student-detail-body [data-idcard]')) {
           showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error');
           return;
         }
+        ensurePrintHeader(db.settings.get());
+        const phLabel = document.getElementById('ph-label');
+        if (phLabel) phLabel.textContent = 'আইডি কার্ড';
+        const phDate = document.getElementById('ph-date');
+        if (phDate) phDate.textContent = todayBn();
         logActivity({ user: session.name, role: session.role, action: 'printed ID card', target: profileStudentId || '' });
         window.print();
       });
       document.getElementById('print-ledger')?.addEventListener('click', () => {
+        ensurePrintHeader(db.settings.get());
+        const phLabel = document.getElementById('ph-label');
+        if (phLabel) phLabel.textContent = 'ফি লেজার';
+        const phDate = document.getElementById('ph-date');
+        if (phDate) phDate.textContent = todayBn();
         logActivity({ user: session.name, role: session.role, action: 'printed fee ledger', target: profileStudentId || '' });
         window.print();
       });
@@ -821,6 +1034,8 @@
         const editBtn = event.target.closest('[data-edit-student]');
         const delBtn = event.target.closest('[data-delete-student]');
         const profileBtn = event.target.closest('[data-profile-student]');
+        const waBtn = event.target.closest('[data-wa-student]');
+        if (waBtn) { const st = db.students.find(waBtn.dataset.waStudent); if (st) openWhatsApp(st); return; }
         if (profileBtn) { openStudentProfile(profileBtn.dataset.profileStudent); return; }
         if (editBtn) { openStudentModal(editBtn.dataset.editStudent); return; }
         if (delBtn) {
@@ -841,6 +1056,7 @@
       /* ------------------------------------------------------------ */
       const renderTeachers = () => {
         renderTable('#teacher-table', [
+          { key: 'id', label: 'আইডি', render: (row) => escapeHtml(row.id || '—') },
           { key: 'name', label: 'নাম' },
           { key: 'subject', label: 'বিষয়' },
           { key: 'phone', label: 'মোবাইল' },
@@ -881,23 +1097,26 @@
         if (!onlineFor('শিক্ষক সংরক্ষণ')) return;
         const data = new FormData(teacherForm);
         const editName = String(data.get('editName') || '');
-        const record = {
-          name: String(data.get('name') || '').trim(),
-          subject: String(data.get('subject') || '').trim(),
-          classes: Number(data.get('classes')) || 0,
-          phone: String(data.get('phone') || '—').trim()
-        };
-        if (!record.name || !record.subject) { showToast('নাম ও বিষয় দুটোই দিন।', 'error'); return; }
-        if (editName && editName !== record.name && db.teachers.find(record.name)) {
-          showToast('এই নামে আরেকজন শিক্ষক আছেন।', 'error'); return;
-        }
+        const name = String(data.get('name') || '').trim();
+        const subject = String(data.get('subject') || '').trim();
+        const classes = Number(data.get('classes')) || 0;
+        const phone = String(data.get('phone') || '—').trim();
+        if (!name || !subject) { showToast('নাম ও বিষয় দুটোই দিন।', 'error'); return; }
         if (editName) {
+          const existing = db.teachers.find(editName);
+          // Keep the original id unless the name or mobile changed; fall back to
+          // auto-generation if the teacher has no id yet (e.g. seed data).
+          const id = (existing?.id && existing.name === name && existing.phone === phone)
+            ? existing.id
+            : nextTeacherId({ name, phone });
+          if (editName !== name && db.teachers.find(name)) { showToast('এই নামে আরেকজন শিক্ষক আছেন।', 'error'); return; }
           db.teachers.remove(editName);
-          db.teachers.add(record);
+          db.teachers.add({ id, name, subject, classes, phone });
           showToast('শিক্ষকের তথ্য আপডেট হয়েছে।', 'success');
         } else {
-          if (db.teachers.find(record.name)) { showToast('এই নামে শিক্ষক আগে থেকেই আছেন।', 'error'); return; }
-          db.teachers.add(record);
+          if (db.teachers.find(name)) { showToast('এই নামে শিক্ষক আগে থেকেই আছেন।', 'error'); return; }
+          const id = nextTeacherId({ name, phone });
+          db.teachers.add({ id, name, subject, classes, phone });
           showToast('শিক্ষক যোগ করা হয়েছে।', 'success');
         }
         closeModal('teacher-modal');
@@ -1093,6 +1312,7 @@
         document.getElementById('receipt-body').innerHTML = `
           <div data-receipt-sheet style="border:2px solid var(--accent);border-radius:12px;padding:1rem">
             <div style="text-align:center">
+              <img src="assets/logo.png" alt="" class="doc-logo" style="width:64px;height:64px">
               <div style="font-weight:700">${escapeHtml(settings.orgName || 'Active Plus')}</div>
               <div class="meta">${escapeHtml(settings.address || '')}</div>
               <div class="meta">${escapeHtml(settings.mobile || '')}</div>
@@ -1118,6 +1338,11 @@
           showToast('রিসিট তৈরি হয়নি।', 'error');
           return;
         }
+        ensurePrintHeader(db.settings.get());
+        const phLabel = document.getElementById('ph-label');
+        if (phLabel) phLabel.textContent = 'পেমেন্ট রিসিট';
+        const phDate = document.getElementById('ph-date');
+        if (phDate) phDate.textContent = todayBn();
         logActivity({ user: session.name, role: session.role, action: 'printed receipt' });
         window.print();
       });

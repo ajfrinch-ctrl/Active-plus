@@ -196,7 +196,11 @@ function parseStudentId(studentId) {
 }
 
 function validateStudentId(studentId) {
-  return typeof studentId === 'string' && /^\d{4}-\d{1,2}-\d{1,3}$/.test(studentId);
+  // Accepts both the legacy YYYY-C-RRR format and the compact YYCCNNN
+  // (e.g. 2609001 = 2026, class 09, serial 001).
+  if (typeof studentId !== 'string') return false;
+  if (/^\d{7}$/.test(studentId)) return true;
+  return /^\d{4}-\d{1,2}-\d{1,3}$/.test(studentId);
 }
 
 /* ------------------------------------------------------------------ */

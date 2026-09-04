@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Generate the PWA icon set for Active Plus.
+"""Generate the Active Plus brand icon set and master logo.
+
+The brand mark mirrors the supplied logo: a grey broken ring with a dark
+bold "A" and an orange "+" beneath/overlapping it, on a transparent (or
+white) background. Run this whenever the brand mark changes.
 
 Usage:
-    python3 tools/generate-icons.py            # writes assets/*.png
+    python3 tools/generate-icons.py            # writes assets/*.png + logo
     python3 tools/generate-icons.py --check    # verify files exist with right sizes
 
-Pure Pillow, no network access needed. Run it whenever the brand mark changes.
+Pure Pillow, no network access needed.
 """
 from __future__ import annotations
 
@@ -18,10 +22,13 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "assets")
 
-# Brand gradient, top-left -> bottom-right.
-GRADIENT_TOP = (66, 153, 225, 255)      # #4299e1
-GRADIENT_BOTTOM = (43, 108, 176, 255)   # #2b6cb0
-PAGE_BG = (45, 55, 72, 255)             # #2d3748
+# Brand colours.
+GRAY = (140, 144, 149, 255)      # ring
+DARK = (41, 41, 41, 255)         # "A"
+ORANGE = (245, 145, 15, 255)     # "+"
+TRANSPARENT = (0, 0, 0, 0)
+WHITE = (255, 255, 255, 255)
+PAGE_BG = (45, 55, 72, 255)      # #2d3748 — for maskable full-bleed icons
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -38,90 +45,93 @@ def load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def gradient(size: int) -> Image.Image:
-    """Diagonal gradient between the two brand colours."""
-    base = Image.new("RGBA", (size, size), GRADIENT_TOP)
-    top = Image.new("RGBA", (size, size), GRADIENT_BOTTOM)
-    # Distance along the diagonal, normalised 0..1 -> used as the blend mask.
-    mask = Image.new("L", (size, size))
-    pixels = mask.load()
-    denom = 2 * (size - 1) if size > 1 else 1
-    for y in range(size):
-        for x in range(size):
-            pixels[x, y] = int(255 * (x + y) / denom)
-    base.paste(top, (0, 0), mask)
-    return base
+def compose(size: int, background=TRANSPARENT) -> Image.Image:
+    """Draw the A+ logo at a given square size on `background`."""
+    img = Image.new("RGBA", (size, size), background)
+    d = ImageDraw.Draw(img)
+    sc = size / 1024.0
+    cx = cy = size / 2
+
+    # Broken grey ring (small gap at the lower-left).
+    ring_r = 458 * sc
+    ring_w = 66 * sc
+    gap_center = 207
+    gap_half = 5
+    a0 = gap_center + gap_half
+    a1 = gap_center - gap_half + 360
+    bbox = [cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r]
+    d.arc(bbox, start=a0, end=a1, fill=GRAY, width=int(ring_w))
+
+    # Dark "A", offset left of centre.
+    font_a = load_font(int(440 * sc))
+    text_a = "A"
+    ba = d.textbbox((0, 0), text_a, font=font_a)
+    aw, ah = ba[2] - ba[0], ba[3] - ba[1]
+    ax = cx - 118 * sc - aw / 2
+    ay = cy - ah / 2 - ba[1] + 6 * sc
+    d.text((ax, ay), text_a, font=font_a, fill=DARK)
+
+    # Orange "+", right of centre, slightly overlapping the A and raised.
+    font_p = load_font(int(460 * sc))
+    text_p = "+"
+    bp = d.textbbox((0, 0), text_p, font=font_p)
+    pw, ph = bp[2] - bp[0], bp[3] - bp[1]
+    px = cx + 96 * sc - pw / 2
+    py = cy + 34 * sc - ph / 2 - bp[1]
+    d.text((px, py), text_p, font=font_p, fill=ORANGE)
+
+    if background == TRANSPARENT:
+        return img
+    return img.convert("RGB")
 
 
-def rounded_mask(size: int, radius_ratio: float) -> Image.Image:
-    radius = int(size * radius_ratio)
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, size - 1, size - 1], radius=radius, fill=255)
-    return mask
-
-
-def draw_mark(size: int, inset_ratio: float = 0.2) -> Image.Image:
-    """White 'A+' centred inside the safe area."""
-    layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(layer)
-    safe = int(size * (1 - 2 * inset_ratio))
-    left = (size - safe) // 2
-    top = (size - safe) // 2
-    font = load_font(int(safe * 0.52))
-    text = "A+"
-    box = draw.textbbox((0, 0), text, font=font)
-    text_w = box[2] - box[0]
-    text_h = box[3] - box[1]
-    draw.text((left + (safe - text_w) / 2 - box[0], top + (safe - text_h) / 2 - box[1]),
-              text, font=font, fill=(255, 255, 255, 255))
-    return layer
-
-
-def compose(size: int, corner_radius: float = 0.22, maskable: bool = False) -> Image.Image:
-    if maskable:
-        # Maskable icons must be full-bleed; the mark stays inside the 80% safe zone.
-        icon = Image.new("RGBA", (size, size), PAGE_BG)
-        icon.alpha_composite(gradient(size))
-        icon.alpha_composite(draw_mark(size, inset_ratio=0.28))
-        return icon.convert("RGB")
-
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    tile = gradient(size)
-    tile.putalpha(rounded_mask(size, corner_radius))
-    canvas.alpha_composite(tile)
-    canvas.alpha_composite(draw_mark(size, inset_ratio=0.24))
-    return canvas
+def write_logo() -> None:
+    """Write the standalone logo used in the UI header and reports."""
+    os.makedirs(ASSETS, exist_ok=True)
+    logo = compose(512, WHITE)
+    logo.save(os.path.join(ASSETS, "logo.png"), "PNG")
+    # A transparent variant (for dark app headers via the brand mark).
+    compose(512, TRANSPARENT).save(os.path.join(ASSETS, "logo-transparent.png"), "PNG")
+    print("wrote assets/logo.png (512x512)")
+    print("wrote assets/logo-transparent.png (512x512)")
 
 
 TARGETS = {
-    "icon-192.png": (192, False),
-    "icon-512.png": (512, False),
-    "icon-maskable-512.png": (512, True),
-    "apple-touch-icon.png": (180, False),
-    "favicon-32x32.png": (32, False),
-    "favicon-16x16.png": (16, False),
+    "icon-192.png": (192, TRANSPARENT),
+    "icon-512.png": (512, TRANSPARENT),
+    # Maskable must be full-bleed on the app theme background.
+    "icon-maskable-512.png": (512, PAGE_BG),
+    "apple-touch-icon.png": (180, TRANSPARENT),
+    "favicon-32x32.png": (32, TRANSPARENT),
+    "favicon-16x16.png": (16, TRANSPARENT),
 }
 
 
 def generate() -> None:
     os.makedirs(ASSETS, exist_ok=True)
-    for filename, (size, maskable) in TARGETS.items():
+    write_logo()
+    for filename, (size, background) in TARGETS.items():
         path = os.path.join(ASSETS, filename)
-        compose(size, maskable=maskable).save(path, "PNG")
+        img = compose(size, background)
+        if background == TRANSPARENT:
+            img.save(path, "PNG")
+        else:
+            img.save(path, "PNG")
         print(f"wrote {os.path.relpath(path, ROOT)} ({size}x{size})")
 
 
 def check() -> int:
     failures = 0
-    for filename, (size, _) in TARGETS.items():
+    files = list(TARGETS.items()) + [("logo.png", (512, None)), ("logo-transparent.png", (512, None))]
+    for filename, (size, _) in files:
         path = os.path.join(ASSETS, filename)
         if not os.path.exists(path):
             print(f"MISSING {filename}")
             failures += 1
             continue
         with Image.open(path) as image:
-            ok = image.size == (size, size)
-            print(f"{'ok  ' if ok else 'BAD '} {filename} {image.size} expected {(size, size)}")
+            ok = size is None or image.size == (size, size)
+            print(f"{'ok  ' if ok else 'BAD '} {filename} {image.size} expected {(size, size) if size else 'any'}")
             failures += 0 if ok else 1
     return failures
 

@@ -123,7 +123,11 @@ a { color: var(--accent); }
   width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px;
   background: linear-gradient(135deg, #4299e1, #3182ce);
   display: grid; place-items: center; font-size: 18px;
+  overflow: hidden;
 }
+/* The app/company logo shown in the header (replaces the initials tile). */
+.brand-mark.brand-logo { background: #fff; }
+.brand-mark.brand-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brand-text { min-width: 0; }
 .brand-text strong { display: block; font-size: 0.9375rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-text span { display: block; font-size: 0.6875rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -210,14 +214,16 @@ a { color: var(--accent); }
 
 .auth-head { text-align: center; margin-bottom: 1.25rem; }
 .logo {
-  width: 72px; height: 72px; margin: 0 auto 1rem;
-  background: linear-gradient(135deg, #4299e1, #3182ce);
-  border-radius: 18px; display: grid; place-items: center;
+  width: 84px; height: 84px; margin: 0 auto 1rem;
+  background: var(--white);
+  border-radius: 20px; display: grid; place-items: center;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  padding: 8px;
 }
-.logo-icon {
-  width: 40px; height: 40px; background: var(--white); border-radius: 12px;
-  display: grid; place-items: center; font-size: 20px; color: var(--primary);
+.logo-icon,
+.logo img.logo-img {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  border-radius: 0; background: transparent;
 }
 .auth-head h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.25; }
 .subtitle { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; }
@@ -685,9 +691,32 @@ a { color: var(--accent); }
 }
 
 /* Print */
+/* The official report letterhead: logo + organisation name. Hidden on screen,
+   shown only when printing/exporting a report, receipt, ID card or ledger. */
+.print-header {
+  display: none;
+}
+.doc-logo {
+  display: inline-block; width: 56px; height: 56px; object-fit: contain;
+  vertical-align: middle; margin-right: 0.5rem;
+}
+
 @media print {
   body { background: #fff; color: #000; }
   .app-header, .top-tab-bar, .bottom-nav, .toast-container { display: none !important; }
+
+  /* Report letterhead printed at the top of every exported report. */
+  .print-header {
+    display: flex !important;
+    align-items: center; gap: 0.75rem;
+    padding: 0 0 0.75rem; margin-bottom: 1rem;
+    border-bottom: 2px solid #d0d0d0;
+  }
+  .print-header img { width: 64px; height: 64px; object-fit: contain; display: block; }
+  .print-header .ph-title { font-size: 1.05rem; font-weight: 700; line-height: 1.2; }
+  .print-header .ph-sub { font-size: 0.72rem; color: #555; }
+  .print-header .ph-right { margin-left: auto; text-align: right; font-size: 0.72rem; color: #555; }
+  .print-header .ph-right strong { display: block; font-size: 0.9rem; color: #000; }
 
   /*
    * Receipts, ID cards and fee ledgers are rendered inside a modal. Hiding all
@@ -721,9 +750,31 @@ a { color: var(--accent); }
   .modal-overlay.active .modal-close,
   .modal-overlay.active .btn { display: none !important; }
   body.modal-open .app { display: none !important; }
+
+  /* The admission form carries its own logo + org header inside the sheet;
+     drop the shared letterhead so the logo doesn't print twice. */
+  body.print-admission-form .print-header { display: none !important; }
+  body.print-admission-form .admission-sheet .af-head { display: flex !important; }
 }
 
 /* Admin: checkbox grid for home card visibility */
 .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .5rem .75rem; }
 .check { display: flex; align-items: center; gap: .4rem; font-size: .875rem; cursor: pointer; min-height: 44px; }
 .check input { width: 1.15rem; height: 1.15rem; accent-color: var(--brand, #2563eb); }
+
+/* Admission Form (screen + print) */
+.admission-sheet { background: #fff; color: #111; border: 1px solid #d9d9d9; border-radius: 12px; padding: 1.25rem; }
+.admission-sheet .af-head { display: flex; align-items: center; gap: .75rem; border-bottom: 3px solid var(--brand, #2563eb); padding-bottom: .75rem; margin-bottom: .75rem; }
+.admission-sheet .af-head img { width: 56px; height: 56px; object-fit: contain; }
+.admission-sheet .af-org { font-size: 1.1rem; font-weight: 800; color: #111; }
+.admission-sheet .af-addr { font-size: .72rem; color: #555; }
+.admission-sheet .af-title { text-align: center; font-size: 1rem; font-weight: 700; letter-spacing: .03em; margin-bottom: 1rem; text-transform: uppercase; }
+.admission-sheet .af-grid { display: grid; grid-template-columns: 1fr; gap: .4rem 1rem; }
+@media (min-width: 520px) { .admission-sheet .af-grid { grid-template-columns: 1fr 1fr; } }
+.admission-sheet .admission-field { display: flex; flex-direction: column; border-bottom: 1px solid #eee; padding: .2rem 0 .35rem; }
+#admission-form-modal .modal-content { max-width: 720px; }
+.admission-sheet .af-label { font-size: .68rem; color: #777; text-transform: uppercase; letter-spacing: .03em; }
+.admission-sheet .af-value { font-size: .95rem; font-weight: 600; color: #111; }
+.admission-sheet .af-sign { display: flex; justify-content: space-between; gap: 1.5rem; margin-top: 2rem; }
+.admission-sheet .af-sign-col { flex: 1; text-align: center; font-size: .72rem; color: #555; }
+.admission-sheet .af-line { border-top: 1px solid #999; margin-bottom: .35rem; }

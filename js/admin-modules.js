@@ -24,7 +24,7 @@ const onlineFor = (action) => requireOnline(action, getDbStatus);
 
 export function mountExtraAdmin(session) {
   mountDashboard(session);
-  mountGlobalSearch();
+  mountGlobalSearch(session);
   mountClasses(session);
   mountSubjects(session);
   mountMaterials(session);
@@ -87,7 +87,7 @@ function mountDashboard(session) {
 }
 
 /* ---------------- Global search ---------------- */
-function mountGlobalSearch() {
+function mountGlobalSearch(session) {
   const input = document.getElementById('global-search');
   const out = document.getElementById('global-results');
   if (!input || !out) return;
@@ -227,7 +227,7 @@ function mountSubmissions(session) {
     if (!onlineFor('কাজ চেক করা')) return;
     const feedback = window.prompt('শিক্ষকের মন্তব্য (ঐচ্ছিক):') || '';
     checkSubmission(btn.dataset.check, feedback);
-    logActivity('assignment-checked', 'assignments');
+    logActivity({ user: session.name, role: session.role, action: 'checked submission', target: btn.dataset.check });
     render();
     showToast('কাজ চেক হিসেবে চিহ্নিত হয়েছে।', 'success');
   });
@@ -363,6 +363,14 @@ function mountQuestionBank(session) {
   renderList();
 }
 
+/* Stamp the shared print letterhead with the current report label + date. */
+function stampPrintHeader(label) {
+  const phLabel = document.getElementById('ph-label');
+  const phDate = document.getElementById('ph-date');
+  if (phLabel) phLabel.textContent = label;
+  if (phDate) phDate.textContent = todayBn();
+}
+
 /* ---------------- Results + leaderboard ---------------- */
 function mountResults(session) {
   const sel = document.getElementById('res-exam');
@@ -391,7 +399,10 @@ function mountResults(session) {
     ], leaderboard(sel.value)), 'text/csv');
     showToast('রিপোর্ট ডাউনলোড হয়েছে।', 'success');
   });
-  document.getElementById('res-print').addEventListener('click', () => window.print());
+  document.getElementById('res-print').addEventListener('click', () => {
+    stampPrintHeader('ফলাফল রিপোর্ট');
+    window.print();
+  });
   render();
 }
 
@@ -412,8 +423,8 @@ function mountNotifications(session) {
       || '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
   };
   document.getElementById('notif-form').addEventListener('submit', (e) => {
-    if (!onlineFor('নোটিফিকেশন পাঠানো')) return;
     e.preventDefault();
+    if (!onlineFor('নোটিফিকেশন পাঠানো')) return;
     const d = new FormData(e.target);
     db.notifications.add({ id: newId('ntf'), type: String(d.get('type')), title: String(d.get('title')), target: String(d.get('target')), date: todayBn(), createdAt: new Date().toISOString(), read: false });
     logActivity({ user: session.name, role: session.role, action: 'sent notification', target: String(d.get('title')) });
@@ -547,7 +558,10 @@ function mountReports() {
     const r = reports[sel.value];
     downloadText(`${sel.value}-report.csv`, toCSV(r.cols, r.rows()), 'text/csv');
   });
-  document.getElementById('report-print').addEventListener('click', () => window.print());
+  document.getElementById('report-print').addEventListener('click', () => {
+    stampPrintHeader('রিপোর্ট');
+    window.print();
+  });
   render();
 }
 
