@@ -134,7 +134,7 @@ test('database rules deny by default and scope student-owned data', () => {
 
 test('admin student form carries every profile field the student page shows', () => {
   const admin = read('admin.html');
-  for (const name of ['name', 'school', 'className', 'section', 'batch', 'roll', 'phone', 'guardian', 'admissionDate', 'photo', 'status']) {
+  for (const name of ['name', 'school', 'className', 'section', 'batch', 'roll', 'phone', 'guardianPhone', 'guardian', 'admissionDate', 'photo', 'status']) {
     assert.ok(admin.includes(`name="${name}"`), `student form has ${name}`);
   }
   const student = read('js/student-home.js');

@@ -32,6 +32,19 @@ function installWindow(localStorage) {
   };
 }
 
+test('dates are stored and displayed as day-month-year', async () => {
+  installWindow(makeLocalStorage());
+  (await import('../js/store.js'))._clearMemoryStore();
+  const m = await import('../js/data.js?page=dates');
+  assert.equal(m.formatDateBn(new Date(2026, 0, 5)), '০৫-০১-২০২৬');
+  assert.equal(m.formatDateBn('2026-09-10'), '১০-০৯-২০২৬');
+  assert.equal(m.formatDateBn('১০-০৯-২০২৬'), '১০-০৯-২০২৬');
+  assert.equal(m.dateToIso('০৫-০১-২০২৬'), '2026-01-05');
+  const today = m.todayBn();
+  assert.match(today, /^[০-৯]{2}-[০-৯]{2}-[০-৯]{4}$/, 'today is DD-MM-YYYY');
+  assert.equal(m.db.students.find('2026-09-001').admissionDate, '০৫-০১-২০২৬');
+});
+
 test('students: add with school/college, edit, delete — persisted across page loads', async () => {
   const storage = makeLocalStorage();
   installWindow(storage);

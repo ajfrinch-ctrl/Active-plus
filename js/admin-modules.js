@@ -7,7 +7,7 @@
 import {
   db, analytics, examSummary, classPerformance, leaderboard, exportBackup, importBackup,
   parseMcqPaste, parseMcqCsv, toCSV, downloadText, logActivity, activityLogs,
-  todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor,
+  todayBn, parseDate, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor,
   admissionTrend, collectionTrend, dueTrend, subjectPerformance, passRate,
   PERMISSIONS, DEFAULT_PERMISSIONS, getDbStatus
 } from './data.js';
@@ -154,7 +154,7 @@ function mountAssignments(session) {
       { name: 'title', label: 'শিরোনাম', required: true },
       { name: 'subject', label: 'বিষয়', required: true },
       { name: 'className', label: 'ক্লাস', type: 'select', options: CLASS_OPTIONS },
-      { name: 'deadline', label: 'ডেডলাইন' },
+      { name: 'deadline', label: 'ডেডলাইন (দিন-মাস-বছর)' },
       { name: 'marks', label: 'নম্বর', type: 'number' },
       { name: 'description', label: 'বিবরণ', type: 'textarea' }
     ],
@@ -600,8 +600,11 @@ function mountReports(session) {
       label: 'মাসিক আদায়', classScoped: true,
       cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }],
       rows: () => {
-        const m = String(todayBn()).slice(0, 7);
-        return payRows(db.payments.list().filter((p) => String(p.date || '').slice(0, 7) === m));
+        const now = new Date();
+        return payRows(db.payments.list().filter((p) => {
+          const d = parseDate(p.date);
+          return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }));
       },
       summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
     },

@@ -4,7 +4,7 @@
  * students take exams and read suggestions (mountExamTaker / suggestion list).
  */
 
-import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity, examWindow, getDbStatus, assertCan, teacherCanAccessClass } from './data.js';
+import { db, CLASS_OPTIONS, ALL_CLASSES, todayBn, formatDateBn, newId, scoreExam, examResultFor, suggestionsFor, examsFor, recordStudyActivity, examWindow, getDbStatus, assertCan, teacherCanAccessClass } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 
 // Spec 51: never report a saved record that could not be saved.
@@ -182,17 +182,16 @@ export function mountExamAuthoring({ session = null } = {}) {
     }
     const startDate = String(d.get('startDate') || '').trim();
     const endDate = String(d.get('endDate') || '').trim();
-    const toBnDate = (iso) => (iso ? iso.replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[Number(x)]) : '');
     db.exams.add({
       id: newId('exam'), title,
       className,
       subject: String(d.get('subject') || '').trim(),
       author: window.__examAuthor || '',
-      date: String(d.get('date') || '').trim() || todayBn(),
+      date: formatDateBn(String(d.get('date') || '').trim() || todayBn()),
       time: String(d.get('time') || '').trim(),
       duration: Number(d.get('duration')) || 30,
-      startDate: toBnDate(startDate),
-      endDate: toBnDate(endDate),
+      startDate: startDate ? formatDateBn(startDate) : '',
+      endDate: endDate ? formatDateBn(endDate) : '',
       questions: staged
     });
     closeModal('exam-modal');

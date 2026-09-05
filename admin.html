@@ -415,16 +415,21 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label for="student-phone">অভিভাবকের মোবাইল</label>
+              <label for="student-phone">শিক্ষার্থীর মোবাইল</label>
               <input class="form-input" id="student-phone" name="phone" inputmode="tel" placeholder="০১XXXXXXXXX">
             </div>
             <div class="form-group">
-              <label for="student-status">অবস্থা</label>
-              <select class="form-input form-select" id="student-status" name="status">
-                <option value="সক্রিয়">সক্রিয়</option>
-                <option value="বকেয়া">বকেয়া</option>
-              </select>
+              <label for="student-guardian-phone">অভিভাবকের মোবাইল</label>
+              <input class="form-input" id="student-guardian-phone" name="guardianPhone" inputmode="tel" placeholder="০১XXXXXXXXX">
             </div>
+          </div>
+          <div class="form-group">
+            <label for="student-status">অবস্থা</label>
+            <select class="form-input form-select" id="student-status" name="status">
+              <option value="সক্রিয়">সক্রিয়</option>
+              <option value="নিষ্ক্রিয়">নিষ্ক্রিয়</option>
+              <option value="বকেয়া">বকেয়া</option>
+            </select>
           </div>
           <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001</p>
           <button type="submit" class="btn btn-block" id="student-save">ভর্তি করুন</button>
@@ -594,14 +599,14 @@
             <div class="form-group"><label for="exam-subject">বিষয়</label><input class="form-input" id="exam-subject" name="subject"></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label for="exam-date">তারিখ</label><input class="form-input" id="exam-date" name="date" placeholder="২০২৬-০৯-১০"></div>
+            <div class="form-group"><label for="exam-date">তারিখ</label><input class="form-input" id="exam-date" name="date" placeholder="১০-০৯-২০২৬"></div>
             <div class="form-group"><label for="exam-time">সময়</label><input class="form-input" id="exam-time" name="time" placeholder="১৭:০০"></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label for="exam-duration">সময়কাল (মিনিট)</label><input class="form-input" id="exam-duration" name="duration" type="number" min="1" value="30"></div>
-            <div class="form-group"><label for="exam-start">শুরু (YYYY-MM-DD)</label><input class="form-input" id="exam-start" name="startDate" type="date"></div>
+            <div class="form-group"><label for="exam-start">শুরু (দিন-মাস-বছর)</label><input class="form-input" id="exam-start" name="startDate" type="date"></div>
           </div>
-          <div class="form-group"><label for="exam-end">শেষ (YYYY-MM-DD)</label><input class="form-input" id="exam-end" name="endDate" type="date"></div>
+          <div class="form-group"><label for="exam-end">শেষ (দিন-মাস-বছর)</label><input class="form-input" id="exam-end" name="endDate" type="date"></div>
           <div class="card" style="margin:.75rem 0">
             <h3>প্রশ্ন যোগ করুন</h3>
             <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
@@ -654,7 +659,7 @@
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo } from './js/data.js';
+      import { db, CLASS_OPTIONS, todayBn, formatDateBn, dateToIso, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
       import { receiptSummary, shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from './js/docs.js';
@@ -673,6 +678,8 @@
       /* ------------------------------------------------------------ */
       const BN_DIGITS = '০১২৩৪৫৬৭৮৯';
       const waToEn = (s) => String(s || '').replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)));
+      const dateForInput = (s) => dateToIso(s);
+      const todayIso = () => dateToIso(new Date());
       const waNumber = (phone) => {
         const digits = waToEn(phone).replace(/[^\d]/g, '');
         if (!digits) return '';
@@ -701,7 +708,7 @@
         return lines.join('\n');
       };
       const openWhatsApp = (st) => {
-        const phone = st.phone || st.guardianPhone;
+        const phone = st.guardianPhone || st.phone;
         if (!waNumber(phone)) { showToast('মোবাইল নম্বর পাওয়া যায়নি।', 'error'); return; }
         const url = waLink(phone, admissionMessage(st));
         window.open(url, '_blank', 'noopener');
@@ -800,16 +807,19 @@
           studentForm.elements.className.value = student.className || 'নবম';
           studentForm.elements.roll.value = parseInt(student.roll, 10) || 1;
           studentForm.elements.phone.value = student.phone || '';
+          studentForm.elements.guardianPhone.value = student.guardianPhone || '';
           studentForm.elements.section.value = student.section || '';
           studentForm.elements.batch.value = student.batch || '';
           studentForm.elements.guardian.value = student.guardian || '';
-          studentForm.elements.admissionDate.value = student.admissionDate || '';
+          studentForm.elements.admissionDate.value = dateForInput(student.admissionDate) || '';
           studentForm.elements.photo.value = student.photo || '';
           studentForm.elements.status.value = student.status || 'সক্রিয়';
         } else {
           document.getElementById('student-modal-title').textContent = 'নতুন শিক্ষার্থী ভর্তি';
           document.getElementById('student-save').textContent = 'ভর্তি করুন';
           document.getElementById('student-id-hint').textContent = 'স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001';
+          studentForm.elements.admissionDate.value = todayIso();
+          studentForm.elements.status.value = 'সক্রিয়';
         }
         openModal('student-modal');
       };
@@ -829,11 +839,12 @@
           section: String(data.get('section') || '').trim(),
           batch: String(data.get('batch') || '').trim(),
           guardian: String(data.get('guardian') || '').trim(),
-          admissionDate: String(data.get('admissionDate') || '').trim(),
+          admissionDate: formatDateBn(String(data.get('admissionDate') || '').trim()),
           photo: String(data.get('photo') || '').trim(),
           roll: String(data.get('roll')),
-          phone: String(data.get('phone') || '—').trim(),
-          status: String(data.get('status'))
+          phone: String(data.get('phone') || '').trim(),
+          guardianPhone: String(data.get('guardianPhone') || '').trim(),
+          status: String(data.get('status') || 'সক্রিয়')
         };
         if (!record.name) { showToast('শিক্ষার্থীর নাম আবশ্যক।', 'error'); return; }
 
@@ -873,7 +884,8 @@
           ${info('শ্রেণি', `${student.className || '—'}${student.section ? ` · ${student.section}` : ''}${student.roll ? ` · রোল ${student.roll}` : ''}`)}
           ${student.school ? info('স্কুল/কলেজ', student.school) : ''}
           ${student.guardian ? info('অভিভাবক', student.guardian) : ''}
-          ${info('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}`;
+          ${info('শিক্ষার্থীর মোবাইল', student.phone || '—')}
+          ${info('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}`;
         openModal('admission-modal');
       };
       document.getElementById('admission-wa')?.addEventListener('click', () => {
@@ -901,6 +913,7 @@
               </div>
             </div>
             <div class="af-title">ভর্তি ফরম / Admission Form</div>
+            ${student.photo ? `<div class="af-photo"><img src="${escapeHtml(student.photo)}" alt=""></div>` : ''}
             <div class="af-grid">
               ${field('শিক্ষার্থীর নাম', student.name)}
               ${field('স্টুডেন্ট আইডি', student.id)}
@@ -910,7 +923,8 @@
               ${field('ব্যাচ', student.batch || '—')}
               ${field('স্কুল / কলেজ', student.school || '—')}
               ${field('অভিভাবকের নাম', student.guardian || '—')}
-              ${field('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}
+              ${field('শিক্ষার্থীর মোবাইল', student.phone || '—')}
+              ${field('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}
               ${field('ভর্তির তারিখ', student.admissionDate || '—')}
             </div>
             <div class="af-sign">
@@ -1302,7 +1316,7 @@
         const d = new FormData(paymentForm);
         const feeId = String(d.get('feeId') || '');
         const amount = Number(d.get('amount'));
-        const date = String(d.get('date') || '').trim();
+        const date = formatDateBn(String(d.get('date') || '').trim());
         if (!feeId) { showToast('বকেয়া নির্বাচন করুন।', 'error'); return; }
         if (!Number.isFinite(amount) || amount <= 0) { showToast('সঠিক পরিমাণ লিখুন।', 'error'); return; }
         if (!date) { showToast('তারিখ দিন।', 'error'); return; }

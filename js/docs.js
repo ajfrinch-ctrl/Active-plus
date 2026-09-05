@@ -12,7 +12,7 @@
  * Neither output contains any application UI.
  */
 
-import { db, CLASS_TO_NUMBER, ALL_CLASSES } from './data.js';
+import { db, CLASS_TO_NUMBER, ALL_CLASSES, formatDateBn } from './data.js';
 import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, assetDataUrl, loadImage, makeCanvas, wrapText } from './pdf.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -326,7 +326,7 @@ export function buildReportHtml({ settings, title, subtitle, columns, rows, logo
       <tbody>${body || empty}</tbody>
     </table>
     <div style="margin-top:auto;padding-top:20px;text-align:center;font-size:11px;color:#9ca3af">
-      Active Plus · ${new Date().toLocaleDateString('bn-BD')}
+      Active Plus · ${formatDateBn(new Date())}
     </div>
   </div>`;
 }
@@ -514,7 +514,7 @@ function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
   setFont(ctx, 16, 400);
   ctx.textAlign = 'center';
   ctx.fillStyle = FAINT;
-  ctx.fillText(`Active Plus · ${new Date().toLocaleDateString('bn-BD')}`, width / 2, pageHeight - pad - 14);
+  ctx.fillText(`Active Plus · ${formatDateBn(new Date())}`, width / 2, pageHeight - pad - 14);
 
   return y; // bottom of the table, so callers can append a summary
 }
@@ -799,7 +799,7 @@ export async function renderLedgerCanvases(student, opts = {}) {
   });
 }
 
-/** Admission form — the student's details as a clean two-column document. */
+/** Admission form — student details as a full-width A4 sheet with signatures. */
 export async function renderAdmissionFormCanvases(student, opts = {}) {
   const fields = [
     ['শিক্ষার্থীর নাম', student.name],
@@ -810,16 +810,22 @@ export async function renderAdmissionFormCanvases(student, opts = {}) {
     ['ব্যাচ', student.batch],
     ['স্কুল / কলেজ', student.school],
     ['অভিভাবকের নাম', student.guardian],
-    ['অভিভাবকের মোবাইল', student.phone || student.guardianPhone],
+    ['শিক্ষার্থীর মোবাইল', student.phone],
+    ['অভিভাবকের মোবাইল', student.guardianPhone || student.phone],
     ['ভর্তির তারিখ', student.admissionDate]
   ];
-  return renderReportCanvases({
+  const canvases = await renderReportCanvases({
     settings: opts.settings || {},
     title: 'ভর্তি ফরম',
     subtitle: 'Admission Form',
     columns: [{ key: 'label', label: 'বিবরণ' }, { key: 'value', label: 'তথ্য' }],
-    rows: fields.map(([label, value]) => ({ label, value: value || '—' }))
+    rows: fields.map(([label, value]) => ({ label, value: value || '—' })),
+    summary: [
+      { label: 'অভিভাবকের স্বাক্ষর', value: '____________________' },
+      { label: 'প্রতিষ্ঠানের স্বাক্ষর', value: '____________________' }
+    ]
   });
+  return canvases;
 }
 
 export function receiptPdfFileName(pay) {

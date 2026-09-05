@@ -808,6 +808,8 @@ a { color: var(--accent); }
 .admission-sheet .af-org { font-size: 1.1rem; font-weight: 800; color: #111; }
 .admission-sheet .af-addr { font-size: .72rem; color: #555; }
 .admission-sheet .af-title { text-align: center; font-size: 1rem; font-weight: 700; letter-spacing: .03em; margin-bottom: 1rem; text-transform: uppercase; }
+.admission-sheet .af-photo { text-align: center; margin-bottom: .75rem; }
+.admission-sheet .af-photo img { width: 96px; height: 112px; object-fit: cover; border: 1px solid #d9d9d9; border-radius: 6px; }
 .admission-sheet .af-grid { display: grid; grid-template-columns: 1fr; gap: .4rem 1rem; }
 @media (min-width: 520px) { .admission-sheet .af-grid { grid-template-columns: 1fr 1fr; } }
 .admission-sheet .admission-field { display: flex; flex-direction: column; border-bottom: 1px solid #eee; padding: .2rem 0 .35rem; }

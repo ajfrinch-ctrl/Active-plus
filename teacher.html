@@ -73,7 +73,7 @@
               <div class="form-group"><label>শিরোনাম</label><input class="form-input" name="title" required></div>
               <div class="form-group"><label>ক্লাস</label><select class="form-input" name="className" id="asg-class"></select></div>
               <div class="form-group"><label>বিবরণ</label><textarea class="form-input" name="description"></textarea></div>
-              <div class="form-group"><label>শেষ তারিখ</label><input class="form-input" name="dueDate" required></div>
+              <div class="form-group"><label>শেষ তারিখ (দিন-মাস-বছর)</label><input class="form-input" name="dueDate" required placeholder="১০-০৯-২০২৬"></div>
               <div class="form-group"><label>নম্বর</label><input class="form-input" name="marks" type="number" min="1" value="10"></div>
               <button type="submit" class="btn btn-block">অ্যাসাইনমেন্ট প্রকাশ করুন</button>
             </form>
@@ -377,7 +377,7 @@
 
     <script type="module">
       import { initApp, activeTabs, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, requireOnline } from './js/app.js';
-      import { db, newId, todayBn, teacherProfile, teacherStudents, teacherMaterials, teacherExams,
+      import { db, newId, todayBn, formatDateBn, teacherProfile, teacherStudents, teacherMaterials, teacherExams,
         teacherPendingResults, teacherPendingAssignments, submissionsFor, submitAssignment,
         checkSubmission, assignmentStatus, logActivity, timeAgo, CLASS_OPTIONS,
         can, assertCan, teacherCanAccessClass, parseMcqPaste, parseMcqCsv,
@@ -701,7 +701,7 @@
             // Every consumer reads `deadline` (status, due label, student view,
             // admin table); writing `dueDate` here left the deadline blank and
             // stopped overdue detection from ever firing.
-            deadline: String(d.get('dueDate') || ''), marks: Number(d.get('marks')) || 10,
+            deadline: formatDateBn(String(d.get('dueDate') || '')), marks: Number(d.get('marks')) || 10,
             teacher: session.name, createdAt: new Date().toISOString()
           });
           db.notifications.add({

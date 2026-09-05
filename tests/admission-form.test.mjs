@@ -135,6 +135,8 @@ test('admission form renders org header + student details and prints a PDF', asy
   assert.ok(sheet.textContent.includes('নতুন ভর্তি শিক্ষার্থী'), 'student name present');
   assert.match(sheet.textContent, /ভর্তি ফরম/);
   assert.ok(sheet.textContent.includes('অভিভাবকের স্বাক্ষর'), 'signature area present');
+  assert.ok(sheet.textContent.includes('শিক্ষার্থীর মোবাইল'), 'student mobile field present');
+  assert.ok(sheet.textContent.includes('অভিভাবকের মোবাইল'), 'guardian mobile field present');
   // The student's active/inactive status must never appear on the form.
   assert.equal(sheet.textContent.includes('অবস্থা'), false, 'no status field on the admission form');
   assert.equal(sheet.textContent.includes('সক্রিয়'), false, 'no active/inactive status on the admission form');

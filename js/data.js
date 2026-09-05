@@ -50,10 +50,10 @@ const SEED = {
     }
   },
   students: [
-    { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', section: 'A', batch: 'A', roll: '০১', phone: '০১৭১১-০০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়', guardian: 'করিম হাসান', guardianPhone: '০১৮১১-০০০০০১', admissionDate: '২০২৬-০১-০৫', photo: '' },
-    { id: '2026-09-002', name: 'সুমাইয়া ইসলাম', className: 'নবম', section: 'A', batch: 'A', roll: '০২', phone: '০১৭১১-০০০০০২', school: 'ভিকারুননিসা নূন স্কুল অ্যান্ড কলেজ', status: 'সক্রিয়', guardian: 'জাহিদ ইসলাম', guardianPhone: '০১৮১১-০০০০০২', admissionDate: '২০২৬-০১-০৫', photo: '' },
-    { id: '2026-10-014', name: 'নাফিস ইকবাল', className: 'দশম', section: 'B', batch: 'B', roll: '১৪', phone: '০১৭১১-০০০০১৪', school: 'মতিঝিল সরকারি বালক উচ্চ বিদ্যালয়', status: 'বকেয়া', guardian: 'ইকবাল হোসেন', guardianPhone: '০১৮১১-০০০০১৪', admissionDate: '২০২৬-০১-০৮', photo: '' },
-    { id: '2026-08-007', name: 'তাসনিম জাহান', className: 'অষ্টম', section: 'A', batch: 'A', roll: '০৭', phone: '০১৭১১-০০০০০৭', school: 'লালমাটিয়া বালিকা বিদ্যালয়', status: 'সক্রিয়', guardian: 'জাহান আলম', guardianPhone: '০১৮১১-০০০০০৭', admissionDate: '২০২৬-০১-১০', photo: '' }
+    { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', section: 'A', batch: 'A', roll: '০১', phone: '০১৭১১-০০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়', guardian: 'করিম হাসান', guardianPhone: '০১৮১১-০০০০০১', admissionDate: '০৫-০১-২০২৬', photo: '' },
+    { id: '2026-09-002', name: 'সুমাইয়া ইসলাম', className: 'নবম', section: 'A', batch: 'A', roll: '০২', phone: '০১৭১১-০০০০০২', school: 'ভিকারুননিসা নূন স্কুল অ্যান্ড কলেজ', status: 'সক্রিয়', guardian: 'জাহিদ ইসলাম', guardianPhone: '০১৮১১-০০০০০২', admissionDate: '০৫-০১-২০২৬', photo: '' },
+    { id: '2026-10-014', name: 'নাফিস ইকবাল', className: 'দশম', section: 'B', batch: 'B', roll: '১৪', phone: '০১৭১১-০০০০১৪', school: 'মতিঝিল সরকারি বালক উচ্চ বিদ্যালয়', status: 'বকেয়া', guardian: 'ইকবাল হোসেন', guardianPhone: '০১৮১১-০০০০১৪', admissionDate: '০৮-০১-২০২৬', photo: '' },
+    { id: '2026-08-007', name: 'তাসনিম জাহান', className: 'অষ্টম', section: 'A', batch: 'A', roll: '০৭', phone: '০১৭১১-০০০০০৭', school: 'লালমাটিয়া বালিকা বিদ্যালয়', status: 'সক্রিয়', guardian: 'জাহান আলম', guardianPhone: '০১৮১১-০০০০০৭', admissionDate: '১০-০১-২০২৬', photo: '' }
   ],
   teachers: [
     { id: 'রাহেলা১১', name: 'রাহেলা আক্তার', subject: 'পদার্থবিজ্ঞান', phone: '০১৮১১-১১১১১১', classes: 6 },
@@ -67,9 +67,9 @@ const SEED = {
     { name: 'অষ্টম', students: 30, teacher: 'সাদিয়া রহমান', time: 'বিকাল ৪টা' }
   ],
   notices: [
-    { id: 'n-1', title: 'অর্ধবার্ষিক পরীক্ষার রুটিন প্রকাশ', date: '২০২৬-০৯-০১', audience: 'সবাই', className: ALL_CLASSES },
-    { id: 'n-2', title: 'সেপ্টেম্বর মাসের বেতন পরিশোধের শেষ তারিখ ১০ সেপ্টেম্বর', date: '২০২৬-০৮-২৮', audience: 'অভিভাবক', className: ALL_CLASSES },
-    { id: 'n-3', title: 'নবম শ্রেণির পদার্থবিজ্ঞান ক্লাস শনিবার সকাল ৮টায়', date: '২০২৬-০৮-২৫', audience: 'শিক্ষার্থী', className: 'নবম' }
+    { id: 'n-1', title: 'অর্ধবার্ষিক পরীক্ষার রুটিন প্রকাশ', date: '০১-০৯-২০২৬', audience: 'সবাই', className: ALL_CLASSES },
+    { id: 'n-2', title: 'সেপ্টেম্বর মাসের বেতন পরিশোধের শেষ তারিখ ১০ সেপ্টেম্বর', date: '২৮-০৮-২০২৬', audience: 'অভিভাবক', className: ALL_CLASSES },
+    { id: 'n-3', title: 'নবম শ্রেণির পদার্থবিজ্ঞান ক্লাস শনিবার সকাল ৮টায়', date: '২৫-০৮-২০২৬', audience: 'শিক্ষার্থী', className: 'নবম' }
   ],
   routine: [
     { id: 'rt-1', day: 'শনিবার', subject: 'গণিত', teacher: 'রাহেলা আক্তার', time: '০৮:০০ – ০৯:০০', room: 'কক্ষ ২০১' },
@@ -79,10 +79,10 @@ const SEED = {
     { id: 'rt-5', day: 'বুধবার', subject: 'জীববিজ্ঞান', teacher: 'তানভীর আহমেদ', time: '০৯:০০ – ১০:০০', room: 'ল্যাব ২' }
   ],
   attendance: [
-    { date: '২০২৬-০৯-০১', subject: 'গণিত', status: 'উপস্থিত' },
-    { date: '২০২৬-০৯-০২', subject: 'পদার্থবিজ্ঞান', status: 'উপস্থিত' },
-    { date: '২০২৬-০৯-০৩', subject: 'রসায়ন', status: 'অনুপস্থিত' },
-    { date: '২০২৬-০৯-০৪', subject: 'ইংরেজি', status: 'উপস্থিত' }
+    { date: '০১-০৯-২০২৬', subject: 'গণিত', status: 'উপস্থিত' },
+    { date: '০২-০৯-২০২৬', subject: 'পদার্থবিজ্ঞান', status: 'উপস্থিত' },
+    { date: '০৩-০৯-২০২৬', subject: 'রসায়ন', status: 'অনুপস্থিত' },
+    { date: '০৪-০৯-২০২৬', subject: 'ইংরেজি', status: 'উপস্থিত' }
   ],
   results: [
     { exam: 'প্রথম সাময়িক', subject: 'গণিত', marks: 82, grade: 'A-' },
@@ -92,30 +92,30 @@ const SEED = {
   ],
   /* Per-student monthly fees. status: পরিশোধিত | বকেয়া */
   fees: [
-    { id: 'fee-001-ago', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৫' },
-    { id: 'fee-001-now', studentId: '2026-09-001', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৯-০২' },
-    { id: 'fee-002-ago', studentId: '2026-09-002', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৬' },
+    { id: 'fee-001-ago', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '০৫-০৮-২০২৬' },
+    { id: 'fee-001-now', studentId: '2026-09-001', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '০২-০৯-২০২৬' },
+    { id: 'fee-002-ago', studentId: '2026-09-002', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '০৬-০৮-২০২৬' },
     { id: 'fee-002-now', studentId: '2026-09-002', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
-    { id: 'fee-014-ago', studentId: '2026-10-014', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-১০' },
+    { id: 'fee-014-ago', studentId: '2026-10-014', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '১০-০৮-২০২৬' },
     { id: 'fee-014-now', studentId: '2026-10-014', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
-    { id: 'fee-007-ago', studentId: '2026-08-007', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৪' },
-    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৯-০১' }
+    { id: 'fee-007-ago', studentId: '2026-08-007', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '০৪-০৮-২০২৬' },
+    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '০১-০৯-২০২৬' }
   ],
   payments: [
-    { id: 'pay-1', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, date: '২০২৬-০৮-০৫', receivedBy: 'সিস্টেম' }
+    { id: 'pay-1', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, date: '০৫-০৮-২০২৬', receivedBy: 'সিস্টেম' }
   ],
   suggestions: [
     {
       id: 'sug-1', title: 'পদার্থবিজ্ঞান সাজেশন — অর্ধবার্ষিক ২০২৬', className: 'নবম', subject: 'পদার্থবিজ্ঞান',
-      author: 'রাহেলা আক্তার', date: '২০২৬-০৯-০১',
+      author: 'রাহেলা আক্তার', date: '০১-০৯-২০২৬',
       content: '১) গতি ও বেগের সংজ্ঞা ও একক ভালোভাবে মুখস্থ কর। ২) নিউটনের সূত্রগুলো উদাহরণসহ ব্যাখ্যা করতে পারতে হবে। ৩) কাজ, শক্তি ও ক্ষমতার গাণিতিক অনুশীলন কর। ৪) বোর্ডের ২০২৫ সালের প্রশ্নপত্র সমাধান কর।'
     }
   ],
   exams: [
     {
       id: 'exam-1', title: 'গণিত MCQ মডেল টেস্ট-১', className: 'নবম', subject: 'গণিত',
-      author: 'কামরুল ইসলাম', date: '২০২৬-০৯-০২', time: '১৭:০০',
-      duration: 30, startDate: '২০২৬-০৯-০১', endDate: '২০২৬-০৯-৩০',
+      author: 'কামরুল ইসলাম', date: '০২-০৯-২০২৬', time: '১৭:০০',
+      duration: 30, startDate: '০১-০৯-২০২৬', endDate: '৩০-০৯-২০২৬',
       questions: [
         { q: '৫ + ৩ × ২ = ?', options: ['১০', '১১', '১৬', ''], answer: 1 },
         { q: 'একটি ত্রিভুজের তিন কোণের সমষ্টি কত?', options: ['৯০°', '১৮০°', '২৭০°', '৩৬০°'], answer: 1 },
@@ -136,23 +136,23 @@ const SEED = {
     { id: 'sub-4', name: 'ইংরেজি', className: 'নবম', teacher: 'সাদিয়া রহমান' }
   ],
   materials: [
-    { id: 'mat-1', title: 'গণিত নোট — অধ্যায় ১', subject: 'গণিত', className: 'নবম', type: 'নোট', chapter: '১', description: 'স্বাভাবিক সংখ্যা ও ভগ্নাংশ', date: '২০২৬-০৯-০১', by: 'কামরুল ইসলাম', published: true }
+    { id: 'mat-1', title: 'গণিত নোট — অধ্যায় ১', subject: 'গণিত', className: 'নবম', type: 'নোট', chapter: '১', description: 'স্বাভাবিক সংখ্যা ও ভগ্নাংশ', date: '০১-০৯-২০২৬', by: 'কামরুল ইসলাম', published: true }
   ],
   assignments: [
-    { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: '২০২৬-০৯-১০', marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
+    { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: '১০-০৯-২০২৬', marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
   ],
   submissions: [
-    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: '২০২৬-০৯-০৩', feedback: '' }
+    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: '০৩-০৯-২০২৬', feedback: '' }
   ],
   notifications: [
-    { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০২৬-০৯-০১', createdAt: new Date().toISOString(), read: false }
+    { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '০১-০৯-২০২৬', createdAt: new Date().toISOString(), read: false }
   ],
   activityLogs: [],
   tips: [
-    { id: 'tip-1', text: 'প্রতিদিন কমপক্ষে ৩০ মিনিট গণিত অনুশীলন কর।', active: true, by: 'কামরুল ইসলাম', date: '২০২৬-০৯-০১' }
+    { id: 'tip-1', text: 'প্রতিদিন কমপক্ষে ৩০ মিনিট গণিত অনুশীলন কর।', active: true, by: 'কামরুল ইসলাম', date: '০১-০৯-২০২৬' }
   ],
   banners: [
-    { id: 'ban-1', title: 'গ্র্যান্ড মডেল টেস্ট ২০২৬', desc: 'সব ক্লাসের জন্য বৃহৎ মডেল টেস্ট — নিবন্ধন চলছে।', cta: 'নোটিশ দেখুন', active: true, date: '২০২৬-০৯-০১' }
+    { id: 'ban-1', title: 'গ্র্যান্ড মডেল টেস্ট ২০২৬', desc: 'সব ক্লাসের জন্য বৃহৎ মডেল টেস্ট — নিবন্ধন চলছে।', cta: 'নোটিশ দেখুন', active: true, date: '০১-০৯-২০২৬' }
   ],
   materialProgress: [],
   studyActivity: [],
@@ -338,9 +338,48 @@ export const db = {
 /* Domain helpers                                                      */
 /* ------------------------------------------------------------------ */
 
+const DATE_BN = '০১২৩৪৫৬৭৮৯';
+export function toEnDigits(text) {
+  return String(text ?? '').replace(/[০-৯]/g, (d) => String(DATE_BN.indexOf(d)));
+}
+export function toBnDigits(text) {
+  return String(text ?? '').replace(/\d/g, (d) => DATE_BN[Number(d)]);
+}
+
+/**
+ * Parse a calendar date. Accepts দিন-মাস-বছর (preferred) and legacy
+ * বছর-মাস-দিন, with ASCII or Bengali digits, `-` `/` or `.` separators.
+ */
+export function parseDate(text) {
+  if (text instanceof Date && !Number.isNaN(text.getTime())) {
+    return new Date(text.getFullYear(), text.getMonth(), text.getDate());
+  }
+  const ascii = toEnDigits(text).replace(/[./]/g, '-').trim();
+  let m = ascii.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  m = ascii.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return null;
+}
+
+/** Display/store format: দিন-মাস-বছর with Bengali digits, e.g. ০৫-০১-২০২৬. */
+export function formatDateBn(value = new Date()) {
+  const d = value instanceof Date ? value : parseDate(value);
+  if (!d || Number.isNaN(d.getTime())) return String(value || '');
+  const p = (n) => String(n).padStart(2, '0');
+  return toBnDigits(`${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`);
+}
+
+/** ISO yyyy-mm-dd for `<input type="date">`. */
+export function dateToIso(value) {
+  const d = parseDate(value);
+  if (!d) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export function todayBn() {
-  const iso = new Date().toISOString().slice(0, 10);
-  return iso.replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+  return formatDateBn(new Date());
 }
 
 export function newId(prefix) {
@@ -725,7 +764,7 @@ export function studyStreak() {
   if (!dates.has(todayBn())) iso.setDate(iso.getDate() - 1);
   let streak = 0;
   for (;;) {
-    const d = iso.toISOString().slice(0, 10).replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[x]);
+    const d = formatDateBn(iso);
     if (!dates.has(d)) break;
     streak += 1;
     iso.setDate(iso.getDate() - 1);
@@ -734,7 +773,7 @@ export function studyStreak() {
   const now = new Date();
   for (let i = 6; i >= 0; i -= 1) {
     const d = new Date(now); d.setDate(now.getDate() - i);
-    const key = d.toISOString().slice(0, 10).replace(/\d/g, (x) => '০১২৩৪৫৬৭৮৯'[x]);
+    const key = formatDateBn(d);
     week.push({ day: DAY_BN[d.getDay()].slice(0, 1), done: dates.has(key) });
   }
   return { streak, week };
@@ -870,10 +909,7 @@ function bnDigitsToAscii(text) {
 }
 
 function bnToIso(text) {
-  const ascii = bnDigitsToAscii(text);
-  const m = ascii.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return parseDate(text);
 }
 
 /** Is an exam open right now? Drives View Exam vs Start Exam (never both). */
@@ -1186,8 +1222,10 @@ export function admissionTrend(limit = 6) {
 export function collectionTrend(limit = 6) {
   const byMonth = {};
   db.payments.list().forEach((p) => {
-    const key = String(p.date || '').slice(0, 7);
-    if (key) byMonth[key] = (byMonth[key] || 0) + Number(p.amount || 0);
+    const d = parseDate(p.date);
+    if (!d) return;
+    const key = toBnDigits(`${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`);
+    byMonth[key] = (byMonth[key] || 0) + Number(p.amount || 0);
   });
   return Object.entries(byMonth)
     .sort((a, b) => a[0].localeCompare(b[0]))
