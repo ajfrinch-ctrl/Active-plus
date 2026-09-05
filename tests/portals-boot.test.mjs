@@ -266,13 +266,26 @@ test('payment capture records method/reference and prints a receipt', async () =
   assert.match(saved.receiptNo || '', /^RCP-\d+$/, 'a receipt number was generated');
   assert.equal(data.db.fees.find(fee.id).status, 'পরিশোধিত', 'the fee is settled');
 
-  // the receipt sheet opened with the real values
+  // the success sheet opens first: "পেমেন্ট সফল" + view/WhatsApp/download
+  const success = doc.getElementById('payment-success-modal');
+  assert.ok(success.classList.contains('active'), 'success sheet opens after saving');
+  assert.match(success.textContent, /পেমেন্ট সফল/, 'announces the payment succeeded');
+  assert.ok(doc.getElementById('pay-success-view'), 'view-receipt action available');
+  assert.ok(doc.getElementById('pay-success-whatsapp'), 'WhatsApp image share action available');
+  assert.ok(doc.getElementById('pay-success-download'), 'download action available');
+
+  // viewing the receipt opens the clean sheet with the real values
+  doc.getElementById('pay-success-view')
+    .dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
   const receipt = doc.querySelector('#receipt-body [data-receipt-sheet]');
   assert.ok(receipt, 'receipt sheet rendered');
   assert.ok(receipt.textContent.includes('TRX-9911'), 'shows the reference');
   assert.ok(receipt.textContent.includes('বিকাশ'), 'shows the method');
   assert.ok(receipt.textContent.includes(saved.receiptNo), 'shows the receipt number');
+  assert.ok(receipt.textContent.includes('পেমেন্ট রিসিট'), 'is a payment receipt');
   assert.ok(doc.getElementById('receipt-print'), 'print action available');
+  assert.ok(doc.getElementById('receipt-whatsapp'), 'receipt WhatsApp action available');
+  assert.ok(doc.getElementById('receipt-download'), 'receipt download action available');
 
   // a receipt button now exists in the recent payments list
   assert.ok(doc.querySelector('[data-receipt]'), 'receipt reachable from the payment list');
@@ -461,6 +474,73 @@ test('saving the permission matrix really changes what a teacher may do', async 
   assert.equal(can('teacher', 'manageQuestions'), false,
     'the data layer now refuses it — not just the UI');
   assert.equal(can('teacher', 'manageMaterials'), true, 'other rights are untouched');
+});
+
+test('the report centre replaces Print with PDF download and offers class reports', async () => {
+  const { doc, errors } = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'reportpdf'
+  });
+
+  // Print is gone; the PDF workflow is present.
+  assert.equal(doc.getElementById('report-print'), null, 'the Print button is removed');
+  assert.ok(doc.getElementById('report-pdf'), 'Download PDF button present');
+  assert.ok(doc.getElementById('report-class-pdf'), 'Download Class PDF button present');
+  assert.ok(doc.getElementById('report-all-pdf'), 'Download All Classes PDF button present');
+
+  // Class dropdown offers the real class list.
+  const classSel = doc.getElementById('report-class');
+  assert.ok(classSel, 'class dropdown exists');
+  const labels = [...classSel.options].map((o) => o.textContent);
+  const { CLASS_OPTIONS } = await import('../js/data.js');
+  for (const c of CLASS_OPTIONS) assert.ok(labels.includes(c), `class dropdown offers ${c}`);
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('student save requires a name and assigns a unique auto ID', async () => {
+  const { doc, errors } = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'studentval'
+  });
+  const win = doc.defaultView;
+  const data = await import('../js/data.js');
+
+  doc.getElementById('open-student-modal')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const form = doc.getElementById('student-form');
+  assert.ok(form.elements.name.hasAttribute('required'), 'name field marked required');
+
+  // Empty name is blocked with the exact Bangla message and nothing is written.
+  const before = data.db.students.list().length;
+  form.elements.name.value = '';
+  form.elements.className.value = 'নবম';
+  form.elements.roll.value = '1';
+  form.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.students.list().length, before, 'no student saved without a name');
+  assert.match(doc.getElementById('toast-container').textContent,
+    /শিক্ষার্থীর নাম আবশ্যক/, 'the Bangla name-required error is shown');
+
+  // A valid save persists the student with a generated, unique ID.
+  form.elements.name.value = 'পরীক্ষা শিক্ষার্থী';
+  form.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.students.list().length, before + 1, 'the student was saved');
+  const saved = data.db.students.list().find((s) => s.name === 'পরীক্ষা শিক্ষার্থী');
+  assert.ok(saved.id, 'an auto ID was assigned');
+  assert.equal(data.db.students.list().filter((s) => s.id === saved.id).length, 1,
+    'the assigned ID is unique');
+
+  // Editing keeps the same ID — never re-validates it as a duplicate.
+  const editBtn = doc.querySelector(`[data-edit-student="${saved.id}"]`);
+  assert.ok(editBtn, 'the new student can be edited');
+  editBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(doc.getElementById('student-edit-id').value, saved.id, 'edit mode holds the ID');
+  form.elements.name.value = 'পরীক্ষা শিক্ষার্থী (আপডেট)';
+  form.dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.students.find(saved.id).name, 'পরীক্ষা শিক্ষার্থী (আপডেট)',
+    'editing updates in place without a duplicate complaint');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
 test('the report centre exports the selected report as CSV', async () => {

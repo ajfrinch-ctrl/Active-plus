@@ -286,7 +286,14 @@
           <h2 class="section-title">রিপোর্ট সেন্টার</h2>
           <div class="form-group"><label for="report-type">রিপোর্ট</label><select id="report-type" class="form-input form-select"></select></div>
           <div class="table-wrap"><table class="table" id="report-table"><thead><tr></tr></thead><tbody></tbody></table></div>
-          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="report-csv">এক্সেল/CSV</button><button type="button" class="btn btn-small btn-secondary" id="report-print">প্রিন্ট</button></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="report-csv">এক্সেল/CSV</button><button type="button" class="btn btn-small" id="report-pdf">⬇️ Download PDF</button></div>
+
+          <h2 class="section-title" style="margin-top:1.5rem">শিক্ষার্থী রিপোর্ট (ক্লাস অনুযায়ী)</h2>
+          <div class="form-group"><label for="report-class">ক্লাস নির্বাচন</label><select id="report-class" class="form-input form-select"></select></div>
+          <div class="row-actions" style="margin-top:.75rem">
+            <button type="button" class="btn btn-small" id="report-class-pdf">⬇️ Download Class PDF</button>
+            <button type="button" class="btn btn-small" id="report-all-pdf">⬇️ Download All Classes PDF</button>
+          </div>
         </section>
 
         <section class="tab-panel" id="tab-users" hidden>
@@ -518,7 +525,29 @@
         <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
         <h2 id="receipt-title">পেমেন্ট রিসিট</h2>
         <div id="receipt-body"></div>
-        <button type="button" class="btn btn-block" id="receipt-print" style="margin-top:.75rem">রিসিট প্রিন্ট করুন</button>
+        <div class="btn-stack" style="margin-top:.75rem">
+          <button type="button" class="btn" id="receipt-print">🖨️ প্রিন্ট</button>
+          <button type="button" class="btn btn-success" id="receipt-whatsapp">📱 WhatsApp রিসিট</button>
+          <button type="button" class="btn btn-secondary" id="receipt-download">⬇️ রিসিট ডাউনলোড</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment successful: view / WhatsApp / download the receipt -->
+    <div class="modal-overlay" id="payment-success-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="payment-success-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <div style="text-align:center">
+          <div class="success-hero">✅</div>
+          <h2 id="payment-success-title">পেমেন্ট সফল</h2>
+          <p id="payment-success-sub" style="color:var(--text-muted, #6b7280);margin:.25rem 0 0"></p>
+        </div>
+        <div class="list" id="payment-success-summary"></div>
+        <div class="btn-stack" style="margin-top:.75rem">
+          <button type="button" class="btn" id="pay-success-view">🧾 রিসিট দেখুন</button>
+          <button type="button" class="btn btn-success" id="pay-success-whatsapp">📱 WhatsApp রিসিট</button>
+          <button type="button" class="btn btn-secondary" id="pay-success-download">⬇️ রিসিট ডাউনলোড</button>
+        </div>
       </div>
     </div>
 
@@ -628,6 +657,7 @@
       import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
+      import { buildReceiptHtml, receiptSummary, shareReceiptAsImage, downloadReceiptPng } from './js/docs.js';
 
       const session = initApp({ roles: ['admin'] });
       if (!session) throw new Error('guard redirect');
@@ -803,7 +833,7 @@
           phone: String(data.get('phone') || '—').trim(),
           status: String(data.get('status'))
         };
-        if (!record.name) { showToast('নাম লিখুন।', 'error'); return; }
+        if (!record.name) { showToast('শিক্ষার্থীর নাম আবশ্যক।', 'error'); return; }
 
         if (editId) {
           db.students.update(editId, record);
@@ -813,6 +843,12 @@
           renderOverview();
         } else {
           const id = nextStudentId({ year: new Date().getFullYear(), className });
+          // Unique ID is mandatory and must never collide with an existing one.
+          if (!id) { showToast('শিক্ষার্থীর Unique ID আবশ্যক।', 'error'); return; }
+          if (db.students.find(id)) {
+            showToast('এই Unique ID ইতোমধ্যে অন্য একজন শিক্ষার্থীর জন্য ব্যবহৃত হয়েছে।', 'error');
+            return;
+          }
           const saved = { id, ...record };
           db.students.add(saved);
           closeModal('student-modal');
@@ -1266,40 +1302,75 @@
         });
         logActivity({ user: session.name, role: session.role, action: 'recorded payment', target: `${result.payment.studentId} ৳${amount}` });
         closeModal('payment-modal');
-        showToast('পেমেন্ট গৃহীত হয়েছে। শিক্ষার্থীকে নোটিশ পাঠানো হয়েছে।', 'success');
         renderDues(); renderStudents(); renderOverview();
-        openReceipt(result.payment.id);
+        showPaymentSuccess(result.payment.id);
       });
 
-      const openReceipt = (paymentId) => {
+      /* -------- Receipt: view, print, WhatsApp image share, download -------- */
+      let currentReceiptId = null;
+
+      const receiptOpts = (paymentId) => {
         const pay = db.payments.find(paymentId);
-        if (!pay) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
-        const student = db.students.find(pay.studentId);
-        const settings = db.settings.get();
-        const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(String(value ?? '—'))}</span></div>`;
-        document.getElementById('receipt-body').innerHTML = `
-          <div data-receipt-sheet style="border:2px solid var(--accent);border-radius:12px;padding:1rem">
-            <div style="text-align:center">
-              <img src="assets/logo.png" alt="" class="doc-logo" style="width:64px;height:64px">
-              <div style="font-weight:700">${escapeHtml(settings.orgName || 'Active Plus')}</div>
-              <div class="meta">${escapeHtml(settings.address || '')}</div>
-              <div class="meta">${escapeHtml(settings.mobile || '')}</div>
-              <div style="margin-top:.5rem;font-weight:700">পেমেন্ট রিসিট</div>
-            </div>
-            ${row('রিসিট নম্বর', pay.receiptNo || pay.id)}
-            ${row('তারিখ', pay.date)}
-            ${row('শিক্ষার্থী', student?.name || pay.studentId)}
-            ${row('আইডি', pay.studentId)}
-            ${row('শ্রেণি', student?.className || '—')}
-            ${row('মাস', pay.month)}
-            ${row('পরিমাণ', `৳${bn(pay.amount || 0)}`)}
-            ${row('মাধ্যম', pay.method)}
-            ${row('রেফারেন্স', pay.reference)}
-            ${row('মন্তব্য', pay.remarks)}
-            ${row('গ্রহণকারী', pay.receivedBy)}
-          </div>`;
+        if (!pay) return null;
+        return { pay, student: db.students.find(pay.studentId) || null, settings: db.settings.get() };
+      };
+
+      const openReceipt = (paymentId) => {
+        const opts = receiptOpts(paymentId);
+        if (!opts) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
+        currentReceiptId = paymentId;
+        document.getElementById('receipt-body').innerHTML = buildReceiptHtml(opts.pay, opts);
         openModal('receipt-modal');
       };
+
+      const shareReceipt = async (paymentId) => {
+        const opts = receiptOpts(paymentId);
+        if (!opts) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
+        try {
+          const res = await shareReceiptAsImage(opts.pay, opts);
+          if (res.shared) showToast('রিসিট ছবি শেয়ার করা হয়েছে।', 'success');
+          else if (res.downloaded) showToast('রিসিট ছবি ডাউনলোড হয়েছে — WhatsApp থেকে শেয়ার করুন।', 'info');
+          logActivity({ user: session.name, role: session.role, action: 'shared receipt image', target: opts.pay.studentId });
+        } catch (e) {
+          if (!(e && e.name === 'AbortError')) showToast('রিসিট শেয়ার করা যায়নি।', 'error');
+        }
+      };
+
+      const downloadReceipt = async (paymentId) => {
+        const opts = receiptOpts(paymentId);
+        if (!opts) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
+        try {
+          await downloadReceiptPng(opts.pay, opts);
+          showToast('রিসিট ডাউনলোড হয়েছে।', 'success');
+        } catch (e) {
+          showToast('রিসিট ডাউনলোড করা যায়নি।', 'error');
+        }
+      };
+
+      /* -------- Payment success: view / WhatsApp / download -------- */
+      const showPaymentSuccess = (paymentId) => {
+        const opts = receiptOpts(paymentId);
+        if (!opts) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
+        currentReceiptId = paymentId;
+        const { pay, student } = opts;
+        const { remainingDue } = receiptSummary(pay);
+        document.getElementById('payment-success-sub').textContent =
+          `${student?.name || pay.studentId} · ৳${bn(pay.amount || 0)} পরিশোধিত হয়েছে`;
+        document.getElementById('payment-success-summary').innerHTML = `
+          <div class="list-item"><div class="li-main"><div class="li-sub">রিসিট নম্বর</div><div class="li-title">${escapeHtml(pay.receiptNo || pay.id)}</div></div></div>
+          <div class="list-item"><div class="li-main"><div class="li-sub">অবশিষ্ট বকেয়া</div><div class="li-title">${remainingDue > 0 ? `৳${bn(remainingDue)}` : 'নেই'}</div></div></div>`;
+        openModal('payment-success-modal');
+      };
+
+      document.getElementById('pay-success-view')?.addEventListener('click', () => {
+        closeModal('payment-success-modal');
+        openReceipt(currentReceiptId);
+      });
+      document.getElementById('pay-success-whatsapp')?.addEventListener('click', () => shareReceipt(currentReceiptId));
+      document.getElementById('pay-success-download')?.addEventListener('click', () => downloadReceipt(currentReceiptId));
+
+      document.getElementById('receipt-whatsapp')?.addEventListener('click', () => shareReceipt(currentReceiptId));
+      document.getElementById('receipt-download')?.addEventListener('click', () => downloadReceipt(currentReceiptId));
 
       document.getElementById('receipt-print')?.addEventListener('click', () => {
         if (!document.querySelector('#receipt-body [data-receipt-sheet]')) {

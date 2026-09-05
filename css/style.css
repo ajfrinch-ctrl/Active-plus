@@ -368,6 +368,13 @@ a { color: var(--accent); }
 .btn-small { padding: 0.5rem 0.875rem; font-size: 0.8125rem; min-height: 38px; width: auto; }
 .btn-block { width: 100%; }
 
+/* Stacked full-width action buttons (payment success / receipt actions). */
+.btn-stack { display: grid; gap: 0.5rem; }
+.btn-stack .btn { width: 100%; }
+
+/* Payment-success hero checkmark. */
+.success-hero { font-size: 3rem; line-height: 1; margin-bottom: 0.25rem; }
+
 .spinner {
   width: 16px; height: 16px; flex: 0 0 auto;
   border: 2px solid rgba(255, 255, 255, 0.35);
@@ -751,6 +758,10 @@ a { color: var(--accent); }
   }
   .modal-overlay.active .modal-close,
   .modal-overlay.active .btn { display: none !important; }
+  /* Only the sheet itself prints — drop the modal heading and action rows. */
+  .modal-overlay.active .modal-content > h2,
+  .modal-overlay.active .row-actions,
+  .modal-overlay.active .btn-stack { display: none !important; }
   body.modal-open .app { display: none !important; }
 
   /* The admission form carries its own logo + org header inside the sheet;
