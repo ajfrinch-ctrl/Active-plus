@@ -144,3 +144,40 @@ test('every report option has a matching downloadable filename', () => {
     assert.match(label, /^Class-\d+$/, `${c} → ${label}`);
   }
 });
+
+test('canvas renderers draw and paginate without any SVG foreignObject', async () => {
+  // jsdom has no 2D context; use a minimal fake canvas to prove the renderer
+  // paints to a real Canvas 2D surface and paginates long reports into pages.
+  const fakeCtx = {
+    fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textBaseline: 'top', textAlign: 'left',
+    fillText: () => {}, fillRect: () => {}, strokeRect: () => {},
+    beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {}, drawImage: () => {},
+    measureText: (t) => ({ width: String(t).length * 12 })
+  };
+  const makeCanvas = (w, h) => ({ width: w, height: h, getContext: () => fakeCtx });
+  globalThis.document = {
+    baseURI: 'http://localhost/',
+    createElement: (tag) => (tag === 'canvas' ? makeCanvas(0, 0) : { style: {} })
+  };
+  try {
+    const { renderReportCanvases, renderReceiptCanvas, classReportRows, CLASS_REPORT_COLUMNS } = await import('../js/docs.js');
+    const rows = classReportRows(
+      Array.from({ length: 200 }, (_, i) => ({ id: `S${i}`, name: `শিক্ষার্থী ${i}`, className: 'নবম' }))
+    ).rows;
+    const canvases = await renderReportCanvases({
+      settings: { orgName: 'Active Plus' }, title: 'শিক্ষার্থী রিপোর্ট',
+      subtitle: 'শ্রেণি: নবম', columns: CLASS_REPORT_COLUMNS, rows
+    });
+    assert.ok(canvases.length > 1, `paginated into ${canvases.length} pages`);
+    assert.ok(canvases.every((c) => c.width === 1240 && c.height === 1754), 'A4 pages');
+
+    const receipt = await renderReceiptCanvas(
+      { id: 'pay1', studentId: 'S1', amount: 1200, receiptNo: 'RCP-123456', method: 'বিকাশ' },
+      { settings: { orgName: 'Active Plus' }, student: { name: 'রহিম', className: 'নবম' } }
+    );
+    assert.equal(receipt.width, 760, 'receipt canvas is 760px wide');
+    assert.ok(receipt.height > 500, `receipt canvas has real height (${receipt.height})`);
+  } finally {
+    delete globalThis.document;
+  }
+});

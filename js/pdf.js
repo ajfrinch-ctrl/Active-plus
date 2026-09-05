@@ -1,28 +1,57 @@
 /**
  * Dependency-free document utilities.
  *
- * No third-party libraries: receipts and reports are rendered as clean,
- * standalone HTML templates (inline styles only) and captured to a canvas via
- * an SVG <foreignObject>, then either shared as a PNG (receipt) or embedded
- * into a minimal, hand-written PDF (reports). This keeps every generated file
- * free of the application UI and works on mobile + desktop browsers alike.
+ * No third-party libraries: receipts and reports are drawn directly with the
+ * Canvas 2D API (no SVG <foreignObject>, which browsers refuse to export to
+ * canvas — that path taints the canvas and breaks toDataURL/PDF export). The
+ * resulting canvases are either shared as a PNG (receipt) or embedded into a
+ * minimal, hand-written PDF (reports). Every generated file is free of the
+ * application UI and works on mobile + desktop browsers alike.
  */
 
 /**
- * Absolute same-origin URL for an asset (the SVG foreignObject renderer needs
- * an absolute URL; relative paths would not resolve inside a data: SVG).
+ * Absolute same-origin URL for an asset.
  */
 export function absUrl(path) {
   try { return new URL(path, document.baseURI).href; } catch (e) { return path; }
 }
 
+/** Trigger a client-side file download for a Blob. */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+/** Create a blank canvas of the given size. */
+export function makeCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+/** Load an image (data URL or same-origin URL) into an <img> element. */
+export function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('image load failed'));
+    img.src = src;
+  });
+}
+
 let logoDataUrlCache = null;
 
 /**
- * The centre logo as a data URL. Browsers refuse to load external resources
- * from inside an SVG that is itself used as an <img>, so the SVG foreignObject
- * capture must inline the logo as a data URL rather than an http(s) URL.
- * Fetched once, then cached for the page lifetime.
+ * The centre logo as a data URL. A data URL can always be drawn to canvas
+ * without tainting it (an http(s) fetch would need CORS). Fetched once, then
+ * cached for the page lifetime.
  */
 export async function logoDataUrl() {
   if (logoDataUrlCache) return logoDataUrlCache;
@@ -43,45 +72,31 @@ export async function logoDataUrl() {
   return logoDataUrlCache;
 }
 
-/** Trigger a client-side file download for a Blob. */
-export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
-
 /**
- * Render a standalone HTML string to a canvas (SVG foreignObject technique).
- * The HTML must be self-contained (inline styles, absolute/same-origin assets).
+ * Wrap `text` into lines that fit `maxWidth`. Words break on spaces; a single
+ * word longer than the line is broken by character.
  */
-export async function htmlToCanvas({ html, width, height, bg = '#ffffff' }) {
-  if (document.fonts && document.fonts.ready) {
-    try { await document.fonts.ready; } catch (e) { /* proceed without font wait */ }
+export function wrapText(ctx, text, maxWidth) {
+  const lines = [];
+  let line = '';
+  for (const word of String(text).split(' ')) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      line = candidate;
+    } else if (line) {
+      lines.push(line);
+      line = word;
+    } else {
+      let acc = '';
+      for (const ch of word) {
+        if (acc && ctx.measureText(acc + ch).width > maxWidth) { lines.push(acc); acc = ch; }
+        else acc += ch;
+      }
+      line = acc;
+    }
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`
-    + `<foreignObject width="100%" height="100%">`
-    + `<div xmlns="http://www.w3.org/1999/xhtml">${html}</div>`
-    + `</foreignObject></svg>`;
-  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-  const img = new Image();
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = () => reject(new Error('render failed'));
-    img.src = url;
-  });
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, width, height);
-  ctx.drawImage(img, 0, 0, width, height);
-  return canvas;
+  if (line) lines.push(line);
+  return lines;
 }
 
 /** `data:image/jpeg;base64,...` → raw bytes. */

@@ -1,13 +1,19 @@
 /**
  * Clean, standalone document builders (payment receipt + report pages).
  *
- * These templates are self-contained (inline styles + absolute asset URLs) so
- * they render identically on screen, when captured to an image, and when
- * embedded into a PDF — with no trace of the application UI.
+ * Two outputs share the same field logic:
+ *   - HTML builders (buildReceiptHtml / buildReportHtml) render a clean
+ *     standalone sheet for on-screen preview/tests.
+ *   - Canvas renderers (renderReceiptCanvas / renderReportCanvases) draw the
+ *     same document straight onto a canvas with the Canvas 2D API, so it can
+ *     be shared as a PNG or embedded in a PDF on every browser — no SVG
+ *     <foreignObject> (which taints the canvas and blocks export).
+ *
+ * Neither output contains any application UI.
  */
 
 import { db, CLASS_TO_NUMBER, ALL_CLASSES } from './data.js';
-import { absUrl, htmlToCanvas, downloadBlob, canvasToPngBlob, logoDataUrl } from './pdf.js';
+import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, loadImage, makeCanvas, wrapText } from './pdf.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -15,6 +21,13 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
 
 const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
+
+const FONT = "'Hind Siliguri', 'Noto Sans Bengali', sans-serif";
+const INK = '#111827';
+const MUTED = '#5b6470';
+const FAINT = '#9ca3af';
+const BORDER = '#e6e9ee';
+const ACCENT = '#2563eb';
 
 /* ------------------------------------------------------------------ */
 /* Payment receipt                                                     */
@@ -34,9 +47,29 @@ export function receiptSummary(pay) {
   return { remainingDue, paidAmount, previousDue };
 }
 
+/** Receipt rows in display order — shared by the HTML and canvas renderers. */
+function receiptRows(pay, { student }) {
+  const { previousDue, paidAmount, remainingDue } = receiptSummary(pay);
+  const rows = [
+    ['রিসিট নম্বর', pay.receiptNo || pay.id],
+    ['তারিখ', pay.date || '—'],
+    ['শিক্ষার্থীর নাম', student?.name || pay.studentId],
+    ['ইউনিক আইডি', pay.studentId],
+    ['শ্রেণি', student?.className || '—'],
+    ['ফি টাইপ', pay.month || '—'],
+    ['পেমেন্টের পরিমাণ', taka(pay.amount)],
+  ];
+  if (previousDue > 0) rows.push(['আগের বকেয়া', taka(previousDue)]);
+  rows.push(['পরিশোধিত', taka(paidAmount)]);
+  rows.push(['অবশিষ্ট বকেয়া', remainingDue > 0 ? taka(remainingDue) : 'নেই']);
+  rows.push(['মাধ্যম', pay.method || '—']);
+  if (pay.reference) rows.push(['ট্রানজেকশন নম্বর', pay.reference]);
+  rows.push(['গ্রহণকারী', pay.receivedBy || '—']);
+  return rows;
+}
+
 /** Clean, professional, print/PDF-ready payment receipt (no app UI). */
 export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
-  const { remainingDue, paidAmount, previousDue } = receiptSummary(pay);
   const org = settings || {};
   const logoSrc = logo || absUrl('assets/logo.png');
 
@@ -45,10 +78,6 @@ export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
       <span style="color:#5b6470;flex:none">${label}</span>
       <span style="font-weight:600;text-align:right;color:#111827;word-break:break-word">${value}</span>
     </div>`;
-
-  const refLine = pay.reference
-    ? row('ট্রানজেকশন নম্বর', esc(pay.reference))
-    : '';
 
   return `
   <div data-receipt-sheet style="background:#ffffff;color:#111827;font-family:'Hind Siliguri','Noto Sans Bengali',sans-serif;border-radius:14px;padding:24px 22px;max-width:560px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.06)">
@@ -61,19 +90,7 @@ export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
     </div>
 
     <div style="margin-top:6px">
-      ${row('রিসিট নম্বর', esc(pay.receiptNo || pay.id))}
-      ${row('তারিখ', esc(pay.date || '—'))}
-      ${row('শিক্ষার্থীর নাম', esc(student?.name || pay.studentId))}
-      ${row('ইউনিক আইডি', esc(pay.studentId))}
-      ${row('শ্রেণি', esc(student?.className || '—'))}
-      ${row('ফি টাইপ', esc(pay.month || '—'))}
-      ${row('পেমেন্টের পরিমাণ', taka(pay.amount))}
-      ${previousDue > 0 ? row('আগের বকেয়া', taka(previousDue)) : ''}
-      ${row('পরিশোধিত', taka(paidAmount))}
-      ${row('অবশিষ্ট বকেয়া', remainingDue > 0 ? taka(remainingDue) : 'নেই')}
-      ${row('মাধ্যম', esc(pay.method || '—'))}
-      ${refLine}
-      ${row('গ্রহণকারী', esc(pay.receivedBy || '—'))}
+      ${receiptRows(pay, { student }).map(([label, value]) => row(label, esc(value))).join('')}
     </div>
 
     <div style="display:flex;gap:24px;margin-top:40px;text-align:center">
@@ -92,10 +109,156 @@ export function receiptFileName(pay) {
   return `receipt-${pay.receiptNo || pay.id}.png`;
 }
 
-async function receiptCanvas(pay, opts) {
-  const logo = await logoDataUrl();
-  const html = buildReceiptHtml(pay, { ...opts, logo });
-  return htmlToCanvas({ html, width: 900, height: 1320 });
+/* ------------------------------------------------------------------ */
+/* Canvas drawing (shared by receipt + report)                         */
+/* ------------------------------------------------------------------ */
+
+async function warmFonts() {
+  if (!document.fonts) return;
+  try { await document.fonts.ready; } catch (e) { /* proceed */ }
+  try {
+    await Promise.all([
+      document.fonts.load(`400 22px ${FONT}`),
+      document.fonts.load(`700 22px ${FONT}`)
+    ]);
+  } catch (e) { /* proceed */ }
+}
+
+async function loadLogo() {
+  try {
+    return await loadImage(await logoDataUrl());
+  } catch (e) {
+    return null; // drawing without a logo is always better than failing
+  }
+}
+
+function setFont(ctx, px, weight = 400) {
+  ctx.font = `${weight} ${px}px ${FONT}`;
+}
+
+function drawLogo(ctx, img, centerX, top, size) {
+  if (!img) return;
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
+  const scale = Math.min(size / iw, size / ih);
+  ctx.drawImage(img, centerX - (iw * scale) / 2, top, iw * scale, ih * scale);
+}
+
+/**
+ * Receipt layout pass. Runs twice: once to measure the height (paint=false)
+ * and once to actually paint (paint=true). Both passes advance the cursor
+ * identically so the measured height is exact.
+ */
+function receiptPass(ctx, width, pay, opts, paint) {
+  const pad = 44;
+  const inner = width - pad * 2;
+  let y = pad;
+  const org = opts.settings || {};
+
+  ctx.textBaseline = 'top';
+
+  const center = (text, px, weight, color, lhMul = 1.4) => {
+    setFont(ctx, px, weight);
+    ctx.textAlign = 'center';
+    const lines = wrapText(ctx, text, inner);
+    const lh = Math.round(px * lhMul);
+    if (paint) {
+      ctx.fillStyle = color;
+      lines.forEach((ln, i) => ctx.fillText(ln, width / 2, y + i * lh));
+    }
+    y += lines.length * lh;
+  };
+
+  if (opts.logoImg) {
+    if (paint) drawLogo(ctx, opts.logoImg, width / 2, y, 96);
+    y += 96 + 10;
+  }
+
+  center(org.orgName || 'Active Plus', 32, 700, INK);
+  if (org.address) center(org.address, 16, 400, MUTED, 1.4);
+  const contact = [org.mobile, org.email].filter(Boolean).join(' · ');
+  if (contact) center(contact, 16, 400, MUTED, 1.4);
+
+  y += 16;
+  center('পেমেন্ট রিসিট', 28, 700, INK);
+  y += 10;
+  if (paint) {
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(pad, y, inner, 3);
+  }
+  y += 3 + 18;
+
+  const labelW = Math.round(inner * 0.42);
+  const valueW = inner - labelW - 26;
+  const lh = 34;
+
+  for (const [label, value] of receiptRows(pay, opts)) {
+    setFont(ctx, 24, 400);
+    const labelLines = wrapText(ctx, label, labelW);
+    setFont(ctx, 24, 700);
+    const valueLines = wrapText(ctx, String(value), valueW);
+    const rowH = Math.max(labelLines.length, valueLines.length) * lh + 16;
+    if (paint) {
+      setFont(ctx, 24, 400);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = MUTED;
+      labelLines.forEach((ln, i) => ctx.fillText(ln, pad, y + 8 + i * lh));
+      setFont(ctx, 24, 700);
+      ctx.fillStyle = INK;
+      valueLines.forEach((ln, i) => ctx.fillText(ln, pad + labelW + 26, y + 8 + i * lh));
+      ctx.strokeStyle = BORDER;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, y + rowH);
+      ctx.lineTo(pad + inner, y + rowH);
+      ctx.stroke();
+    }
+    y += rowH;
+  }
+
+  y += 36;
+  const sigW = (inner - 40) / 2;
+  if (paint) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(pad + sigW, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad + sigW + 40, y); ctx.lineTo(pad + sigW + 40 + sigW, y); ctx.stroke();
+    setFont(ctx, 18, 400);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#374151';
+    ctx.fillText('আদায়কারীর স্বাক্ষর', pad, y + 12);
+    ctx.fillText('শিক্ষার্থী / অভিভাবকের স্বাক্ষর', pad + sigW + 40, y + 12);
+  }
+  y += 48;
+
+  if (paint) {
+    setFont(ctx, 15, 400);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = FAINT;
+    ctx.fillText('ধন্যবাদ — Active Plus', width / 2, y);
+  }
+  y += 26;
+
+  return y + pad;
+}
+
+/** Draw the receipt onto a clean canvas (white background, no app UI). */
+export async function renderReceiptCanvas(pay, opts = {}) {
+  await warmFonts();
+  const width = 760;
+  const fullOpts = { ...opts, logoImg: await loadLogo() };
+
+  const probe = makeCanvas(width, 4);
+  const pctx = probe.getContext('2d');
+  const height = receiptPass(pctx, width, pay, fullOpts, false);
+
+  const canvas = makeCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  receiptPass(ctx, width, pay, fullOpts, true);
+  return canvas;
 }
 
 /**
@@ -104,7 +267,7 @@ async function receiptCanvas(pay, opts) {
  * is unsupported. Never sends the receipt as a text-only message.
  */
 export async function shareReceiptAsImage(pay, opts) {
-  const canvas = await receiptCanvas(pay, opts);
+  const canvas = await renderReceiptCanvas(pay, opts);
   const blob = await canvasToPngBlob(canvas);
   const file = new File([blob], receiptFileName(pay), { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -117,7 +280,7 @@ export async function shareReceiptAsImage(pay, opts) {
 
 /** Download the receipt as a PNG image. */
 export async function downloadReceiptPng(pay, opts) {
-  const canvas = await receiptCanvas(pay, opts);
+  const canvas = await renderReceiptCanvas(pay, opts);
   const blob = await canvasToPngBlob(canvas);
   downloadBlob(blob, receiptFileName(pay));
 }
@@ -136,8 +299,8 @@ export function classFileLabel(className) {
 }
 
 /**
- * Clean standalone report page. `columns` are `{ key, label }`, rows are
- * plain objects. Values are escaped, so app/user data never breaks the layout.
+ * Clean standalone report page (HTML form — used for preview/tests). `columns`
+ * are `{ key, label }`, rows are plain objects. Values are escaped.
  */
 export function buildReportHtml({ settings, title, subtitle, columns, rows, logo }) {
   const org = settings || {};
@@ -200,4 +363,191 @@ export function classReportRows(students) {
     };
   });
   return { rows, incomplete };
+}
+
+/* ------------------------------------------------------------------ */
+/* Canvas report renderer (paged, no app UI)                           */
+/* ------------------------------------------------------------------ */
+
+const PAGE = { width: 1240, height: 1754 };
+const PAD = 60;
+const CELL_PAD = 22;
+const BODY = 21;
+const LH = 30;
+
+function reportHeaderPass(ctx, width, pad, opts, paint) {
+  const org = opts.settings || {};
+  let y = pad;
+  const inner = width - pad * 2;
+
+  ctx.textBaseline = 'top';
+  const center = (text, px, weight, color, lhMul = 1.4) => {
+    setFont(ctx, px, weight);
+    ctx.textAlign = 'center';
+    const lines = wrapText(ctx, text, inner);
+    const lh = Math.round(px * lhMul);
+    if (paint) {
+      ctx.fillStyle = color;
+      lines.forEach((ln, i) => ctx.fillText(ln, width / 2, y + i * lh));
+    }
+    y += lines.length * lh;
+  };
+
+  if (opts.logoImg) {
+    if (paint) drawLogo(ctx, opts.logoImg, width / 2, y, 80);
+    y += 80 + 10;
+  }
+  center(org.orgName || 'Active Plus', 36, 700, INK);
+  if (org.address) center(org.address, 18, 400, MUTED, 1.4);
+  const contact = [org.mobile, org.email].filter(Boolean).join(' · ');
+  if (contact) center(contact, 18, 400, MUTED, 1.4);
+  y += 16;
+  center(opts.title || 'রিপোর্ট', 32, 700, INK);
+  if (opts.subtitle) center(opts.subtitle, 22, 400, MUTED, 1.4);
+  y += 14;
+  if (paint) {
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(pad, y, inner, 3);
+  }
+  y += 3 + 18;
+  return y; // top of the table
+}
+
+function columnWidths(ctx, columns, rows, usable) {
+  const req = columns.map((c) => {
+    setFont(ctx, 22, 700);
+    let w = ctx.measureText(c.label).width;
+    setFont(ctx, BODY, 400);
+    for (const r of rows) {
+      const v = String(r[c.key] ?? '');
+      for (const ln of v.split('\n')) w = Math.max(w, ctx.measureText(ln).width);
+    }
+    return Math.min(w + CELL_PAD, usable);
+  });
+  const total = req.reduce((a, b) => a + b, 0);
+  if (total > usable) {
+    const scale = usable / total;
+    return req.map((w) => Math.max(48, w * scale));
+  }
+  return req;
+}
+
+function cellLines(ctx, columns, widths, row) {
+  return columns.map((c, i) => {
+    const v = String(row[c.key] ?? '');
+    setFont(ctx, BODY, 400);
+    return v.split('\n').reduce((acc, ln) => acc.concat(wrapText(ctx, ln, widths[i] - CELL_PAD)), []);
+  });
+}
+
+function rowHeight(ctx, columns, widths, row) {
+  let h = 0;
+  setFont(ctx, BODY, 400);
+  for (const lines of cellLines(ctx, columns, widths, row)) h = Math.max(h, lines.length * LH);
+  return h + CELL_PAD;
+}
+
+function tableHeaderHeight(ctx, columns, widths) {
+  let h = 0;
+  setFont(ctx, 22, 700);
+  columns.forEach((c, i) => {
+    const lines = wrapText(ctx, c.label, widths[i] - CELL_PAD);
+    h = Math.max(h, lines.length * LH);
+  });
+  return h + CELL_PAD;
+}
+
+function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
+  let y = top;
+  const totalW = widths.reduce((a, b) => a + b, 0);
+  const headerH = tableHeaderHeight(ctx, columns, widths);
+
+  // header row
+  ctx.fillStyle = '#eef2f7';
+  ctx.fillRect(pad, y, totalW, headerH);
+  let x = pad;
+  columns.forEach((c, i) => {
+    setFont(ctx, 22, 700);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = INK;
+    const lines = wrapText(ctx, c.label, widths[i] - CELL_PAD);
+    lines.forEach((ln, li) => ctx.fillText(ln, x + CELL_PAD / 2, y + CELL_PAD / 2 + li * LH));
+    x += widths[i];
+  });
+  ctx.strokeStyle = '#d3d9e0';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pad, y, totalW, headerH);
+  y += headerH;
+
+  // data rows
+  for (const row of rows) {
+    const rh = rowHeight(ctx, columns, widths, row);
+    x = pad;
+    columns.forEach((c, i) => {
+      setFont(ctx, BODY, 400);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = INK;
+      const lines = cellLines(ctx, columns, widths, row)[i];
+      lines.forEach((ln, li) => ctx.fillText(ln, x + CELL_PAD / 2, y + CELL_PAD / 2 + li * LH));
+      x += widths[i];
+    });
+    ctx.strokeStyle = BORDER;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, y + rh);
+    ctx.lineTo(pad + totalW, y + rh);
+    ctx.stroke();
+    y += rh;
+  }
+
+  // footer
+  setFont(ctx, 16, 400);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = FAINT;
+  ctx.fillText(`Active Plus · ${new Date().toLocaleDateString('bn-BD')}`, width / 2, pageHeight - pad - 14);
+}
+
+/**
+ * Render a report into one or more A4 canvases (a new page is started when a
+ * row would overflow). Returns an array of canvases ready for canvasesToPdf.
+ */
+export async function renderReportCanvases({ settings, title, subtitle, columns, rows }) {
+  await warmFonts();
+  const opts = { settings, title, subtitle, logoImg: await loadLogo() };
+  const { width, height } = PAGE;
+  const usable = width - PAD * 2;
+
+  const probe = makeCanvas(width, 4);
+  const pctx = probe.getContext('2d');
+  const tableTop = reportHeaderPass(pctx, width, PAD, opts, false);
+  const widths = columnWidths(pctx, columns, rows, usable);
+  const headerH = tableHeaderHeight(pctx, columns, widths);
+  const footerReserve = PAD + 60;
+
+  // paginate
+  const pages = [];
+  let current = [];
+  let y = tableTop + headerH;
+  for (const row of rows) {
+    const rh = rowHeight(pctx, columns, widths, row);
+    if (current.length && y + rh > height - footerReserve) {
+      pages.push(current);
+      current = [row];
+      y = tableTop + headerH;
+    } else {
+      current.push(row);
+      y += rh;
+    }
+  }
+  pages.push(current);
+
+  return pages.map((chunk) => {
+    const canvas = makeCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    const top = reportHeaderPass(ctx, width, PAD, opts, true);
+    paintTable(ctx, width, PAD, top, columns, widths, chunk, height);
+    return canvas;
+  });
 }

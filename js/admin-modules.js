@@ -15,8 +15,8 @@ import { mountCrud } from './crud.js';
 import { escapeHtml, renderTable, statGrid, showToast, openModal, closeModal, getAuthMode, requireOnline } from './app.js';
 import { checkConnectionStatus } from './firebase.js';
 import { listUsers, updateProfile, changePassword } from './auth.js';
-import { htmlToCanvas, canvasesToPdf, logoDataUrl } from './pdf.js';
-import { buildReportHtml, classReportRows, CLASS_REPORT_COLUMNS, classFileLabel } from './docs.js';
+import { canvasesToPdf } from './pdf.js';
+import { renderReportCanvases, classReportRows, CLASS_REPORT_COLUMNS, classFileLabel } from './docs.js';
 
 const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 
@@ -541,23 +541,9 @@ function mountReports() {
   });
 
   /* ---- PDF export: a clean standalone report document, no app UI ---- */
-  const PAGE = { width: 1240, height: 1754 };
-  const paginate = (rows, size) => {
-    const pages = [];
-    for (let i = 0; i < rows.length; i += size) pages.push(rows.slice(i, i + size));
-    return pages.length ? pages : [[]];
-  };
-
   const exportReportPdf = async ({ title, subtitle, columns, rows, filename }) => {
     const settings = db.settings.get();
-    const logo = await logoDataUrl();
-    const canvases = [];
-    for (const chunk of paginate(rows, 26)) {
-      canvases.push(await htmlToCanvas({
-        html: buildReportHtml({ settings, title, subtitle, columns, rows: chunk, logo }),
-        width: PAGE.width, height: PAGE.height
-      }));
-    }
+    const canvases = await renderReportCanvases({ settings, title, subtitle, columns, rows });
     await canvasesToPdf(canvases, filename);
   };
 
@@ -605,16 +591,13 @@ function mountReports() {
     const classes = CLASS_OPTIONS.filter((c) => db.students.list().some((s) => s.className === c));
     if (!classes.length) { showToast('কোনো শিক্ষার্থী নেই।', 'error'); return; }
     try {
-      const logo = await logoDataUrl();
       const canvases = [];
       for (const cls of classes) {
         const { rows } = classReportRows(db.students.list().filter((s) => s.className === cls));
-        for (const chunk of paginate(rows, 26)) {
-          canvases.push(await htmlToCanvas({
-            html: buildReportHtml({ settings, title: 'শিক্ষার্থী রিপোর্ট', subtitle: `শ্রেণি: ${cls}`, columns: CLASS_REPORT_COLUMNS, rows: chunk, logo }),
-            width: PAGE.width, height: PAGE.height
-          }));
-        }
+        canvases.push(...await renderReportCanvases({
+          settings, title: 'শিক্ষার্থী রিপোর্ট', subtitle: `শ্রেণি: ${cls}`,
+          columns: CLASS_REPORT_COLUMNS, rows
+        }));
       }
       await canvasesToPdf(canvases, 'Student-Report-All-Classes.pdf');
       showToast('PDF ডাউনলোড হয়েছে।', 'success');
