@@ -4,12 +4,12 @@
  * Strategy:
  *   - Navigations: network-first (fresh HTML wins), falling back to cache
  *     so the app still opens offline.
- *   - Same-origin static assets (css/js/png): cache-first, revalidating in
- *     the background.
+ *   - Same-origin static assets (css/js/png): network-first (so a fresh
+ *     deploy shows up at once), falling back to the cache offline.
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v7';
+const CACHE_NAME = 'active-plus-v8';
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -85,27 +85,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Static assets: network-first so a new deploy is visible immediately;
+  // the cache is only the offline fallback.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        const revalidate = fetch(request)
-          .then((response) => {
-            if (response && response.ok) {
-              const copy = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-            }
-          })
-          .catch(() => {});
-        event.waitUntil(revalidate);
-        return cached;
-      }
-      return fetch(request).then((response) => {
-        if (!response || !response.ok) return response;
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    fetch(request)
+      .then((response) => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });
 
