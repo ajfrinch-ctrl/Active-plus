@@ -39,12 +39,6 @@ const QUICK_ACTIONS = [
 ];
 
 const MORE_ITEMS = [
-  { key: 'students', icon: '👨‍🎓', label: 'আমার শিক্ষার্থী' },
-  { key: 'tasks', icon: '📋', label: 'অ্যাসাইনমেন্ট' },
-  { key: 'questions', icon: '❓', label: 'প্রশ্ন ব্যাংক' },
-  { key: 'materials', icon: '📖', label: 'স্টাডি ম্যাটেরিয়াল' },
-  { key: 'results', icon: '🏆', label: 'ফলাফল' },
-  { key: 'routine', icon: '📅', label: 'রুটিন' },
   { key: 'notice', icon: '📢', label: 'নোটিশ' },
   { key: 'queries', icon: '💬', label: 'শিক্ষার্থী প্রশ্ন' },
   { key: 'suggestion', icon: '💡', label: 'সাজেশন' },
