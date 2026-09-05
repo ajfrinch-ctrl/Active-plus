@@ -375,6 +375,32 @@ a { color: var(--accent); }
 /* Payment-success hero checkmark. */
 .success-hero { font-size: 3rem; line-height: 1; margin-bottom: 0.25rem; }
 
+/* --------------------------------------------------------------------------
+   Shared document preview (Generate → Preview → Download PDF / Share Image)
+   -------------------------------------------------------------------------- */
+.doc-preview { max-width: 860px; }
+.doc-preview-head { margin-bottom: 0.75rem; }
+.doc-preview-head h2 { margin-bottom: 0.25rem; }
+.doc-preview-meta { font-size: 0.75rem; color: var(--text-muted); }
+.doc-preview-body {
+  display: grid; gap: 1rem;
+  max-height: 58vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 0.75rem;
+  background: var(--primary-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.doc-page {
+  margin: 0; background: #fff; border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); overflow: hidden;
+}
+.doc-page img { width: 100%; display: block; }
+.doc-page figcaption {
+  text-align: center; font-size: 0.6875rem; color: #666; padding: 0.3rem 0; background: #fff;
+}
+.doc-preview-actions { display: grid; gap: 0.5rem; margin-top: 0.875rem; }
+@media (min-width: 640px) { .doc-preview-actions { grid-template-columns: 1fr 1fr; } }
+
 .spinner {
   width: 16px; height: 16px; flex: 0 0 auto;
   border: 2px solid rgba(255, 255, 255, 0.35);

@@ -365,9 +365,34 @@ export function nextStudentId({ year = new Date().getFullYear(), className } = {
   return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
+/**
+ * Next sequential receipt number for a given day: `YYYYMMDD` + a 3-digit
+ * serial that restarts at 001 each day (e.g. 20260905001, 20260905002).
+ * Always unique — the serial is derived from payments already stored, and a
+ * defensive loop skips any number that is somehow already taken, so two
+ * payments recorded back-to-back can never collide.
+ */
+export function nextReceiptNo(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const prefix = `${y}${m}${d}`;
+  let max = 0;
+  for (const p of db.payments.list()) {
+    const match = String(p.receiptNo || '').match(new RegExp(`^${prefix}(\\d{3})$`));
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  let serial = max + 1;
+  let candidate = `${prefix}${String(serial).padStart(3, '0')}`;
+  while (db.payments.list().some((p) => p.receiptNo === candidate)) {
+    serial += 1;
+    candidate = `${prefix}${String(serial).padStart(3, '0')}`;
+  }
+  return candidate;
+}
+
 /** Teacher ID: first word of the name + last two digits of the mobile. */
-export function nextTeacherId({ name, phone } = {}) {
-  const first = String(name || '').trim().split(/\s+/)[0] || 'T';
+export function nextTeacherId({ name, phone } = {}) {  const first = String(name || '').trim().split(/\s+/)[0] || 'T';
   const digits = String(phone || '').replace(/[^\d\u09E6-\u09EF]/g, '');
   const lastTwo = digits.slice(-2) || '00';
   const base = `${first}${lastTwo}`;

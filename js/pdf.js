@@ -49,26 +49,34 @@ export function loadImage(src) {
 let logoDataUrlCache = null;
 
 /**
- * The centre logo as a data URL. A data URL can always be drawn to canvas
- * without tainting it (an http(s) fetch would need CORS). Fetched once, then
- * cached for the page lifetime.
+ * Fetch an asset (same-origin, or cross-origin if the server allows CORS) and
+ * return it as a data URL, so drawing it never taints the canvas. Returns
+ * `null` when the asset cannot be loaded — callers then fall back gracefully.
  */
-export async function logoDataUrl() {
-  if (logoDataUrlCache) return logoDataUrlCache;
-  const fallback = absUrl('assets/logo.png');
+export async function assetDataUrl(path) {
+  const src = absUrl(path);
   try {
-    const res = await fetch(fallback);
-    if (!res.ok) throw new Error(`logo fetch ${res.status}`);
+    const res = await fetch(src);
+    if (!res.ok) throw new Error(`asset fetch ${res.status}`);
     const blob = await res.blob();
-    logoDataUrlCache = await new Promise((resolve, reject) => {
+    return await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('logo read failed'));
+      reader.onerror = () => reject(new Error('asset read failed'));
       reader.readAsDataURL(blob);
     });
   } catch (e) {
-    logoDataUrlCache = fallback; // last resort: let the browser try the URL
+    return null;
   }
+}
+
+/**
+ * The centre logo as a data URL. A data URL can always be drawn to canvas
+ * without tainting it. Fetched once, then cached for the page lifetime.
+ */
+export async function logoDataUrl() {
+  if (logoDataUrlCache) return logoDataUrlCache;
+  logoDataUrlCache = await assetDataUrl('assets/logo.png') || absUrl('assets/logo.png');
   return logoDataUrlCache;
 }
 

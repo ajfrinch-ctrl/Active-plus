@@ -252,6 +252,47 @@ body.home-body {
   background: color-mix(in srgb, var(--text) 6%, transparent); outline: none;
 }
 
+/* ---------- Admin home: analytics dashboard + grouped nav cards ---------- */
+.home-section { margin-bottom: 1.25rem; }
+.sec-title {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .8rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: .625rem; font-weight: 600;
+}
+
+.analytics-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem;
+}
+.analytics-cell {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .875rem;
+  display: flex; flex-direction: column; gap: .25rem; min-width: 0;
+}
+.analytics-cell .ico { font-size: 1.25rem; line-height: 1; }
+.analytics-cell strong { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.analytics-cell > span:last-child { font-size: .6875rem; color: var(--text-muted); }
+@media (min-width: 640px) { .analytics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .analytics-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.nav-card {
+  display: flex; align-items: center; gap: .75rem; width: 100%;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .875rem; margin-bottom: .625rem; color: var(--text-light);
+  cursor: pointer; text-align: left; font-family: inherit; font-size: 1rem;
+}
+.nav-card .ico { font-size: 1.5rem; line-height: 1; flex: none; }
+.nav-card .nc-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .125rem; }
+.nav-card .nc-body strong { font-size: .9375rem; color: var(--white); }
+.nav-card .nc-body small { font-size: .75rem; color: var(--text-muted); }
+.nav-card .nc-count {
+  flex: none; text-align: right; font-size: 1rem; font-weight: 700; color: var(--accent);
+  display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1;
+}
+.nav-card .nc-count i { font-style: normal; font-size: .625rem; color: var(--text-muted); font-weight: 400; }
+.nav-card .nc-view { flex: none; font-size: .75rem; color: var(--accent); white-space: nowrap; }
+.nav-card:hover { border-color: rgba(66, 153, 225, 0.5); }
+.nav-card:active { transform: scale(0.99); }
+
 /* ---------- Notification bell with unread badge ---------- */
 .notif-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .notif-badge {

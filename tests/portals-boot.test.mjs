@@ -33,6 +33,26 @@ async function bootPage(page, { username, password, role, nonce = '' }) {
   dom.window.alert = () => {};
   dom.window.prompt = () => 'ok';
 
+  // jsdom has no Canvas 2D context; provide a minimal fake so the preview-first
+  // document flow (render → preview modal) can be exercised end to end.
+  const fakeCtx = {
+    fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textBaseline: 'top', textAlign: 'left',
+    fillText: () => {}, fillRect: () => {}, strokeRect: () => {},
+    beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, closePath: () => {}, arcTo: () => {},
+    fill: () => {}, stroke: () => {}, save: () => {}, restore: () => {}, clip: () => {},
+    drawImage: () => {},
+    measureText: (t) => ({ width: String(t).length * 12 })
+  };
+  const makeCanvas = (w, h) => ({
+    width: w, height: h,
+    getContext: () => fakeCtx,
+    toDataURL: () => 'data:image/png;base64,AAAA',
+    toBlob: (cb) => cb(new dom.window.Blob(['x'], { type: 'image/png' }))
+  });
+  const origCreate = dom.window.document.createElement.bind(dom.window.document);
+  dom.window.document.createElement = (tag) =>
+    (String(tag).toLowerCase() === 'canvas' ? makeCanvas(0, 0) : origCreate(tag));
+
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
   globalThis.localStorage = dom.window.localStorage;
@@ -91,9 +111,11 @@ test('admin portal boots and wires the home-content tabs', async () => {
   // the app-style admin home rendered from real data
   const adminHome = doc.getElementById('admin-home');
   assert.ok(adminHome && adminHome.innerHTML.length > 200, 'admin home rendered');
-  assert.ok(doc.getElementById('institute-overview'), 'Institute Overview hero present');
-  assert.ok(doc.querySelectorAll('#admin-features .tile').length >= 8, 'feature grid rendered');
+  assert.ok(doc.querySelector('.analytics-grid'), 'academic analytics grid present');
+  assert.ok(doc.querySelectorAll('.analytics-cell').length >= 11, 'analytics summary cells rendered');
+  assert.ok(doc.querySelectorAll('#admin-home .feature-grid .tile').length >= 8, 'feature grid rendered');
   assert.ok(doc.querySelectorAll('#admin-quick .chip').length >= 6, 'quick actions rendered');
+  assert.ok(doc.querySelectorAll('#admin-home .nav-card').length >= 4, 'navigation cards rendered');
   assert.ok(doc.getElementById('admin-see-more'), 'See More control present');
   // the grid is the only navigation now — every tile must land on a real panel
   for (const tile of doc.querySelectorAll('#admin-home [data-goto]')) {
@@ -101,9 +123,14 @@ test('admin portal boots and wires the home-content tabs', async () => {
     if (key === 'logout') continue;
     assert.ok(doc.getElementById(`tab-${key}`), `admin grid tile "${key}" has a panel`);
   }
-  // hero numbers are the real seeded counts (4 students, 4 teachers, 3 batches)
-  const overview = doc.getElementById('institute-overview').textContent;
-  assert.ok(overview.includes('৪'), 'real counts shown in Bengali digits');
+  // the summary is computed live from the seeded data (4 students) and shown in
+  // Bengali digits. Finance, Academic Review, Announcements and Recent
+  // Activities are navigation cards (buttons), never raw data dumps.
+  const homeText = adminHome.textContent;
+  assert.ok(homeText.includes('৪'), 'real counts shown in Bengali digits');
+  for (const key of ['analytics', 'dues', 'notices', 'activity']) {
+    assert.ok(doc.querySelector(`#admin-home [data-goto="${key}"]`), `navigation card routes to "${key}"`);
+  }
   // database status chip is present and never exposes credentials
   const chip = doc.getElementById('admin-net-chip');
   assert.ok(chip, 'connection status chip rendered');
@@ -229,8 +256,8 @@ test('student profile sheet shows ID card, fee ledger and results', async () => 
   // academic section exists even with no results yet
   assert.match(body.textContent, /একাডেমিক অগ্রগতি/);
 
-  assert.ok(doc.getElementById('print-idcard'), 'ID card print action available');
-  assert.ok(doc.getElementById('print-ledger'), 'ledger print action available');
+  assert.ok(doc.getElementById('preview-idcard'), 'ID card preview action available');
+  assert.ok(doc.getElementById('preview-ledger'), 'ledger preview action available');
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
@@ -263,8 +290,17 @@ test('payment capture records method/reference and prints a receipt', async () =
   assert.ok(saved, 'payment persisted with its reference');
   assert.equal(saved.method, 'বিকাশ');
   assert.equal(saved.remarks, 'অভিভাবকের কাছ থেকে');
-  assert.match(saved.receiptNo || '', /^RCP-\d+$/, 'a receipt number was generated');
+  assert.match(saved.receiptNo || '', /^\d{11}$/, 'a unique YYYYMMDDXXX receipt number was generated');
   assert.equal(data.db.fees.find(fee.id).status, 'পরিশোধিত', 'the fee is settled');
+
+  // Unique, sequential per-day receipt numbers — even across rapid payments.
+  const today = new Date();
+  const prefix = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+  assert.equal(saved.receiptNo.slice(0, 8), prefix, 'receipt number carries today YYYYMMDD prefix');
+  const n1 = Number(saved.receiptNo.slice(8));
+  const n2 = data.nextReceiptNo();
+  assert.equal(Number(n2.slice(8)), n1 + 1, 'the next receipt is the next sequential serial');
+  assert.notEqual(n2, saved.receiptNo, 'receipt numbers never collide');
 
   // the success sheet opens first: "পেমেন্ট সফল" + view/WhatsApp/download
   const success = doc.getElementById('payment-success-modal');
@@ -274,18 +310,18 @@ test('payment capture records method/reference and prints a receipt', async () =
   assert.ok(doc.getElementById('pay-success-whatsapp'), 'WhatsApp image share action available');
   assert.ok(doc.getElementById('pay-success-download'), 'download action available');
 
-  // viewing the receipt opens the clean sheet with the real values
+  // viewing the receipt opens the shared document preview (preview-first), not
+  // a printable sheet — with the real receipt values drawn onto a canvas page.
   doc.getElementById('pay-success-view')
     .dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
-  const receipt = doc.querySelector('#receipt-body [data-receipt-sheet]');
-  assert.ok(receipt, 'receipt sheet rendered');
-  assert.ok(receipt.textContent.includes('TRX-9911'), 'shows the reference');
-  assert.ok(receipt.textContent.includes('বিকাশ'), 'shows the method');
-  assert.ok(receipt.textContent.includes(saved.receiptNo), 'shows the receipt number');
-  assert.ok(receipt.textContent.includes('পেমেন্ট রিসিট'), 'is a payment receipt');
-  assert.ok(doc.getElementById('receipt-print'), 'print action available');
-  assert.ok(doc.getElementById('receipt-whatsapp'), 'receipt WhatsApp action available');
-  assert.ok(doc.getElementById('receipt-download'), 'receipt download action available');
+  await new Promise((r) => setTimeout(r, 200));
+  assert.ok(doc.getElementById('document-preview-modal').classList.contains('active'),
+    'receipt opens in the shared document preview');
+  assert.equal(doc.getElementById('document-preview-title').textContent, 'পেমেন্ট রিসিট',
+    'preview title is the payment receipt');
+  assert.equal(doc.getElementById('receipt-print'), null, 'no direct print button remains');
+  assert.ok(doc.getElementById('document-preview-download'), 'Download PDF action available');
+  assert.ok(doc.getElementById('document-preview-share'), 'Share Image action available');
 
   // a receipt button now exists in the recent payments list
   assert.ok(doc.querySelector('[data-receipt]'), 'receipt reachable from the payment list');
@@ -481,18 +517,50 @@ test('the report centre replaces Print with PDF download and offers class report
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'reportpdf'
   });
 
-  // Print is gone; the PDF workflow is present.
+  // Print and direct-download are gone; the filter → Generate → Preview flow is present.
   assert.equal(doc.getElementById('report-print'), null, 'the Print button is removed');
-  assert.ok(doc.getElementById('report-pdf'), 'Download PDF button present');
-  assert.ok(doc.getElementById('report-class-pdf'), 'Download Class PDF button present');
-  assert.ok(doc.getElementById('report-all-pdf'), 'Download All Classes PDF button present');
+  assert.equal(doc.getElementById('report-pdf'), null, 'the direct Download PDF button is removed');
+  assert.equal(doc.getElementById('report-class-pdf'), null, 'the direct Download Class PDF button is removed');
+  assert.equal(doc.getElementById('report-all-pdf'), null, 'the direct Download All Classes PDF button is removed');
+  assert.ok(doc.getElementById('report-type'), 'report type selector present');
+  assert.ok(doc.getElementById('report-generate'), 'Generate → Preview button present');
 
   // Class dropdown offers the real class list.
   const classSel = doc.getElementById('report-class');
   assert.ok(classSel, 'class dropdown exists');
   const labels = [...classSel.options].map((o) => o.textContent);
   const { CLASS_OPTIONS } = await import('../js/data.js');
+  assert.ok(labels.includes('সব ক্লাস'), 'class dropdown offers the all-classes option');
   for (const c of CLASS_OPTIONS) assert.ok(labels.includes(c), `class dropdown offers ${c}`);
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('the report class filter yields only that class data', async () => {
+  const { doc, errors } = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'clsfilter'
+  });
+  const win = doc.defaultView;
+  const sel = doc.getElementById('report-type');
+  const classSel = doc.getElementById('report-class');
+
+  sel.value = 'students';
+  sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+
+  // One specific class: only its students are rendered in the on-screen table.
+  classSel.value = 'নবম';
+  classSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  let rows = [...doc.querySelectorAll('#report-table tbody tr')].map((r) => r.textContent);
+  assert.equal(rows.length, 2, 'only the নবম students are shown');
+  assert.ok(rows.every((t) => t.includes('নবম')), 'every rendered row belongs to নবম');
+  assert.ok(!rows.some((t) => t.includes('নাফিস ইকবাল')), 'a দশম student is excluded');
+
+  // All classes: every seeded student appears.
+  classSel.value = 'সব ক্লাস';
+  classSel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  rows = [...doc.querySelectorAll('#report-table tbody tr')];
+  assert.equal(rows.length, 4, 'all four seeded students are shown without a filter');
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);

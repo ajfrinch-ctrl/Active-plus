@@ -48,7 +48,7 @@ test('admin home shows a retry card when rendering fails', () => {
     // once the data is healthy again, Retry recovers the dashboard
     restore();
     host.querySelector('[data-retry-home]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-    assert.ok(dom.window.document.getElementById('institute-overview'), 'dashboard recovered after retry');
+    assert.ok(dom.window.document.querySelector('.analytics-grid'), 'dashboard recovered after retry');
     assert.ok(home, 'module returned its controller');
   } finally { restore(); }
 });
@@ -76,6 +76,6 @@ test('a healthy render does not show the error card', () => {
   initTeacherHome({ session: { role: 'teacher', name: 'রাহেলা আক্তার' }, tabs: { activate() {} } });
   const doc = dom.window.document;
   assert.equal(doc.querySelector('[data-retry-home]'), null, 'no error card when data is fine');
-  assert.ok(doc.getElementById('institute-overview'), 'admin hero rendered');
+  assert.ok(doc.querySelector('.analytics-grid'), 'admin analytics dashboard rendered');
   assert.ok(doc.getElementById('teaching-hero'), 'teacher hero rendered');
 });

@@ -1,29 +1,54 @@
 /**
- * Admin Home — the app-style landing screen of the admin panel.
+ * Admin Home — the landing screen of the admin panel.
  *
- * Same visual language as the student and teacher homes, but the information
- * architecture answers the admin's question: "How is my whole coaching centre
- * performing right now?"
+ * A clean, information-focused dashboard (no raw transaction lists, no
+ * announcement text, no activity-log dump):
+ *   1. an Academic Analytics summary grid computed live from the database,
+ *   2. feature tiles grouped by job (Academic / Finance / Management), and
+ *   3. navigation cards for Finance, Academic Review, Announcements and
+ *      Recent Activities — each routes into its panel instead of dumping data.
  *
- * Every figure is computed live from the database through analytics() and the
- * collections themselves — nothing is hard-coded, and the feature grid simply
- * routes into the existing CRUD panels instead of duplicating them.
+ * Every figure is computed live through analytics() and the collections
+ * themselves — nothing is hard-coded.
  */
 import { escapeHtml, mountConnectionStatus } from './app.js';
 import {
-  db, analytics, recentActivity, activeBanners, latestNotifications,
-  timeAgo, dueFees, todayBn, logActivity, classPerformance, getDbStatus
+  db, analytics, dueFees, getDbStatus, DAY_BN
 } from './data.js';
 
-const FEATURES = [
-  { key: 'students', icon: '👨‍🎓', label: 'শিক্ষার্থী' },
-  { key: 'teachers', icon: '👨‍🏫', label: 'শিক্ষক' },
-  { key: 'classes', icon: '🏫', label: 'ক্লাস' },
-  { key: 'batches', icon: '📚', label: 'ব্যাচ' },
-  { key: 'exam', icon: '📝', label: 'পরীক্ষা' },
-  { key: 'results', icon: '🏆', label: 'ফলাফল' },
-  { key: 'dues', icon: '💰', label: 'ফি ও পেমেন্ট' },
-  { key: 'reports', icon: '📊', label: 'রিপোর্ট' }
+const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
+
+const GROUPS = [
+  {
+    title: '🎓 একাডেমিক',
+    tiles: [
+      { key: 'students', icon: '👨‍🎓', label: 'শিক্ষার্থী' },
+      { key: 'classes', icon: '🏫', label: 'ক্লাস' },
+      { key: 'teachers', icon: '👨‍🏫', label: 'শিক্ষক' },
+      { key: 'exam', icon: '📝', label: 'পরীক্ষা' },
+      { key: 'results', icon: '🏆', label: 'ফলাফল' }
+    ],
+    cards: ['academic-review']
+  },
+  {
+    title: '💰 ফিন্যান্স',
+    tiles: [
+      { key: 'dues', icon: '🧾', label: 'বকেয়া ও পেমেন্ট' },
+      { key: 'reports', icon: '📊', label: 'রিপোর্ট' }
+    ],
+    cards: ['finance']
+  },
+  {
+    title: '🗂️ ম্যানেজমেন্ট',
+    tiles: [
+      { key: 'notices', icon: '📢', label: 'নোটিশ' },
+      { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
+      { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি' },
+      { key: 'settings', icon: '⚙️', label: 'সেটিংস' }
+    ],
+    cards: ['announcements', 'recent-activities']
+  }
 ];
 
 const QUICK_ACTIONS = [
@@ -42,22 +67,14 @@ const MORE_ITEMS = [
   { key: 'assignments', icon: '📋', label: 'অ্যাসাইনমেন্ট' },
   { key: 'submissions', icon: '✅', label: 'জমাকৃত কাজ' },
   { key: 'routine', icon: '📅', label: 'রুটিন' },
-  { key: 'notices', icon: '📢', label: 'নোটিশ' },
   { key: 'suggestion', icon: '📝', label: 'সাজেশন' },
-  { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
-  { key: 'analytics', icon: '📈', label: 'অ্যানালিটিক্স' },
-  { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি' },
-  { key: 'activity', icon: '🧾', label: 'অ্যাক্টিভিটি লগ' },
-  { key: 'backup', icon: '💾', label: 'ব্যাকআপ' },
+  { key: 'batches', icon: '📚', label: 'ব্যাচ' },
   { key: 'tips', icon: '💡', label: 'টিপ' },
   { key: 'banners', icon: '🖼️', label: 'ব্যানার' },
+  { key: 'backup', icon: '💾', label: 'ব্যাকআপ' },
   { key: 'profile', icon: '👤', label: 'প্রোফাইল' },
-  { key: 'settings', icon: '⚙️', label: 'সেটিংস' },
   { key: 'logout', icon: '🚪', label: 'লগআউট' }
 ];
-
-const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
-const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
 
 export function initAdminHome({ session, tabs, openModal, showToast, onLogout }) {
   const host = document.getElementById('admin-home');
@@ -68,118 +85,104 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     tabs?.activate?.(key);
   };
 
-  /* -------------------------------------------------------------- */
-  /* Sections                                                        */
-  /* -------------------------------------------------------------- */
-  // Live chip: online / offline / syncing / synced — never fakes success.
   const statusChip = () => `<span class="net-chip" id="admin-net-chip" role="status" aria-live="polite">…</span>`;
 
-  const hero = () => {
+  const analyticsGrid = () => {
     const a = analytics();
+    const due = dueFees();
+    const dueStudents = new Set(due.map((d) => d.studentId)).size;
+    const results = db.examResults.list();
+    const pcts = results.map((r) => Math.round((Number(r.score) || 0) / (Number(r.total) || 1) * 100));
+    const avgResult = pcts.length ? Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length) : 0;
+    const todayClasses = db.routine.list().filter((r) => r.day === DAY_BN[new Date().getDay()]).length;
+    const activityCount = db.activityLogs.list().length;
+
     const cell = (icon, value, label) => `
-      <div class="tile"><span class="ico">${icon}</span><strong>${bn(value)}</strong><span>${label}</span></div>`;
-    return `<div class="hero" id="institute-overview">
-      <div class="h-title">প্রতিষ্ঠান পর্যালোচনা</div>
-      <div class="feature-grid four">
-        ${cell('👨‍🎓', a.totalStudents, 'শিক্ষার্থী')}
-        ${cell('👨‍🏫', a.totalTeachers, 'শিক্ষক')}
-        ${cell('📚', a.activeBatches, 'ব্যাচ')}
-        ${cell('📖', a.totalSubjects, 'বিষয়')}
-      </div>
-      <div class="info-row"><span class="l">সক্রিয় শিক্ষার্থী</span><span class="v">${bn(a.activeStudents)}</span></div>
-      <div class="info-row"><span class="l">আজকের আদায়</span><span class="v">${taka(a.todayCollection)}</span></div>
-      <div class="info-row"><span class="l">এই মাসে</span><span class="v">${taka(a.monthlyCollection)}</span></div>
-      <div class="info-row"><span class="l">মোট বকেয়া</span><span class="v">${taka(a.totalDue)}</span></div>
-    </div>`;
+      <div class="analytics-cell"><span class="ico">${icon}</span><strong>${value}</strong><span>${label}</span></div>`;
+
+    return `
+      <section class="home-section" aria-label="একাডেমিক অ্যানালিটিক্স">
+        <h2 class="sec-title">📈 একাডেমিক অ্যানালিটিক্স</h2>
+        <div class="analytics-grid">
+          ${cell('👨‍🎓', bn(a.totalStudents), 'মোট শিক্ষার্থী')}
+          ${cell('✅', bn(a.activeStudents), 'সক্রিয় শিক্ষার্থী')}
+          ${cell('🏫', bn(a.totalClasses), 'মোট ক্লাস')}
+          ${cell('👨‍🏫', bn(a.totalTeachers), 'মোট শিক্ষক')}
+          ${cell('📅', bn(todayClasses), 'আজকের ক্লাস')}
+          ${cell('📝', bn(a.upcomingExams), 'মোট পরীক্ষা')}
+          ${cell('🏆', bn(results.length), 'পরীক্ষার ফলাফল')}
+          ${cell('📈', avgResult ? `${bn(avgResult)}%` : '—', 'গড় ফলাফল')}
+          ${cell('⚠️', bn(dueStudents), 'বকেয়া শিক্ষার্থী')}
+          ${cell('💰', taka(a.totalDue), 'মোট বকেয়া')}
+          ${cell('🧾', bn(activityCount), 'সাম্প্রতিক কার্যক্রম')}
+        </div>
+      </section>`;
   };
 
-  const featureGrid = () => `
-    <div class="feature-grid" id="admin-features">
-      ${FEATURES.map((f) => `<button type="button" class="tile" data-goto="${f.key}"><span class="ico">${f.icon}</span>${escapeHtml(f.label)}</button>`).join('')}
-    </div>
-    <button type="button" class="see-more" id="admin-see-more">আরও দেখুন ↓</button>`;
+  const navCard = (icon, title, desc, count, countLabel, gotoKey) => `
+    <button type="button" class="nav-card" data-goto="${gotoKey}">
+      <span class="ico">${icon}</span>
+      <span class="nc-body"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(desc)}</small></span>
+      ${count != null ? `<span class="nc-count">${count}<i>${escapeHtml(countLabel || '')}</i></span>` : ''}
+      <span class="nc-view">দেখুন ›</span>
+    </button>`;
+
+  const cards = {
+    'academic-review': (a, avgResult) => navCard(
+      '📊', 'একাডেমিক রিভিউ', 'View academic performance and analytics',
+      avgResult ? `${bn(avgResult)}%` : '—', 'গড় ফলাফল', 'analytics'),
+    finance: (a) => navCard(
+      '💰', 'ফিন্যান্স', 'Financial overview and payment management',
+      taka(a.totalDue), 'মোট বকেয়া', 'dues'),
+    announcements: () => navCard(
+      '📢', 'ঘোষণা', 'View latest announcements',
+      bn(db.notices.list().length), 'টি নোটিশ', 'notices'),
+    'recent-activities': () => navCard(
+      '📝', 'সাম্প্রতিক কার্যক্রম', 'View recent system activities',
+      bn(db.activityLogs.list().length), 'টি কার্যক্রম', 'activity')
+  };
+
+  const groupSection = (group, ctx) => `
+    <section class="home-section">
+      <h2 class="sec-title">${group.title}</h2>
+      ${group.tiles.length ? `<div class="feature-grid">${group.tiles.map((t) => `
+        <button type="button" class="tile" data-goto="${t.key}"><span class="ico">${t.icon}</span>${escapeHtml(t.label)}</button>`).join('')}</div>` : ''}
+      ${group.cards.map((key) => cards[key] ? cards[key](ctx.a, ctx.avgResult) : '').join('')}
+    </section>`;
 
   const quickActions = () => `
     <div class="quick-row" id="admin-quick">
       ${QUICK_ACTIONS.map((q) => `<button type="button" class="chip" data-act="${q.act}">${q.icon} ${escapeHtml(q.label)}</button>`).join('')}
     </div>`;
 
-  const academic = () => {
-    const a = analytics();
-    const perf = classPerformance();
-    const rows = perf.length
-      ? perf.slice(0, 5).map((c) => `<div class="info-row"><span class="l">${escapeHtml(c.className)}</span><span class="v">${bn(c.avg)}%</span></div>`).join('')
-      : '<p>এখনো কোনো ফলাফল নেই।</p>';
-    return `<div class="hcard"><div class="h-title">📊 একাডেমিক পর্যালোচনা</div>
-      <div class="info-row"><span class="l">আসন্ন পরীক্ষা</span><span class="v">${bn(a.upcomingExams)}</span></div>
-      <div class="info-row"><span class="l">প্রকাশিত ফলাফল</span><span class="v">${bn(a.publishedResults)}</span></div>
-      <div class="info-row"><span class="l">অপেক্ষমাণ অ্যাসাইনমেন্ট</span><span class="v">${bn(a.pendingAssignments)}</span></div>
-      <div class="h-title" style="margin-top:.75rem">ক্লাস অনুযায়ী গড়</div>${rows}</div>`;
-  };
-
-  const finance = () => {
-    const a = analytics();
-    const due = dueFees();
-    return `<div class="hcard"><div class="h-title">💰 ফিন্যান্স</div>
-      <div class="info-row"><span class="l">আজ</span><span class="v">${taka(a.todayCollection)}</span></div>
-      <div class="info-row"><span class="l">এই মাস</span><span class="v">${taka(a.monthlyCollection)}</span></div>
-      <div class="info-row"><span class="l">বকেয়া</span><span class="v">${taka(a.totalDue)}</span></div>
-      <div class="info-row"><span class="l">বকেয়া শিক্ষার্থী</span><span class="v">${bn(due.length)} জন</span></div>
-      <button type="button" class="btn btn-block" data-goto="dues">বকেয়া ও পেমেন্ট</button></div>`;
-  };
-
-  const announcements = () => {
-    const latest = db.notices.list().slice(-1)[0];
-    return `<div class="hcard"><div class="h-title">📢 ঘোষণা</div>${
-      latest ? `<p><strong>${escapeHtml(latest.title)}</strong></p>
-        <p class="meta">${escapeHtml(latest.date || '')} · ${escapeHtml(latest.audience || '')}</p>
-        <button type="button" class="btn btn-block" data-goto="notices">সব নোটিশ</button>`
-        : '<p>কোনো ঘোষণা নেই।</p>'}</div>`;
-  };
-
-  const activity = () => {
-    const items = recentActivity(6);
-    return `<div class="hcard"><div class="h-title">📝 সাম্প্রতিক কার্যক্রম</div>${
-      items.length ? items.map((it) => `
-        <div class="info-row"><span class="l">${it.icon} ${escapeHtml(it.text)}</span>
-        <span class="v">${escapeHtml(it.meta || '')}</span></div>`).join('')
-        : '<p>এখনো কোনো কার্যক্রম নেই।</p>'}
-      <button type="button" class="btn btn-block" data-goto="activity">সব দেখুন</button></div>`;
-  };
-
-  const bannerCard = () => {
-    const banners = activeBanners();
-    if (!banners.length) return '';
-    return `<div class="carousel"><div class="carousel-track">${banners.map((b) => `
-      <div class="banner"${b.image ? ` style="background-image:url('${escapeHtml(b.image)}')"` : ''}>
-        <strong>${escapeHtml(b.title)}</strong>${b.subtitle ? `<span>${escapeHtml(b.subtitle)}</span>` : ''}
-      </div>`).join('')}</div></div>`;
-  };
-
   const morePanel = () => `
     <div class="feature-grid more-grid" id="admin-more-grid">
       ${MORE_ITEMS.map((m) => `<button type="button" class="tile" data-goto="${m.key}"><span class="ico">${m.icon}</span>${escapeHtml(m.label)}</button>`).join('')}
     </div>`;
 
-  /* -------------------------------------------------------------- */
-  /* Render + wire                                                   */
-  /* -------------------------------------------------------------- */
   function render() {
     const headerSub = document.getElementById('user-role');
     if (headerSub) headerSub.textContent = db.settings.get().orgName || 'Active Plus';
+    const a = analytics();
+    const results = db.examResults.list();
+    const pcts = results.map((r) => Math.round((Number(r.score) || 0) / (Number(r.total) || 1) * 100));
+    const avgResult = pcts.length ? Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length) : 0;
+    const ctx = { a, avgResult };
+
     host.innerHTML = `
       <div id="admin-home-content">
         ${statusChip()}
-        ${hero()}
-        ${featureGrid()}
-        ${quickActions()}
-        ${academic()}
-        ${finance()}
-        ${bannerCard()}
-        ${announcements()}
-        ${activity()}
+        ${analyticsGrid()}
+        ${GROUPS.map((g) => groupSection(g, ctx)).join('')}
+        <section class="home-section">
+          <h2 class="sec-title">⚡ কুইক অ্যাকশন</h2>
+          ${quickActions()}
+        </section>
+        <button type="button" class="see-more" id="admin-see-more">আরও দেখুন ↓</button>
       </div>
-      <div id="admin-more" hidden>${morePanel()}</div>`;
+      <div id="admin-more" hidden>
+        <section class="home-section"><h2 class="sec-title">আরও ফিচার</h2>${morePanel()}</section>
+      </div>`;
   }
 
   host.addEventListener('click', (e) => {
@@ -205,10 +208,6 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     else if (act === 'create-notice') { tabs?.activate?.('notices'); openModal?.('notice-modal'); }
   });
 
-  /**
-   * Render with a safety net (spec 60): a failure shows a friendly message with
-   * Retry rather than a blank dashboard, and hides the technical error.
-   */
   function renderSafe() {
     try {
       render();
@@ -226,8 +225,12 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
   }
 
   renderSafe();
-  return { render: renderSafe, goto, openMore: () => {
-    const btn = host.querySelector('#admin-see-more');
-    if (btn && host.querySelector('#admin-more')?.hidden) btn.click();
-  } };
+  return {
+    render: renderSafe,
+    goto,
+    openMore: () => {
+      const btn = host.querySelector('#admin-see-more');
+      if (btn && host.querySelector('#admin-more')?.hidden) btn.click();
+    }
+  };
 }

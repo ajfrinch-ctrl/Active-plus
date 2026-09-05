@@ -2,9 +2,10 @@
  * Printable Admission Form (logo + institution header).
  *
  * After a successful admission the admin can open the admission form, verify it
- * shows the institution logo and org name plus the student's details, then
- * trigger a PDF download via window.print(). This boots the real admin portal
- * module in jsdom and drives the actual button wiring.
+ * shows the institution logo and org name plus the student's details, then open
+ * the shared document preview (Generate → Preview → Download PDF) instead of a
+ * direct print. This boots the real admin portal module in jsdom and drives the
+ * actual button wiring.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,6 +37,26 @@ async function bootAdmin(nonce) {
   dom.window.prompt = () => 'ok';
   let printed = 0;
   dom.window.print = () => { printed += 1; };
+
+  // jsdom has no Canvas 2D context; provide a minimal fake so the preview-first
+  // document flow (render → preview modal) can be exercised end to end.
+  const fakeCtx = {
+    fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textBaseline: 'top', textAlign: 'left',
+    fillText: () => {}, fillRect: () => {}, strokeRect: () => {},
+    beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, closePath: () => {}, arcTo: () => {},
+    fill: () => {}, stroke: () => {}, save: () => {}, restore: () => {}, clip: () => {},
+    drawImage: () => {},
+    measureText: (t) => ({ width: String(t).length * 12 })
+  };
+  const makeCanvas = (w, h) => ({
+    width: w, height: h,
+    getContext: () => fakeCtx,
+    toDataURL: () => 'data:image/png;base64,AAAA',
+    toBlob: (cb) => cb(new dom.window.Blob(['x'], { type: 'image/png' }))
+  });
+  const origCreate = dom.window.document.createElement.bind(dom.window.document);
+  dom.window.document.createElement = (tag) =>
+    (String(tag).toLowerCase() === 'canvas' ? makeCanvas(0, 0) : origCreate(tag));
 
   globalThis.window = dom.window;
   globalThis.document = dom.window.document;
@@ -115,10 +136,14 @@ test('admission form renders org header + student details and prints a PDF', asy
   assert.match(sheet.textContent, /ভর্তি ফরম/);
   assert.ok(sheet.textContent.includes('অভিভাবকের স্বাক্ষর'), 'signature area present');
 
-  // Print the PDF: the library must call window.print().
+  // Preview-first: the PDF button opens the shared document preview (it must
+  // never call window.print() directly).
   const before = printed();
   doc.getElementById('admission-form-pdf').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  assert.equal(printed(), before + 1, 'PDF button triggers window.print()');
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(printed(), before, 'PDF button never calls window.print() directly');
+  assert.ok(doc.getElementById('document-preview-modal').classList.contains('active'), 'document preview opens');
+  assert.equal(doc.getElementById('document-preview-title').textContent, 'ভর্তি ফরম', 'preview title is the admission form');
 
   // Closing clears the flag.
   doc.getElementById('admission-form-close').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));

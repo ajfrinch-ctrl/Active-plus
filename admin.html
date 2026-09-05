@@ -251,7 +251,7 @@
           <div class="form-group"><label for="res-exam">পরীক্ষা</label><select id="res-exam" class="form-input form-select"></select></div>
           <p class="form-hint" id="res-analytics"></p>
           <div class="table-wrap"><table class="table" id="res-table"><thead><tr></tr></thead><tbody></tbody></table></div>
-          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="res-export">এক্সেল/CSV</button><button type="button" class="btn btn-small btn-secondary" id="res-print">প্রিন্ট</button></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="res-export">এক্সেল/CSV</button><button type="button" class="btn btn-small" id="res-preview">📄 PDF প্রিভিউ</button></div>
         </section>
 
         <section class="tab-panel" id="tab-materials" hidden><h2 class="section-title">স্টাডি ম্যাটেরিয়াল</h2><div id="materials-crud"></div></section>
@@ -284,16 +284,14 @@
 
         <section class="tab-panel" id="tab-reports" hidden>
           <h2 class="section-title">রিপোর্ট সেন্টার</h2>
-          <div class="form-group"><label for="report-type">রিপোর্ট</label><select id="report-type" class="form-input form-select"></select></div>
-          <div class="table-wrap"><table class="table" id="report-table"><thead><tr></tr></thead><tbody></tbody></table></div>
-          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small" id="report-csv">এক্সেল/CSV</button><button type="button" class="btn btn-small" id="report-pdf">⬇️ Download PDF</button></div>
-
-          <h2 class="section-title" style="margin-top:1.5rem">শিক্ষার্থী রিপোর্ট (ক্লাস অনুযায়ী)</h2>
-          <div class="form-group"><label for="report-class">ক্লাস নির্বাচন</label><select id="report-class" class="form-input form-select"></select></div>
-          <div class="row-actions" style="margin-top:.75rem">
-            <button type="button" class="btn btn-small" id="report-class-pdf">⬇️ Download Class PDF</button>
-            <button type="button" class="btn btn-small" id="report-all-pdf">⬇️ Download All Classes PDF</button>
+          <div class="form-row">
+            <div class="form-group"><label for="report-type">রিপোর্টের ধরন</label><select id="report-type" class="form-input form-select"></select></div>
+            <div class="form-group"><label for="report-class">ক্লাস নির্বাচন</label><select id="report-class" class="form-input form-select"></select></div>
           </div>
+          <button type="button" class="btn btn-block" id="report-generate">📄 রিপোর্ট Generate করুন</button>
+          <p class="form-hint">Generate চাপলে প্রথমে রিপোর্টের প্রিভিউ দেখানো হবে — সেখান থেকে PDF ডাউনলোড করতে পারবেন।</p>
+          <div class="table-wrap" style="margin-top:.75rem"><table class="table" id="report-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small btn-secondary" id="report-csv">এক্সেল/CSV</button></div>
         </section>
 
         <section class="tab-panel" id="tab-users" hidden>
@@ -372,7 +370,7 @@
         <h2 id="admission-form-title">ভর্তি ফরম</h2>
         <div id="admission-form-body"></div>
         <div class="row-actions" style="margin-top:.75rem">
-          <button type="button" class="btn" id="admission-form-pdf">PDF ডাউনলোড করুন</button>
+          <button type="button" class="btn" id="admission-form-pdf">⬇️ PDF প্রিভিউ</button>
           <button type="button" class="btn btn-secondary" id="admission-form-close">বন্ধ করুন</button>
         </div>
       </div>
@@ -519,16 +517,18 @@
       </div>
     </div>
 
-    <!-- Printable receipt (spec 40) -->
-    <div class="modal-overlay" id="receipt-modal" aria-hidden="true">
-      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+    <!-- Shared document preview (Generate → Preview → Download PDF / Share Image) -->
+    <div class="modal-overlay" id="document-preview-modal" aria-hidden="true">
+      <div class="modal-content doc-preview" role="dialog" aria-modal="true" aria-labelledby="document-preview-title">
         <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
-        <h2 id="receipt-title">পেমেন্ট রিসিট</h2>
-        <div id="receipt-body"></div>
-        <div class="btn-stack" style="margin-top:.75rem">
-          <button type="button" class="btn" id="receipt-print">🖨️ প্রিন্ট</button>
-          <button type="button" class="btn btn-success" id="receipt-whatsapp">📱 WhatsApp রিসিট</button>
-          <button type="button" class="btn btn-secondary" id="receipt-download">⬇️ রিসিট ডাউনলোড</button>
+        <div class="doc-preview-head">
+          <h2 id="document-preview-title">Document Preview</h2>
+          <p class="doc-preview-meta" id="document-preview-meta"></p>
+        </div>
+        <div class="doc-preview-body" id="document-preview-body"></div>
+        <div class="doc-preview-actions">
+          <button type="button" class="btn" id="document-preview-download">⬇️ Download PDF</button>
+          <button type="button" class="btn btn-success" id="document-preview-share">📱 Share Image</button>
         </div>
       </div>
     </div>
@@ -559,9 +559,9 @@
         <div id="student-detail-body"></div>
         <div class="row-actions" style="margin-top:.75rem">
           <button type="button" class="btn btn-small btn-success" id="wa-profile">হোয়াটসঅ্যাপে পাঠান</button>
-          <button type="button" class="btn btn-small" id="admission-form-profile">এডমিশন ফরম PDF</button>
-          <button type="button" class="btn btn-small" id="print-idcard">আইডি কার্ড প্রিন্ট</button>
-          <button type="button" class="btn btn-small btn-secondary" id="print-ledger">লেজার প্রিন্ট</button>
+          <button type="button" class="btn btn-small" id="admission-form-profile">এডমিশন ফরম</button>
+          <button type="button" class="btn btn-small" id="preview-idcard">🪪 আইডি কার্ড প্রিভিউ</button>
+          <button type="button" class="btn btn-small btn-secondary" id="preview-ledger">🧾 লেজার প্রিভিউ</button>
         </div>
       </div>
     </div>
@@ -654,10 +654,12 @@
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId } from './js/data.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
-      import { buildReceiptHtml, receiptSummary, shareReceiptAsImage, downloadReceiptPng } from './js/docs.js';
+      import { receiptSummary, shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from './js/docs.js';
+      import { previewDocument, mountDocumentPreview } from './js/preview.js';
+      import { canvasesToPdf } from './js/pdf.js';
 
       const session = initApp({ roles: ['admin'] });
       if (!session) throw new Error('guard redirect');
@@ -695,7 +697,7 @@
         if (st.school) lines.push(`🏫 স্কুল/কলেজ: ${st.school}`);
         if (st.guardian) lines.push(`👨‍👩‍👧 অভিভাবক: ${st.guardian}`);
         if (st.admissionDate) lines.push(`📅 ভর্তির তারিখ: ${st.admissionDate}`);
-        lines.push(``, `এই আইডিটি দিয়ে শিক্ষার্থী অ্যাপে লগইন করতে পারবে। ধন্যবাদ।`);
+        lines.push(``, `ধন্যবাদ।`);
         return lines.join('\n');
       };
       const openWhatsApp = (st) => {
@@ -939,16 +941,22 @@
         if (st) openAdmissionForm(st);
       });
       document.getElementById('admission-form-close')?.addEventListener('click', closeAdmissionForm);
-      document.getElementById('admission-form-pdf')?.addEventListener('click', () => {
+      document.getElementById('admission-form-pdf')?.addEventListener('click', async () => {
         const st = db.students.find(admissionFormId);
         if (!st) return;
-        ensurePrintHeader(db.settings.get());
-        const phLabel = document.getElementById('ph-label');
-        if (phLabel) phLabel.textContent = 'এডমিশন ফরম';
-        const phDate = document.getElementById('ph-date');
-        if (phDate) phDate.textContent = todayBn();
-        logActivity({ user: session.name, role: session.role, action: 'downloaded admission form', target: `${st.id} ${st.name}` });
-        window.print();
+        try {
+          const canvases = await renderAdmissionFormCanvases(st, { settings: db.settings.get() });
+          await previewDocument({
+            title: 'ভর্তি ফরম',
+            meta: `${st.name || ''} · ${st.id}`,
+            filename: `admission-form-${st.id}.pdf`,
+            canvases,
+            shareable: canvases.length === 1
+          });
+          logActivity({ user: session.name, role: session.role, action: 'previewed admission form', target: `${st.id} ${st.name}` });
+        } catch (e) {
+          showToast('এডমিশন ফরম তৈরি করা যায়নি।', 'error');
+        }
       });
 
       /* -------- Student profile: ID card, ledger, results (spec 29) -------- */
@@ -1010,28 +1018,39 @@
         if (st) openAdmissionForm(st);
       });
 
-      document.getElementById('print-idcard')?.addEventListener('click', () => {
-        // The card is rendered on demand, so query it at click time.
-        if (!document.querySelector('#student-detail-body [data-idcard]')) {
-          showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error');
-          return;
+      document.getElementById('preview-idcard')?.addEventListener('click', async () => {
+        const st = db.students.find(profileStudentId);
+        if (!st) { showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error'); return; }
+        try {
+          const canvas = await renderIdCardCanvas(st, { settings: db.settings.get() });
+          await previewDocument({
+            title: 'স্টুডেন্ট আইডি কার্ড',
+            meta: `${st.name || ''} · ${st.id}`,
+            filename: `student-id-card-${st.id}.pdf`,
+            canvases: [canvas],
+            shareable: true
+          });
+          logActivity({ user: session.name, role: session.role, action: 'previewed ID card', target: st.id });
+        } catch (e) {
+          showToast('আইডি কার্ড তৈরি করা যায়নি।', 'error');
         }
-        ensurePrintHeader(db.settings.get());
-        const phLabel = document.getElementById('ph-label');
-        if (phLabel) phLabel.textContent = 'আইডি কার্ড';
-        const phDate = document.getElementById('ph-date');
-        if (phDate) phDate.textContent = todayBn();
-        logActivity({ user: session.name, role: session.role, action: 'printed ID card', target: profileStudentId || '' });
-        window.print();
       });
-      document.getElementById('print-ledger')?.addEventListener('click', () => {
-        ensurePrintHeader(db.settings.get());
-        const phLabel = document.getElementById('ph-label');
-        if (phLabel) phLabel.textContent = 'ফি লেজার';
-        const phDate = document.getElementById('ph-date');
-        if (phDate) phDate.textContent = todayBn();
-        logActivity({ user: session.name, role: session.role, action: 'printed fee ledger', target: profileStudentId || '' });
-        window.print();
+      document.getElementById('preview-ledger')?.addEventListener('click', async () => {
+        const st = db.students.find(profileStudentId);
+        if (!st) { showToast('আগে একজন শিক্ষার্থীর প্রোফাইল খুলুন।', 'error'); return; }
+        try {
+          const canvases = await renderLedgerCanvases(st, { settings: db.settings.get() });
+          await previewDocument({
+            title: 'ফি লেজার',
+            meta: `${st.name || ''} · ${st.id}`,
+            filename: `student-ledger-${st.id}.pdf`,
+            canvases,
+            shareable: canvases.length === 1
+          });
+          logActivity({ user: session.name, role: session.role, action: 'previewed fee ledger', target: st.id });
+        } catch (e) {
+          showToast('লেজার তৈরি করা যায়নি।', 'error');
+        }
       });
 
       document.querySelector('#tab-students').addEventListener('click', (event) => {
@@ -1291,8 +1310,8 @@
 
         const result = receivePayment(feeId, session.name);
         if (!result) { showToast('এই বকেয়া ইতিমধ্যে পরিশোধিত।', 'error'); return; }
-        // enrich the payment with the captured details + a receipt number
-        const receiptNo = `RCP-${Date.now().toString().slice(-6)}`;
+        // enrich the payment with the captured details + a unique receipt number
+        const receiptNo = nextReceiptNo();
         db.payments.update(result.payment.id, {
           amount, date,
           method: String(d.get('method') || 'নগদ'),
@@ -1306,7 +1325,7 @@
         showPaymentSuccess(result.payment.id);
       });
 
-      /* -------- Receipt: view, print, WhatsApp image share, download -------- */
+      /* -------- Receipt: preview → PDF / image share (no direct print) -------- */
       let currentReceiptId = null;
 
       const receiptOpts = (paymentId) => {
@@ -1315,12 +1334,16 @@
         return { pay, student: db.students.find(pay.studentId) || null, settings: db.settings.get() };
       };
 
-      const openReceipt = (paymentId) => {
+      const openReceipt = async (paymentId) => {
         const opts = receiptOpts(paymentId);
         if (!opts) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
         currentReceiptId = paymentId;
-        document.getElementById('receipt-body').innerHTML = buildReceiptHtml(opts.pay, opts);
-        openModal('receipt-modal');
+        try {
+          const doc = await receiptPreviewDoc(opts.pay, opts);
+          await previewDocument(doc);
+        } catch (e) {
+          showToast('রিসিট তৈরি করা যায়নি।', 'error');
+        }
       };
 
       const shareReceipt = async (paymentId) => {
@@ -1336,12 +1359,13 @@
         }
       };
 
-      const downloadReceipt = async (paymentId) => {
+      const downloadReceiptPdf = async (paymentId) => {
         const opts = receiptOpts(paymentId);
         if (!opts) { showToast('পেমেন্ট পাওয়া যায়নি।', 'error'); return; }
         try {
-          await downloadReceiptPng(opts.pay, opts);
-          showToast('রিসিট ডাউনলোড হয়েছে।', 'success');
+          const canvas = await renderReceiptCanvas(opts.pay, opts);
+          await canvasesToPdf([canvas], receiptPdfFileName(opts.pay));
+          showToast('রিসিট PDF ডাউনলোড হয়েছে।', 'success');
         } catch (e) {
           showToast('রিসিট ডাউনলোড করা যায়নি।', 'error');
         }
@@ -1367,24 +1391,7 @@
         openReceipt(currentReceiptId);
       });
       document.getElementById('pay-success-whatsapp')?.addEventListener('click', () => shareReceipt(currentReceiptId));
-      document.getElementById('pay-success-download')?.addEventListener('click', () => downloadReceipt(currentReceiptId));
-
-      document.getElementById('receipt-whatsapp')?.addEventListener('click', () => shareReceipt(currentReceiptId));
-      document.getElementById('receipt-download')?.addEventListener('click', () => downloadReceipt(currentReceiptId));
-
-      document.getElementById('receipt-print')?.addEventListener('click', () => {
-        if (!document.querySelector('#receipt-body [data-receipt-sheet]')) {
-          showToast('রিসিট তৈরি হয়নি।', 'error');
-          return;
-        }
-        ensurePrintHeader(db.settings.get());
-        const phLabel = document.getElementById('ph-label');
-        if (phLabel) phLabel.textContent = 'পেমেন্ট রিসিট';
-        const phDate = document.getElementById('ph-date');
-        if (phDate) phDate.textContent = todayBn();
-        logActivity({ user: session.name, role: session.role, action: 'printed receipt' });
-        window.print();
-      });
+      document.getElementById('pay-success-download')?.addEventListener('click', () => downloadReceiptPdf(currentReceiptId));
 
       /* ------------------------------------------------------------ */
       /* Suggestions + MCQ authoring (admin)                           */
@@ -1495,6 +1502,7 @@
 
       renderAll();
       mountExtraAdmin(session);
+      mountDocumentPreview();
 
       /* ================= Batch management ================= */
       mountCrud({

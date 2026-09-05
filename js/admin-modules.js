@@ -15,7 +15,7 @@ import { mountCrud } from './crud.js';
 import { escapeHtml, renderTable, statGrid, showToast, openModal, closeModal, getAuthMode, requireOnline } from './app.js';
 import { checkConnectionStatus } from './firebase.js';
 import { listUsers, updateProfile, changePassword } from './auth.js';
-import { canvasesToPdf } from './pdf.js';
+import { previewDocument } from './preview.js';
 import { renderReportCanvases, classReportRows, CLASS_REPORT_COLUMNS, classFileLabel } from './docs.js';
 
 const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
@@ -38,7 +38,7 @@ export function mountExtraAdmin(session) {
   mountResults(session);
   mountNotifications(session);
   mountAnalytics();
-  mountReports();
+  mountReports(session);
   mountUsers(session);
   mountActivity();
   mountBackup(session, onlineFor);
@@ -344,18 +344,11 @@ function mountQuestionBank(session) {
   renderList();
 }
 
-/* Stamp the shared print letterhead with the current report label + date. */
-function stampPrintHeader(label) {
-  const phLabel = document.getElementById('ph-label');
-  const phDate = document.getElementById('ph-date');
-  if (phLabel) phLabel.textContent = label;
-  if (phDate) phDate.textContent = todayBn();
-}
-
 /* ---------------- Results + leaderboard ---------------- */
 function mountResults(session) {
   const sel = document.getElementById('res-exam');
   if (!sel) return;
+  const passMark = Number(db.settings.get().passMark) || 40;
   sel.innerHTML = db.exams.list().map((e) => `<option value="${escapeHtml(e.id)}">${escapeHtml(e.title)}</option>`).join('');
   const render = () => {
     const exam = db.exams.find(sel.value);
@@ -366,7 +359,7 @@ function mountResults(session) {
       { key: 'studentId', label: 'আইডি' },
       { key: 'score', label: 'প্রাপ্ত' },
       { key: 'pct', label: '%' },
-      { key: 'pass', label: 'ফলাফল', render: (r) => `<span class="badge ${r.pct >= (db.settings.get().passMark || 40) ? 'success' : 'error'}">${r.pct >= (db.settings.get().passMark || 40) ? 'পাশ' : 'ফেল'}</span>` }
+      { key: 'pass', label: 'ফলাফল', render: (r) => `<span class="badge ${r.pct >= passMark ? 'success' : 'error'}">${r.pct >= passMark ? 'পাশ' : 'ফেল'}</span>` }
     ], rows);
     const s = examSummary(sel.value);
     document.getElementById('res-analytics').innerHTML = s
@@ -380,9 +373,33 @@ function mountResults(session) {
     ], leaderboard(sel.value)), 'text/csv');
     showToast('রিপোর্ট ডাউনলোড হয়েছে।', 'success');
   });
-  document.getElementById('res-print').addEventListener('click', () => {
-    stampPrintHeader('ফলাফল রিপোর্ট');
-    window.print();
+  // Preview-first: the result report is reviewed in the shared modal, then PDF.
+  document.getElementById('res-preview').addEventListener('click', async () => {
+    const exam = db.exams.find(sel.value);
+    const rows = leaderboard(sel.value);
+    const s = examSummary(sel.value);
+    try {
+      const canvases = await renderReportCanvases({
+        settings: db.settings.get(),
+        title: 'ফলাফল রিপোর্ট',
+        subtitle: exam?.title || '',
+        columns: [
+          { key: 'position', label: 'ক্রম' }, { key: 'studentName', label: 'শিক্ষার্থী' },
+          { key: 'studentId', label: 'আইডি' }, { key: 'score', label: 'প্রাপ্ত' },
+          { key: 'pct', label: '%' }, { key: 'pass', label: 'ফলাফল' }
+        ],
+        rows: rows.map((r) => ({ ...r, pass: r.pct >= passMark ? 'পাশ' : 'ফেল' })),
+        summary: s ? [
+          { label: 'পরীক্ষার্থী', value: bn(s.attempts) },
+          { label: 'গড়', value: `${bn(s.avg)}%` },
+          { label: 'সর্বোচ্চ', value: `${bn(s.highest)}%` },
+          { label: 'পাশের হার', value: `${bn(s.passRate)}%` }
+        ] : []
+      });
+      await previewDocument({ title: 'ফলাফল রিপোর্ট', meta: exam?.title || '', filename: `results-${sel.value}-report.pdf`, canvases, shareable: false });
+    } catch (e) {
+      showToast('রিপোর্ট তৈরি করা যায়নি।', 'error');
+    }
   });
   render();
 }
@@ -477,132 +494,223 @@ function mountAnalytics() {
 }
 
 /* ---------------- Reports ---------------- */
-function mountReports() {
+function mountReports(session) {
   const sel = document.getElementById('report-type');
+  const classSel = document.getElementById('report-class');
   const passMark = Number(db.settings.get().passMark) || 40;
   const pct = (r) => Math.round((Number(r.score) || 0) / (Number(r.total) || 1) * 100);
+  const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
+  const classNameOf = (row) => row.className
+    || (row.studentId ? db.students.find(row.studentId)?.className : null)
+    || null;
+  const payRows = (payments) => payments.map((p) => {
+    const st = db.students.find(p.studentId);
+    return { studentId: p.studentId, name: st?.name || '—', className: st?.className || '—', month: p.month, amount: taka(p.amount), date: p.date, method: p.method || '—', reference: p.reference || '—', _amount: Number(p.amount) || 0 };
+  });
 
   const reports = {
-    students: { label: 'শিক্ষার্থী তালিকা', cols: [{ key: 'id', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'roll', label: 'রোল' }, { key: 'status', label: 'অবস্থা' }], rows: () => db.students.list() },
-    teachers: { label: 'শিক্ষক তালিকা', cols: [{ key: 'name', label: 'নাম' }, { key: 'subject', label: 'বিষয়' }, { key: 'phone', label: 'মোবাইল' }], rows: () => db.teachers.list() },
-    classes: { label: 'ক্লাস রিপোর্ট', cols: [{ key: 'className', label: 'ক্লাস' }, { key: 'students', label: 'শিক্ষার্থী' }, { key: 'batches', label: 'ব্যাচ' }],
+    students: {
+      label: 'শিক্ষার্থী তালিকা', classScoped: true, cols: CLASS_REPORT_COLUMNS,
+      rows: () => classReportRows(db.students.list()).rows,
+      summary: (rows) => [{ label: 'মোট শিক্ষার্থী', value: bn(rows.length) }]
+    },
+    teachers: {
+      label: 'শিক্ষক তালিকা', classScoped: false,
+      cols: [{ key: 'name', label: 'নাম' }, { key: 'subject', label: 'বিষয়' }, { key: 'phone', label: 'মোবাইল' }],
+      rows: () => db.teachers.list(),
+      summary: (rows) => [{ label: 'মোট শিক্ষক', value: bn(rows.length) }]
+    },
+    classes: {
+      label: 'ক্লাস রিপোর্ট', classScoped: true,
+      cols: [{ key: 'className', label: 'ক্লাস' }, { key: 'students', label: 'শিক্ষার্থী' }, { key: 'batches', label: 'ব্যাচ' }],
       rows: () => CLASS_OPTIONS.map((c) => ({
         className: c,
         students: db.students.list().filter((s) => s.className === c).length,
         batches: db.batches.list().filter((b) => String(b.className || b.name).includes(c)).length
-      })).filter((r) => r.students || r.batches) },
-    batches: { label: 'ব্যাচ রিপোর্ট', cols: [{ key: 'name', label: 'ব্যাচ' }, { key: 'className', label: 'ক্লাস' }, { key: 'teacher', label: 'শিক্ষক' }, { key: 'students', label: 'শিক্ষার্থী' }], rows: () => db.batches.list() },
-    exams: { label: 'পরীক্ষা রিপোর্ট', cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'subject', label: 'বিষয়' }, { key: 'startDate', label: 'তারিখ' }], rows: () => db.exams.list() },
-    results: { label: 'ফলাফল রিপোর্ট', cols: [{ key: 'studentName', label: 'শিক্ষার্থী' }, { key: 'examId', label: 'পরীক্ষা' }, { key: 'score', label: 'প্রাপ্ত' }, { key: 'total', label: 'পূর্ণ' }], rows: () => db.examResults.list() },
-    merit: { label: 'মেধা তালিকা', cols: [{ key: 'position', label: 'অবস্থান' }, { key: 'studentName', label: 'শিক্ষার্থী' }, { key: 'percent', label: 'শতাংশ' }],
-      rows: () => leaderboard().slice(0, 50).map((r) => ({ position: r.position, studentName: r.studentName, percent: `${r.pct}%` })) },
-    performance: { label: 'একাডেমিক পারফরম্যান্স', cols: [{ key: 'exam', label: 'পরীক্ষা' }, { key: 'participants', label: 'অংশগ্রহণ' }, { key: 'avg', label: 'গড়' }, { key: 'pass', label: 'পাস' }, { key: 'fail', label: 'ফেল' }],
+      })).filter((r) => r.students || r.batches),
+      summary: (rows) => [{ label: 'মোট ক্লাস', value: bn(rows.length) }]
+    },
+    batches: {
+      label: 'ব্যাচ রিপোর্ট', classScoped: false,
+      cols: [{ key: 'name', label: 'ব্যাচ' }, { key: 'className', label: 'ক্লাস' }, { key: 'teacher', label: 'শিক্ষক' }, { key: 'students', label: 'শিক্ষার্থী' }],
+      rows: () => db.batches.list(),
+      summary: (rows) => [{ label: 'মোট ব্যাচ', value: bn(rows.length) }]
+    },
+    exams: {
+      label: 'পরীক্ষা রিপোর্ট', classScoped: true,
+      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'subject', label: 'বিষয়' }, { key: 'startDate', label: 'তারিখ' }],
+      rows: () => db.exams.list(),
+      summary: (rows) => [{ label: 'মোট পরীক্ষা', value: bn(rows.length) }]
+    },
+    results: {
+      label: 'ফলাফল রিপোর্ট', classScoped: true,
+      cols: [{ key: 'studentName', label: 'শিক্ষার্থী' }, { key: 'className', label: 'ক্লাস' }, { key: 'examId', label: 'পরীক্ষা' }, { key: 'score', label: 'প্রাপ্ত' }, { key: 'total', label: 'পূর্ণ' }],
+      rows: () => db.examResults.list().map((r) => ({ ...r, className: db.students.find(r.studentId)?.className || '—' })),
+      summary: (rows) => {
+        const pcts = rows.map(pct);
+        return [
+          { label: 'মোট ফলাফল', value: bn(rows.length) },
+          { label: 'গড় ফলাফল', value: pcts.length ? `${bn(Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length))}%` : '—' }
+        ];
+      }
+    },
+    merit: {
+      label: 'মেধা তালিকা', classScoped: true,
+      cols: [{ key: 'position', label: 'অবস্থান' }, { key: 'studentName', label: 'শিক্ষার্থী' }, { key: 'className', label: 'ক্লাস' }, { key: 'percent', label: 'শতাংশ' }],
+      rows: () => leaderboard().slice(0, 50).map((r) => ({ position: r.position, studentName: r.studentName, className: db.students.find(r.studentId)?.className || '—', percent: `${r.pct}%` })),
+      summary: (rows) => [{ label: 'মোট শিক্ষার্থী', value: bn(rows.length) }]
+    },
+    performance: {
+      label: 'একাডেমিক পারফরম্যান্স', classScoped: true,
+      cols: [{ key: 'exam', label: 'পরীক্ষা' }, { key: 'className', label: 'ক্লাস' }, { key: 'participants', label: 'অংশগ্রহণ' }, { key: 'avg', label: 'গড়' }, { key: 'pass', label: 'পাস' }, { key: 'fail', label: 'ফেল' }],
       rows: () => db.exams.list().map((e) => {
         const rows = db.examResults.list().filter((r) => r.examId === e.id);
         const pcts = rows.map(pct);
         return {
-          exam: e.title, participants: rows.length,
+          exam: e.title, className: e.className, participants: rows.length,
           avg: pcts.length ? `${Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)}%` : '—',
           pass: pcts.filter((v) => v >= passMark).length,
           fail: pcts.filter((v) => v < passMark).length
         };
-      }) },
-    assignments: { label: 'অ্যাসাইনমেন্ট রিপোর্ট', cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'dueDate', label: 'শেষ তারিখ' }, { key: 'submitted', label: 'জমা' }, { key: 'checked', label: 'চেক' }],
+      }),
+      summary: (rows) => [{ label: 'মোট পরীক্ষা', value: bn(rows.length) }]
+    },
+    assignments: {
+      label: 'অ্যাসাইনমেন্ট রিপোর্ট', classScoped: true,
+      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'dueDate', label: 'শেষ তারিখ' }, { key: 'submitted', label: 'জমা' }, { key: 'checked', label: 'চেক' }],
       rows: () => db.assignments.list().map((a) => {
         const subs = db.submissions.list().filter((s) => s.assignmentId === a.id);
         return { ...a, submitted: subs.length, checked: subs.filter((s) => s.status === 'চেক হয়েছে').length };
-      }) },
-    materials: { label: 'ম্যাটেরিয়াল রিপোর্ট', cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'subject', label: 'বিষয়' }], rows: () => db.materials.list() },
-    daily: { label: 'দৈনিক আদায়', cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }, { key: 'method', label: 'মাধ্যম' }],
-      rows: () => db.payments.list().filter((p) => p.date === todayBn()) },
-    monthly: { label: 'মাসিক আদায়', cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }],
-      rows: () => { const m = String(todayBn()).slice(0, 7); return db.payments.list().filter((p) => String(p.date || '').slice(0, 7) === m); } },
-    due: { label: 'বকেয়া তালিকা', cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'পরিমাণ' }], rows: () => dueFees() },
-    payments: { label: 'পেমেন্ট ইতিহাস', cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }, { key: 'method', label: 'মাধ্যম' }, { key: 'reference', label: 'রেফারেন্স' }], rows: () => db.payments.list() },
-    ledger: { label: 'শিক্ষার্থী লেজার', cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'paid', label: 'পরিশোধিত' }, { key: 'due', label: 'বকেয়া' }],
+      }),
+      summary: (rows) => [{ label: 'মোট অ্যাসাইনমেন্ট', value: bn(rows.length) }]
+    },
+    materials: {
+      label: 'ম্যাটেরিয়াল রিপোর্ট', classScoped: true,
+      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'subject', label: 'বিষয়' }],
+      rows: () => db.materials.list(),
+      summary: (rows) => [{ label: 'মোট ম্যাটেরিয়াল', value: bn(rows.length) }]
+    },
+    daily: {
+      label: 'দৈনিক আদায়', classScoped: true,
+      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'method', label: 'মাধ্যম' }],
+      rows: () => payRows(db.payments.list().filter((p) => p.date === todayBn())),
+      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
+    },
+    monthly: {
+      label: 'মাসিক আদায়', classScoped: true,
+      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }],
+      rows: () => {
+        const m = String(todayBn()).slice(0, 7);
+        return payRows(db.payments.list().filter((p) => String(p.date || '').slice(0, 7) === m));
+      },
+      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
+    },
+    due: {
+      label: 'বকেয়া তালিকা', classScoped: true,
+      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'পরিমাণ' }],
+      rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.amount), _amount: Number(f.amount) || 0 })),
+      summary: (rows) => [{ label: 'মোট বকেয়া', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
+    },
+    payments: {
+      label: 'পেমেন্ট ইতিহাস', classScoped: true,
+      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }, { key: 'method', label: 'মাধ্যম' }, { key: 'reference', label: 'রেফারেন্স' }],
+      rows: () => payRows(db.payments.list()),
+      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
+    },
+    ledger: {
+      label: 'শিক্ষার্থী লেজার', classScoped: true,
+      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'paid', label: 'পরিশোধিত' }, { key: 'due', label: 'বকেয়া' }],
       rows: () => db.students.list().map((st) => ({
         studentId: st.id, name: st.name, className: st.className,
-        paid: db.payments.list().filter((p) => p.studentId === st.id).reduce((sum, p) => sum + Number(p.amount || 0), 0),
-        due: dueFees().filter((d) => d.studentId === st.id).reduce((sum, d) => sum + Number(d.amount || 0), 0)
-      })) },
-    discounts: { label: 'ছাড় রিপোর্ট', cols: [{ key: 'id', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'discount', label: 'ছাড়' }],
-      rows: () => db.students.list().filter((s) => Number(s.discount) > 0) },
-    activity: { label: 'অ্যাক্টিভিটি লগ', cols: [{ key: 'date', label: 'তারিখ' }, { key: 'user', label: 'ব্যবহারকারী' }, { key: 'role', label: 'রোল' }, { key: 'action', label: 'কাজ' }, { key: 'target', label: 'টার্গেট' }], rows: () => activityLogs() }
-  };
-  sel.innerHTML = Object.entries(reports).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-  const render = () => {
-    const r = reports[sel.value];
-    renderTable('#report-table', r.cols, r.rows());
-  };
-  sel.addEventListener('change', render);
-  document.getElementById('report-csv').addEventListener('click', () => {
-    const r = reports[sel.value];
-    downloadText(`${sel.value}-report.csv`, toCSV(r.cols, r.rows()), 'text/csv');
-  });
-
-  /* ---- PDF export: a clean standalone report document, no app UI ---- */
-  const exportReportPdf = async ({ title, subtitle, columns, rows, filename }) => {
-    const settings = db.settings.get();
-    const canvases = await renderReportCanvases({ settings, title, subtitle, columns, rows });
-    await canvasesToPdf(canvases, filename);
-  };
-
-  document.getElementById('report-pdf').addEventListener('click', async () => {
-    const r = reports[sel.value];
-    try {
-      await exportReportPdf({ title: r.label, columns: r.cols, rows: r.rows(), filename: `${sel.value}-report.pdf` });
-      showToast('PDF ডাউনলোড হয়েছে।', 'success');
-    } catch (e) {
-      showToast('PDF তৈরি করা যায়নি।', 'error');
+        paid: taka(db.payments.list().filter((p) => p.studentId === st.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)),
+        due: taka(dueFees().filter((d) => d.studentId === st.id).reduce((sum, d) => sum + Number(d.amount || 0), 0))
+      })),
+      summary: () => []
+    },
+    discounts: {
+      label: 'ছাড় রিপোর্ট', classScoped: true,
+      cols: [{ key: 'id', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'discount', label: 'ছাড়' }],
+      rows: () => db.students.list().filter((s) => Number(s.discount) > 0).map((s) => ({ id: s.id, name: s.name, className: s.className, discount: taka(s.discount) })),
+      summary: (rows) => [{ label: 'ছাড়প্রাপ্ত শিক্ষার্থী', value: bn(rows.length) }]
+    },
+    activity: {
+      label: 'অ্যাক্টিভিটি লগ', classScoped: false,
+      cols: [{ key: 'date', label: 'তারিখ' }, { key: 'user', label: 'ব্যবহারকারী' }, { key: 'role', label: 'রোল' }, { key: 'action', label: 'কাজ' }, { key: 'target', label: 'টার্গেট' }],
+      rows: () => activityLogs(),
+      summary: (rows) => [{ label: 'মোট কার্যক্রম', value: bn(rows.length) }]
     }
-  });
+  };
 
-  /* ---- Class-wise student report (mandatory Name + Unique ID) ---- */
-  const classSel = document.getElementById('report-class');
-  classSel.innerHTML = '<option value="">ক্লাস নির্বাচন করুন</option>'
+  sel.innerHTML = Object.entries(reports).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+  classSel.innerHTML = `<option value="${ALL_CLASSES}">সব ক্লাস</option>`
     + CLASS_OPTIONS.map((c) => `<option>${c}</option>`).join('');
 
-  const downloadClassPdf = async (className) => {
-    const students = db.students.list().filter((s) => s.className === className);
-    const { rows, incomplete } = classReportRows(students);
-    if (incomplete) showToast(`${bn(incomplete)} জনের নাম/আইডি অসম্পূর্ণ — রিপোর্টে চিহ্নিত করা হয়েছে।`, 'warning');
-    await exportReportPdf({
-      title: 'শিক্ষার্থী রিপোর্ট',
-      subtitle: `শ্রেণি: ${className}`,
-      columns: CLASS_REPORT_COLUMNS,
-      rows,
-      filename: `Student-Report-${classFileLabel(className)}.pdf`
-    });
+  const filteredRows = () => {
+    const r = reports[sel.value];
+    const cls = classSel.value || ALL_CLASSES;
+    let rows = r.rows();
+    if (r.classScoped && cls !== ALL_CLASSES) rows = rows.filter((row) => classNameOf(row) === cls);
+    return { r, cls, rows };
   };
 
-  document.getElementById('report-class-pdf').addEventListener('click', async () => {
-    const cls = classSel.value;
-    if (!cls) { showToast('ক্লাস নির্বাচন করুন।', 'error'); return; }
-    try {
-      await downloadClassPdf(cls);
-      showToast('PDF ডাউনলোড হয়েছে।', 'success');
-    } catch (e) {
-      showToast('PDF তৈরি করা যায়নি।', 'error');
-    }
+  const render = () => {
+    const { r, rows } = filteredRows();
+    renderTable('#report-table', r.cols, rows);
+  };
+  sel.addEventListener('change', render);
+  classSel.addEventListener('change', render);
+
+  document.getElementById('report-csv').addEventListener('click', () => {
+    const { r, cls, rows } = filteredRows();
+    downloadText(`${sel.value}-report.csv`, toCSV(r.cols, rows), 'text/csv');
   });
 
-  document.getElementById('report-all-pdf').addEventListener('click', async () => {
+  /**
+   * Build the document canvases for the selected report + class. Class-scoped
+   * reports are split into one section per class ("সব ক্লাস" → every class in
+   * its own section; a specific class → just that class).
+   */
+  const buildDocument = async (r, cls, rows) => {
     const settings = db.settings.get();
-    const classes = CLASS_OPTIONS.filter((c) => db.students.list().some((s) => s.className === c));
-    if (!classes.length) { showToast('কোনো শিক্ষার্থী নেই।', 'error'); return; }
-    try {
-      const canvases = [];
-      for (const cls of classes) {
-        const { rows } = classReportRows(db.students.list().filter((s) => s.className === cls));
+    const canvases = [];
+    if (r.classScoped) {
+      const classes = (cls && cls !== ALL_CLASSES)
+        ? [cls]
+        : (CLASS_OPTIONS.filter((c) => rows.some((row) => classNameOf(row) === c)) || []);
+      const sections = classes.length ? classes : [ALL_CLASSES];
+      for (const c of sections) {
+        const sectionRows = c === ALL_CLASSES ? rows : rows.filter((row) => classNameOf(row) === c);
         canvases.push(...await renderReportCanvases({
-          settings, title: 'শিক্ষার্থী রিপোর্ট', subtitle: `শ্রেণি: ${cls}`,
-          columns: CLASS_REPORT_COLUMNS, rows
+          settings, title: r.label,
+          subtitle: sections.length === 1 ? `শ্রেণি: ${c === ALL_CLASSES ? 'সব' : c}` : `শ্রেণি: ${c}`,
+          columns: r.cols, rows: sectionRows, summary: r.summary(sectionRows)
         }));
       }
-      await canvasesToPdf(canvases, 'Student-Report-All-Classes.pdf');
-      showToast('PDF ডাউনলোড হয়েছে।', 'success');
+    } else {
+      canvases.push(...await renderReportCanvases({
+        settings, title: r.label, subtitle: `তারিখ: ${todayBn()}`,
+        columns: r.cols, rows, summary: r.summary(rows)
+      }));
+    }
+    return canvases;
+  };
+
+  // Generate → Preview → Download PDF (never a direct download).
+  document.getElementById('report-generate').addEventListener('click', async () => {
+    const { r, cls, rows } = filteredRows();
+    try {
+      const canvases = await buildDocument(r, cls, rows);
+      const clsLabel = (cls && cls !== ALL_CLASSES) ? classFileLabel(cls) : 'All-Classes';
+      await previewDocument({
+        title: r.label,
+        meta: `শ্রেণি: ${cls === ALL_CLASSES ? 'সব' : cls} · ${todayBn()}`,
+        filename: `${sel.value}-report-${clsLabel}.pdf`,
+        canvases,
+        shareable: false
+      });
+      logActivity({ user: session.name, role: session.role, action: 'generated report', target: `${r.label} · ${cls}` });
     } catch (e) {
-      showToast('PDF তৈরি করা যায়নি।', 'error');
+      showToast('রিপোর্ট তৈরি করা যায়নি।', 'error');
     }
   });
 

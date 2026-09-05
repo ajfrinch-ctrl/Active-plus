@@ -676,3 +676,28 @@ test('classesInBatch derives class names from a batch label', async () => {
   assert.deepEqual(m.classesInBatch('নবম (বিজ্ঞান)'), ['নবম']);
   assert.deepEqual(m.classesInBatch(''), []);
 });
+
+test('nextReceiptNo is a unique, sequential YYYYMMDDXXX number per day', async () => {
+  const storage = makeLocalStorage();
+  installWindow(storage);
+  (await import('../js/store.js'))._clearMemoryStore();
+  const { db, nextReceiptNo } = await import('../js/data.js?page=receipt');
+
+  const fixed = new Date(2026, 8, 5); // 2026-09-05
+  const a = nextReceiptNo(fixed);
+  assert.match(a, /^20260905\d{3}$/, 'format is YYYYMMDD + 3-digit serial');
+  assert.equal(a, '20260905001', 'the first receipt of the day starts at 001');
+
+  // The caller persists the number; the next call then skips it — sequential.
+  db.payments.add({ id: 'pay-a', studentId: 'S1', amount: 100, receiptNo: a, date: '০৫/০৯' });
+  assert.equal(nextReceiptNo(fixed), '20260905002', 'the next receipt increments the serial');
+
+  // A persisted receipt number is never re-issued (collision-safe even if the
+  // payments collection already holds a higher one for today).
+  db.payments.add({ id: 'pay-r1', studentId: 'S1', amount: 100, receiptNo: '20260905007', date: '০৫/০৯' });
+  assert.equal(nextReceiptNo(fixed), '20260905008', 'skips past an already-used number');
+
+  // A different day resets to its own prefix/serial.
+  const other = new Date(2026, 8, 6);
+  assert.match(nextReceiptNo(other), /^20260906\d{3}$/, 'each day uses its own prefix');
+});

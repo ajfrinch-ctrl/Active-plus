@@ -13,7 +13,7 @@
  */
 
 import { db, CLASS_TO_NUMBER, ALL_CLASSES } from './data.js';
-import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, loadImage, makeCanvas, wrapText } from './pdf.js';
+import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, assetDataUrl, loadImage, makeCanvas, wrapText } from './pdf.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -479,7 +479,14 @@ function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
   ctx.strokeRect(pad, y, totalW, headerH);
   y += headerH;
 
-  // data rows
+  // data rows (or an honest empty state)
+  if (!rows.length) {
+    setFont(ctx, BODY, 400);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = MUTED;
+    ctx.fillText('কোনো তথ্য নেই।', width / 2, y + CELL_PAD / 2);
+    y += CELL_PAD + LH + 8;
+  }
   for (const row of rows) {
     const rh = rowHeight(ctx, columns, widths, row);
     x = pad;
@@ -505,13 +512,49 @@ function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
   ctx.textAlign = 'center';
   ctx.fillStyle = FAINT;
   ctx.fillText(`Active Plus · ${new Date().toLocaleDateString('bn-BD')}`, width / 2, pageHeight - pad - 14);
+
+  return y; // bottom of the table, so callers can append a summary
+}
+
+function summaryHeight(summary) {
+  return summary.length ? summary.length * LH + 40 : 0;
+}
+
+function paintSummary(ctx, width, pad, top, summary, paint) {
+  if (!summary.length) return top;
+  let y = top + 18;
+  if (paint) {
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(width - pad, y);
+    ctx.stroke();
+  }
+  y += 16;
+  for (const s of summary) {
+    if (paint) {
+      setFont(ctx, 24, 400);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = MUTED;
+      ctx.fillText(String(s.label), pad, y);
+      setFont(ctx, 24, 700);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = INK;
+      ctx.fillText(String(s.value), width - pad, y);
+    }
+    y += LH;
+  }
+  return y;
 }
 
 /**
  * Render a report into one or more A4 canvases (a new page is started when a
- * row would overflow). Returns an array of canvases ready for canvasesToPdf.
+ * row would overflow). `summary` is an optional `[{ label, value }]` totals
+ * block drawn after the final table row. Returns an array of canvases ready
+ * for canvasesToPdf.
  */
-export async function renderReportCanvases({ settings, title, subtitle, columns, rows }) {
+export async function renderReportCanvases({ settings, title, subtitle, columns, rows, summary = [] }) {
   await warmFonts();
   const opts = { settings, title, subtitle, logoImg: await loadLogo() };
   const { width, height } = PAGE;
@@ -523,15 +566,18 @@ export async function renderReportCanvases({ settings, title, subtitle, columns,
   const widths = columnWidths(pctx, columns, rows, usable);
   const headerH = tableHeaderHeight(pctx, columns, widths);
   const footerReserve = PAD + 60;
+  const pageLimit = height - footerReserve;
 
-  // paginate
+  // paginate, tracking how far down each page is filled so the summary has room
   const pages = [];
+  const usedYs = [];
   let current = [];
   let y = tableTop + headerH;
   for (const row of rows) {
     const rh = rowHeight(pctx, columns, widths, row);
-    if (current.length && y + rh > height - footerReserve) {
+    if (current.length && y + rh > pageLimit) {
       pages.push(current);
+      usedYs.push(y);
       current = [row];
       y = tableTop + headerH;
     } else {
@@ -540,14 +586,252 @@ export async function renderReportCanvases({ settings, title, subtitle, columns,
     }
   }
   pages.push(current);
+  usedYs.push(y);
 
-  return pages.map((chunk) => {
+  // if the summary will not fit on the final page, give it a page of its own
+  if (usedYs[usedYs.length - 1] + summaryHeight(summary) > pageLimit) {
+    pages.push([]);
+    usedYs.push(tableTop + headerH);
+  }
+
+  return pages.map((chunk, idx) => {
     const canvas = makeCanvas(width, height);
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
     const top = reportHeaderPass(ctx, width, PAD, opts, true);
-    paintTable(ctx, width, PAD, top, columns, widths, chunk, height);
+    const bottom = paintTable(ctx, width, PAD, top, columns, widths, chunk, height);
+    if (idx === pages.length - 1) paintSummary(ctx, width, PAD, bottom, summary, true);
     return canvas;
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* ID card, ledger and admission form documents                        */
+/* ------------------------------------------------------------------ */
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/**
+ * Student ID card — a clean standalone card (logo, institution, photo/initial,
+ * name, ID, class, roll, session, signature). Nothing else renders.
+ */
+export async function renderIdCardCanvas(student, opts = {}) {
+  await warmFonts();
+  const width = 760;
+  const settings = opts.settings || {};
+  const photo = student?.photo ? await assetDataUrl(student.photo) : null;
+  const photoImg = photo ? await loadImage(photo).catch(() => null) : null;
+  const fullOpts = { ...opts, student, settings, logoImg: await loadLogo(), photoImg };
+
+  const pass = (ctx, paint) => {
+    const pad = 40;
+    const inner = width - pad * 2;
+    let y = pad;
+    const org = settings || {};
+    ctx.textBaseline = 'top';
+
+    const center = (text, px, weight, color, lhMul = 1.4) => {
+      setFont(ctx, px, weight);
+      ctx.textAlign = 'center';
+      const lines = wrapText(ctx, text, inner);
+      const lh = Math.round(px * lhMul);
+      if (paint) {
+        ctx.fillStyle = color;
+        lines.forEach((ln, i) => ctx.fillText(ln, width / 2, y + i * lh));
+      }
+      y += lines.length * lh;
+    };
+
+    if (fullOpts.logoImg) {
+      if (paint) drawLogo(ctx, fullOpts.logoImg, width / 2, y, 96);
+      y += 96 + 8;
+    }
+    center(org.orgName || 'Active Plus', 32, 700, INK);
+    y += 8;
+    center('স্টুডেন্ট আইডি কার্ড', 22, 700, ACCENT);
+    y += 16;
+
+    // photo box
+    const boxW = 150;
+    const boxH = 176;
+    const boxX = (width - boxW) / 2;
+    if (paint) {
+      ctx.fillStyle = '#eef2f7';
+      roundRect(ctx, boxX, y, boxW, boxH, 12);
+      ctx.fill();
+      ctx.strokeStyle = BORDER;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      if (photoImg) {
+        const pw = photoImg.naturalWidth || photoImg.width;
+        const ph = photoImg.naturalHeight || photoImg.height;
+        if (pw && ph) {
+          const scale = Math.max(boxW / pw, boxH / ph);
+          const dw = pw * scale;
+          const dh = ph * scale;
+          ctx.save();
+          roundRect(ctx, boxX, y, boxW, boxH, 12);
+          ctx.clip();
+          ctx.drawImage(photoImg, boxX - (dw - boxW) / 2, y - (dh - boxH) / 2, dw, dh);
+          ctx.restore();
+        }
+      } else {
+        setFont(ctx, 64, 700);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#2563eb';
+        ctx.fillText(String(student?.name || 'অ').trim().charAt(0) || 'অ', width / 2, y + boxH / 2 - 36);
+      }
+    }
+    y += boxH + 20;
+
+    // fields
+    const fields = [
+      ['নাম', student?.name],
+      ['আইডি', student?.id],
+      ['শ্রেণি', student?.className],
+      ['রোল', student?.roll],
+      ['সেশন', student?.admissionDate || settings?.academicYear || '—']
+    ];
+    const labelW = Math.round(inner * 0.38);
+    const valueW = inner - labelW - 26;
+    const lh = 32;
+    for (const [label, value] of fields) {
+      setFont(ctx, 22, 400);
+      const ll = wrapText(ctx, label, labelW);
+      setFont(ctx, 24, 700);
+      const vl = wrapText(ctx, String(value ?? '—'), valueW);
+      const rowH = Math.max(ll.length, vl.length) * lh + 14;
+      if (paint) {
+        setFont(ctx, 22, 400);
+        ctx.textAlign = 'left';
+        ctx.fillStyle = MUTED;
+        ll.forEach((ln, i) => ctx.fillText(ln, pad, y + 7 + i * lh));
+        setFont(ctx, 24, 700);
+        ctx.fillStyle = INK;
+        vl.forEach((ln, i) => ctx.fillText(ln, pad + labelW + 26, y + 7 + i * lh));
+        ctx.strokeStyle = BORDER;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pad, y + rowH);
+        ctx.lineTo(pad + inner, y + rowH);
+        ctx.stroke();
+      }
+      y += rowH;
+    }
+
+    y += 30;
+    if (paint) {
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(pad + inner, y);
+      ctx.stroke();
+      setFont(ctx, 16, 400);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#374151';
+      ctx.fillText('প্রতিষ্ঠানের স্বাক্ষর', width / 2, y + 10);
+    }
+    y += 42;
+    return y + pad;
+  };
+
+  const probe = makeCanvas(width, 4);
+  const pctx = probe.getContext('2d');
+  const height = pass(pctx, false);
+
+  const canvas = makeCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = '#2563eb';
+  ctx.lineWidth = 4;
+  roundRect(ctx, 10, 10, width - 20, height - 20, 16);
+  ctx.stroke();
+  pass(ctx, true);
+  return canvas;
+}
+
+/** Student fee ledger — charges + payments with a running balance and totals. */
+export async function renderLedgerCanvases(student, opts = {}) {
+  const fees = db.fees.list().filter((f) => f.studentId === student.id);
+  const payments = db.payments.list().filter((p) => p.studentId === student.id);
+  let debit = 0;
+  let credit = 0;
+  const rows = [];
+  for (const f of fees) {
+    debit += Number(f.amount || 0);
+    rows.push({ date: f.date || '—', desc: `${f.month} ফি`, debit: taka(f.amount), credit: '', balance: taka(debit - credit) });
+  }
+  for (const p of payments) {
+    credit += Number(p.amount || 0);
+    rows.push({ date: p.date || '—', desc: `পেমেন্ট (${p.month})`, debit: '', credit: taka(p.amount), balance: taka(debit - credit) });
+  }
+  return renderReportCanvases({
+    settings: opts.settings || {},
+    title: 'ফি লেজার',
+    subtitle: `${student.name || student.id} · ${student.id}`,
+    columns: [
+      { key: 'date', label: 'তারিখ' },
+      { key: 'desc', label: 'বিবরণ' },
+      { key: 'debit', label: 'ডেবিট' },
+      { key: 'credit', label: 'ক্রেডিট' },
+      { key: 'balance', label: 'ব্যালেন্স' }
+    ],
+    rows,
+    summary: [
+      { label: 'মোট চার্জ', value: taka(debit) },
+      { label: 'মোট পরিশোধিত', value: taka(credit) },
+      { label: 'বর্তমান ব্যালেন্স', value: taka(debit - credit) }
+    ]
+  });
+}
+
+/** Admission form — the student's details as a clean two-column document. */
+export async function renderAdmissionFormCanvases(student, opts = {}) {
+  const fields = [
+    ['শিক্ষার্থীর নাম', student.name],
+    ['স্টুডেন্ট আইডি', student.id],
+    ['শ্রেণি', student.className],
+    ['শাখা (Section)', student.section],
+    ['রোল', student.roll],
+    ['ব্যাচ', student.batch],
+    ['স্কুল / কলেজ', student.school],
+    ['অভিভাবকের নাম', student.guardian],
+    ['অভিভাবকের মোবাইল', student.phone || student.guardianPhone],
+    ['ভর্তির তারিখ', student.admissionDate],
+    ['অবস্থা', student.status]
+  ];
+  return renderReportCanvases({
+    settings: opts.settings || {},
+    title: 'ভর্তি ফরম',
+    subtitle: 'Admission Form',
+    columns: [{ key: 'label', label: 'বিবরণ' }, { key: 'value', label: 'তথ্য' }],
+    rows: fields.map(([label, value]) => ({ label, value: value || '—' }))
+  });
+}
+
+export function receiptPdfFileName(pay) {
+  return `receipt-${pay.receiptNo || pay.id}.pdf`;
+}
+
+/** A receipt document ready for the shared preview → download/share flow. */
+export async function receiptPreviewDoc(pay, opts = {}) {
+  const canvas = await renderReceiptCanvas(pay, opts);
+  return {
+    title: 'পেমেন্ট রিসিট',
+    meta: `${pay.receiptNo || pay.id} · ${opts.student?.name || pay.studentId}`,
+    filename: receiptPdfFileName(pay),
+    canvases: [canvas],
+    shareable: true
+  };
 }
