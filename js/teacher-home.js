@@ -250,6 +250,16 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     if (btn && host.querySelector('#teacher-more')?.hidden) btn.click();
   }
 
+  /** Reset the home to the main dashboard (used when "হোম" is tapped again). */
+  function showHome() {
+    const more = host.querySelector('#teacher-more');
+    const content = host.querySelector('#teacher-home-content');
+    const btn = host.querySelector('#teacher-see-more');
+    if (more) more.hidden = true;
+    if (content) content.hidden = false;
+    if (btn) btn.textContent = 'আরও দেখুন ↓';
+  }
+
   renderSafe();
-  return { render: renderSafe, goto, openMore };
+  return { render: renderSafe, goto, openMore, showHome };
 }

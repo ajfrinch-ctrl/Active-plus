@@ -224,10 +224,21 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     }
   }
 
+  /** Reset the home to the main dashboard (used when "হোম" is tapped again). */
+  const showHome = () => {
+    const more = host.querySelector('#admin-more');
+    const content = host.querySelector('#admin-home-content');
+    const btn = host.querySelector('#admin-see-more');
+    if (more) more.hidden = true;
+    if (content) content.hidden = false;
+    if (btn) btn.textContent = 'আরও দেখুন ↓';
+  };
+
   renderSafe();
   return {
     render: renderSafe,
     goto,
+    showHome,
     openMore: () => {
       const btn = host.querySelector('#admin-see-more');
       if (btn && host.querySelector('#admin-more')?.hidden) btn.click();

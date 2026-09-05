@@ -1540,6 +1540,9 @@
           const key = btn.dataset.tab;
           if (key === 'more') { tabs?.activate?.('home'); adminHome?.openMore(); return; }
           tabs?.activate?.(key);
+          // Tapping "হোম" always brings back the main dashboard, even when the
+          // "আরও" grid is showing.
+          if (key === 'home') adminHome?.showHome();
         });
       });
       // Grid navigation (admin home tiles) drives the same tab panels; keep the

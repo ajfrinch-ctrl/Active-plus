@@ -634,6 +634,9 @@
               return;
             }
             tabs?.activate?.(key);
+            // Tapping "হোম" always brings back the main dashboard, even when the
+            // "আরও" grid is showing.
+            if (key === 'home') teacherHome?.showHome();
           });
         });
         const syncNav = () => {

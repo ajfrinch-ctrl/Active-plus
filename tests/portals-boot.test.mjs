@@ -147,6 +147,62 @@ test('admin portal boots and wires the home-content tabs', async () => {
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
+test('tapping হোম after আরও restores the admin dashboard', async () => {
+  const out = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'morehome'
+  });
+  const doc = out.dom.window.document;
+  const win = out.dom.window;
+
+  const content = doc.getElementById('admin-home-content');
+  const more = doc.getElementById('admin-more');
+  assert.ok(content && more, 'dashboard content and আরও grid exist');
+
+  // Open the More grid via the bottom navigation ("আরও").
+  doc.querySelector('.bottom-nav button[data-tab="more"]')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(more.hidden, false, 'the আরও grid is shown');
+  assert.equal(content.hidden, true, 'the dashboard is hidden while আরও is open');
+
+  // Tapping "হোম" must bring the main dashboard back.
+  doc.querySelector('.bottom-nav button[data-tab="home"]')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(content.hidden, false, 'the dashboard is visible again after হোম');
+  assert.equal(more.hidden, true, 'the আরও grid is hidden after হোম');
+  assert.equal(doc.getElementById('admin-see-more').textContent.trim(), 'আরও দেখুন ↓',
+    'the See More label is reset');
+
+  const fatal = out.errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('tapping হোম after আরও restores the teacher dashboard', async () => {
+  const out = await bootPage('teacher.html', {
+    username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'morehome'
+  });
+  const doc = out.dom.window.document;
+  const win = out.dom.window;
+
+  const content = doc.getElementById('teacher-home-content');
+  const more = doc.getElementById('teacher-more');
+  assert.ok(content && more, 'dashboard content and আরও grid exist');
+
+  doc.querySelector('.bottom-nav button[data-tab="more"]')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(more.hidden, false, 'the আরও grid is shown');
+  assert.equal(content.hidden, true, 'the dashboard is hidden while আরও is open');
+
+  doc.querySelector('.bottom-nav button[data-tab="home"]')
+    .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(content.hidden, false, 'the dashboard is visible again after হোম');
+  assert.equal(more.hidden, true, 'the আরও grid is hidden after হোম');
+  assert.equal(doc.getElementById('teacher-see-more').textContent.trim(), 'আরও দেখুন ↓',
+    'the See More label is reset');
+
+  const fatal = out.errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
 test('teacher portal boots and shows the student query inbox', async () => {
   const { doc, errors } = await bootPage('teacher.html', {
     username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher'
