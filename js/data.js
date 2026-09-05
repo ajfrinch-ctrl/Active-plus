@@ -665,59 +665,6 @@ export function downloadText(filename, text, mime = 'text/plain') {
   URL.revokeObjectURL(url);
 }
 
-/** Fast global search across key entities. */
-/**
- * Global search — results are scoped to what the caller may see (spec 58).
- *
- * admin    → everything
- * teacher  → only their own classes; never fees/payments
- * student  → only their own record, their class notices and shared material
- *
- * Passing no session behaves like the most restricted role, so a missing
- * session can never widen the result set.
- */
-export function globalSearch(query, session = null) {
-  const q = String(query || '').trim().toLowerCase();
-  const empty = { students: [], teachers: [], exams: [], payments: [], notices: [], materials: [] };
-  if (!q) return empty;
-  const has = (v) => String(v || '').toLowerCase().includes(q);
-  const role = session?.role || 'student';
-
-  if (role === 'admin') {
-    return {
-      students: db.students.list().filter((s) => has(s.id) || has(s.name) || has(s.phone) || has(s.className)),
-      teachers: db.teachers.list().filter((t) => has(t.name) || has(t.subject)),
-      exams: db.exams.list().filter((e) => has(e.title) || has(e.subject)),
-      payments: can('admin', 'viewFinance') ? db.payments.list().filter((p) => has(p.studentId) || has(p.month)) : [],
-      notices: db.notices.list().filter((n) => has(n.title)),
-      materials: db.materials.list().filter((m) => has(m.title) || has(m.subject))
-    };
-  }
-
-  if (role === 'teacher') {
-    const mine = teacherProfile(session.name).classNames;
-    return {
-      students: teacherStudents(session.name).filter((s) => has(s.id) || has(s.name) || has(s.roll)),
-      teachers: [],
-      exams: db.exams.list().filter((e) => mine.includes(e.className) && (has(e.title) || has(e.subject))),
-      payments: [], // teachers never see finance
-      notices: db.notices.list().filter((n) => (n.className === ALL_CLASSES || mine.includes(n.className)) && has(n.title)),
-      materials: db.materials.list().filter((m) => mine.includes(m.className) && (has(m.title) || has(m.subject)))
-    };
-  }
-
-  // Student (or unknown role): own record and own class only.
-  const me = db.students.find(session?.username) || db.students.find(session?.uid);
-  const myClass = me?.className;
-  return {
-    students: me && (has(me.id) || has(me.name)) ? [me] : [],
-    teachers: [],
-    exams: db.exams.list().filter((e) => e.className === myClass && has(e.title)),
-    payments: [],
-    notices: me ? noticesFor(me).filter((n) => has(n.title)) : [],
-    materials: db.materials.list().filter((m) => m.className === myClass && has(m.title))
-  };
-}
 /* ------------------------------------------------------------------ */
 /* Student Home helpers — all computed live from stored data           */
 /* ------------------------------------------------------------------ */

@@ -8,7 +8,7 @@ import { _clearMemoryStore } from '../js/store.js';
 import {
   db, can, assertCan, teacherCanAccessClass, PERMISSIONS, DEFAULT_PERMISSIONS,
   teacherProfile, teacherStudents, teacherMaterials, teacherExams,
-  checkSubmission, submitAssignment, getDbStatus, _setRemoteTransport, globalSearch
+  checkSubmission, submitAssignment, getDbStatus, _setRemoteTransport
 } from '../js/data.js';
 
 const TEACHER = { role: 'teacher', name: 'রাহেলা আক্তার' };
@@ -108,31 +108,4 @@ test('database status reports a failed sync honestly', () => {
   _setRemoteTransport(null);
 });
 
-test('global search is scoped to the caller role', () => {
-  _clearMemoryStore();
-  // 'নবম' matches two seeded students — a good probe for scope differences.
-  const admin = globalSearch('নবম', { role: 'admin', name: 'অ্যাডমিন' });
-  assert.equal(admin.students.length, 2, 'admin sees every matching student');
-  assert.ok('payments' in admin, 'admin may see finance');
 
-  const teacher = globalSearch('সুমাইয়া', TEACHER);
-  assert.ok(teacher.students.length >= 1, 'teacher finds a student in their own class');
-  assert.deepEqual(teacher.payments, [], 'teachers never see payments');
-  assert.deepEqual(teacher.teachers, [], 'no teacher directory for teachers');
-
-  const otherClass = globalSearch('নাফিস', TEACHER);
-  assert.deepEqual(otherClass.students, [], 'a student from another class is invisible');
-
-  const student = globalSearch('আরিয়ান', { role: 'student', username: '2026-09-001' });
-  assert.equal(student.students.length, 1, 'student finds only themselves');
-  assert.deepEqual(student.payments, [], 'no finance for students');
-  assert.deepEqual(globalSearch('সুমাইয়া', { role: 'student', username: '2026-09-001' }).students, [],
-    'one student cannot find another');
-});
-
-test('search without a session is as restricted as a student', () => {
-  _clearMemoryStore();
-  const anon = globalSearch('আরিয়ান');
-  assert.deepEqual(anon.students, [], 'no session, no records');
-  assert.deepEqual(anon.payments, []);
-});

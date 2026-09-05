@@ -147,7 +147,8 @@ a { color: var(--accent); }
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem var(--gutter) calc(1.5rem + var(--safe-bottom));
+  /* Room for the fixed bottom navigation so the last row is never hidden. */
+  padding: 1rem var(--gutter) calc(76px + var(--safe-bottom));
   padding-left: max(var(--gutter), var(--safe-left));
   padding-right: max(var(--gutter), var(--safe-right));
 }
@@ -680,7 +681,7 @@ a { color: var(--accent); }
 @media (min-width: 1024px) {
   .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .top-tab-bar { justify-content: flex-start; gap: 0.5rem; padding: 0.5rem 1rem; }
-  .app-main { padding: 1.5rem 1.5rem 2rem; }
+  .app-main { padding: 1.5rem 1.5rem calc(84px + var(--safe-bottom)); }
 }
 
 /* Landscape phones: keep everything reachable without clipping */
@@ -704,6 +705,7 @@ a { color: var(--accent); }
 @media print {
   body { background: #fff; color: #000; }
   .app-header, .top-tab-bar, .bottom-nav, .toast-container { display: none !important; }
+  .app-main { padding-bottom: 1.5rem !important; }
 
   /* Report letterhead printed at the top of every exported report. */
   .print-header {

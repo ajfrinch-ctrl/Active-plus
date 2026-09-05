@@ -6,7 +6,7 @@
 
 import {
   db, analytics, examSummary, classPerformance, leaderboard, exportBackup, importBackup,
-  parseMcqPaste, parseMcqCsv, toCSV, downloadText, globalSearch, logActivity, activityLogs,
+  parseMcqPaste, parseMcqCsv, toCSV, downloadText, logActivity, activityLogs,
   todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor,
   admissionTrend, collectionTrend, dueTrend, subjectPerformance, passRate,
   PERMISSIONS, DEFAULT_PERMISSIONS, getDbStatus
@@ -24,7 +24,6 @@ const onlineFor = (action) => requireOnline(action, getDbStatus);
 
 export function mountExtraAdmin(session) {
   mountDashboard(session);
-  mountGlobalSearch(session);
   mountClasses(session);
   mountSubjects(session);
   mountMaterials(session);
@@ -84,26 +83,6 @@ function mountDashboard(session) {
       : connected ? `ডেটাবেস: সংযুক্ত · শেষ সিঙ্ক: ${todayBn()}` : 'ডেটাবেস: বিচ্ছিন্ন (অফলাইন)';
   });
   logActivity({ user: session.name, role: session.role, action: 'viewed dashboard' });
-}
-
-/* ---------------- Global search ---------------- */
-function mountGlobalSearch(session) {
-  const input = document.getElementById('global-search');
-  const out = document.getElementById('global-results');
-  if (!input || !out) return;
-  input.addEventListener('input', () => {
-    const r = globalSearch(input.value, session);
-    const total = Object.values(r).reduce((s, arr) => s + arr.length, 0);
-    if (!input.value.trim()) { out.innerHTML = ''; return; }
-    out.innerHTML = total
-      ? `<div class="card">
-          ${r.students.map((s) => `<p>🎓 ${escapeHtml(s.name)} (${escapeHtml(s.id)})</p>`).join('')}
-          ${r.teachers.map((t) => `<p>🧑🏫 ${escapeHtml(t.name)}</p>`).join('')}
-          ${r.exams.map((e) => `<p>📝 ${escapeHtml(e.title)}</p>`).join('')}
-          ${r.notices.map((n) => `<p>📣 ${escapeHtml(n.title)}</p>`).join('')}
-        </div>`
-      : '<div class="card"><p>কিছু পাওয়া যায়নি।</p></div>';
-  });
 }
 
 /* ---------------- Simple CRUD modules ---------------- */
