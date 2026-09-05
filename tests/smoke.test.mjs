@@ -216,17 +216,30 @@ test('dashboard pages share the mobile app shell', () => {
     const dom = new JSDOM(read(page));
     const { document } = dom.window;
     assert.ok(document.querySelector('.app-header'), `${page} has header`);
-    assert.ok(document.querySelector('.top-tab-bar[role="tablist"]'), `${page} has tablist`);
     assert.ok(document.getElementById('logout-btn'), `${page} has logout`);
-    const buttons = document.querySelectorAll('.top-tab-bar button[data-tab]');
+    assert.ok(document.querySelector('.bottom-nav'), `${page} has bottom navigation`);
     const panels = document.querySelectorAll('.tab-panel');
-    assert.ok(buttons.length >= 3, `${page} has several tabs`);
-    for (const button of buttons) {
-      assert.ok(
-        [...panels].some((panel) => panel.id === `tab-${button.dataset.tab}`),
-        `${page}: every tab button has a panel (${button.dataset.tab})`
-      );
+    assert.ok(panels.length >= 3, `${page} has several panels`);
+
+    if (page === 'teacher.html') {
+      // Teacher keeps the top tab bar; every tab button must map to a panel.
+      const bar = document.querySelector('.top-tab-bar[role="tablist"]');
+      assert.ok(bar, `${page} has tablist`);
+      const buttons = bar.querySelectorAll('button[data-tab]');
+      assert.ok(buttons.length >= 3, `${page} has several tabs`);
+      for (const button of buttons) {
+        assert.ok(
+          [...panels].some((panel) => panel.id === `tab-${button.dataset.tab}`),
+          `${page}: every tab button has a panel (${button.dataset.tab})`
+        );
+      }
+    } else {
+      // Admin navigates through the app-style grid (rendered by js/admin-home.js),
+      // so there is no top tab bar.
+      assert.equal(document.querySelector('.top-tab-bar'), null, 'admin has no top tab bar');
+      assert.ok(document.getElementById('admin-home'), 'admin home grid shell present');
     }
+
     // Tables are wrapped so the page itself never scrolls sideways.
     document.querySelectorAll('table.table').forEach((table) => {
       assert.equal(table.parentElement.classList.contains('table-wrap'), true, `${page}: table wrapped`);

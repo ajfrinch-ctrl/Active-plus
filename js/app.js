@@ -49,29 +49,37 @@ export function mountHeader(session = currentSession()) {
  */
 export function initTabs({ storageKey = 'activeplus_tab' } = {}) {
   const bar = document.querySelector('.top-tab-bar');
-  if (!bar) return null;
-  const buttons = Array.from(bar.querySelectorAll('button[data-tab]'));
-  if (!buttons.length) return null;
+  const buttons = bar ? Array.from(bar.querySelectorAll('button[data-tab]')) : [];
+  // When there is no top tab bar (app-style grid navigation), derive the tab
+  // list from the panels themselves so the same switcher still works.
+  const panels = Array.from(document.querySelectorAll('.tab-panel[id^="tab-"]'));
+  const tabNames = buttons.length
+    ? buttons.map((button) => button.dataset.tab)
+    : panels.map((panel) => panel.id.replace(/^tab-/, ''));
+  if (!tabNames.length) return null;
 
   const page = window.location.pathname.split('/').pop() || 'page';
   const memoryKey = `${storageKey}:${page}`;
 
   const activate = (name, { focus = false } = {}) => {
-    let target = buttons.find((b) => b.dataset.tab === name);
-    if (!target) target = buttons[0];
+    const target = tabNames.includes(name) ? name : tabNames[0];
     buttons.forEach((button) => {
-      const selected = button === target;
+      const selected = button.dataset.tab === target;
       button.setAttribute('aria-selected', String(selected));
       button.tabIndex = selected ? 0 : -1;
     });
-    buttons.forEach((button) => {
-      const panel = document.getElementById(`tab-${button.dataset.tab}`);
-      if (panel) panel.hidden = button !== target;
+    panels.forEach((panel) => {
+      panel.hidden = panel.id !== `tab-${target}`;
     });
-    target.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-    if (focus) target.focus();
-    try { window.localStorage.setItem(memoryKey, target.dataset.tab); } catch (e) { /* ignore */ }
-    return target.dataset.tab;
+    const targetBtn = bar ? bar.querySelector(`button[data-tab="${target}"]`) : null;
+    if (targetBtn) {
+      targetBtn.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      if (focus) targetBtn.focus();
+    }
+    try { window.localStorage.setItem(memoryKey, target); } catch (e) { /* ignore */ }
+    // Let app-style shells (bottom nav, grids) stay in sync with the active tab.
+    window.dispatchEvent(new window.CustomEvent('tabchange', { detail: { tab: target } }));
+    return target;
   };
 
   buttons.forEach((button, index) => {
@@ -92,7 +100,7 @@ export function initTabs({ storageKey = 'activeplus_tab' } = {}) {
   let initial = null;
   try { initial = window.localStorage.getItem(memoryKey); } catch (e) { /* ignore */ }
   if (!initial && window.location.hash.startsWith('#')) initial = window.location.hash.slice(1);
-  const current = activate(initial || buttons[0].dataset.tab);
+  const current = activate(initial || tabNames[0]);
   // Expose the switcher so app-style shells (bottom nav, feature grids, More
   // menu) can drive the very same panels instead of duplicating them.
   return { activate, current, buttons };

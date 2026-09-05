@@ -95,6 +95,12 @@ test('admin portal boots and wires the home-content tabs', async () => {
   assert.ok(doc.querySelectorAll('#admin-features .tile').length >= 8, 'feature grid rendered');
   assert.ok(doc.querySelectorAll('#admin-quick .chip').length >= 6, 'quick actions rendered');
   assert.ok(doc.getElementById('admin-see-more'), 'See More control present');
+  // the grid is the only navigation now — every tile must land on a real panel
+  for (const tile of doc.querySelectorAll('#admin-home [data-goto]')) {
+    const key = tile.dataset.goto;
+    if (key === 'logout') continue;
+    assert.ok(doc.getElementById(`tab-${key}`), `admin grid tile "${key}" has a panel`);
+  }
   // hero numbers are the real seeded counts (4 students, 4 teachers, 3 batches)
   const overview = doc.getElementById('institute-overview').textContent;
   assert.ok(overview.includes('৪'), 'real counts shown in Bengali digits');
@@ -514,7 +520,10 @@ test('the submissions review table paginates instead of painting every row', asy
   const total = data.db.submissions.list().length;
   assert.ok(total > 25, `collection is bigger than one page (has ${total})`);
 
-  doc.querySelector('[data-tab="submissions"]')
+  // Navigation is the app-style grid now: reveal the More grid, then open
+  // the Submissions tile (the same panel the old top bar used to switch to).
+  doc.getElementById('admin-see-more').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  doc.querySelector('#admin-more [data-goto="submissions"]')
     .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
 
   // Checking one submission re-renders the table; that render must paginate.

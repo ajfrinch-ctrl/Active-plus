@@ -43,6 +43,7 @@ const MORE_ITEMS = [
   { key: 'submissions', icon: '✅', label: 'জমাকৃত কাজ' },
   { key: 'routine', icon: '📅', label: 'রুটিন' },
   { key: 'notices', icon: '📢', label: 'নোটিশ' },
+  { key: 'suggestion', icon: '📝', label: 'সাজেশন' },
   { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
   { key: 'analytics', icon: '📈', label: 'অ্যানালিটিক্স' },
   { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি' },

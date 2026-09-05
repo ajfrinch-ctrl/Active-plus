@@ -41,36 +41,6 @@
       </header>
       <div id="global-results" class="container" style="position:absolute;top:56px;right:.5rem;z-index:60;max-width:320px"></div>
 
-      <nav class="top-tab-bar" role="tablist" aria-label="অ্যাডমিন মেনু">
-        <button type="button" data-tab="home" aria-selected="true">🏠 হোম</button>
-        <button type="button" data-tab="overview">ড্যাশবোর্ড</button>
-        <button type="button" data-tab="batches">ব্যাচ</button>
-        <button type="button" data-tab="students">শিক্ষার্থী</button>
-        <button type="button" data-tab="dues">বকেয়া ও পেমেন্ট</button>
-        <button type="button" data-tab="teachers">শিক্ষক</button>
-        <button type="button" data-tab="notices">নোটিশ</button>
-        <button type="button" data-tab="suggestion">সাজেশন</button>
-        <button type="button" data-tab="exam">MCQ পরীক্ষা</button>
-        <button type="button" data-tab="classes">ক্লাস</button>
-        <button type="button" data-tab="subjects">বিষয়</button>
-        <button type="button" data-tab="questionbank">প্রশ্ন ব্যাংক</button>
-        <button type="button" data-tab="results">ফলাফল</button>
-        <button type="button" data-tab="materials">ম্যাটেরিয়াল</button>
-        <button type="button" data-tab="assignments">অ্যাসাইনমেন্ট</button>
-        <button type="button" data-tab="submissions">জমাকৃত কাজ</button>
-        <button type="button" data-tab="routine">রুটিন</button>
-        <button type="button" data-tab="notifications">নোটিফিকেশন</button>
-        <button type="button" data-tab="analytics">অ্যানালিটিক্স</button>
-        <button type="button" data-tab="reports">রিপোর্ট</button>
-        <button type="button" data-tab="users">ইউজার</button>
-        <button type="button" data-tab="activity">অ্যাক্টিভিটি লগ</button>
-        <button type="button" data-tab="backup">ব্যাকআপ</button>
-        <button type="button" data-tab="tips">💡 টিপ</button>
-        <button type="button" data-tab="banners">📢 ব্যানার</button>
-        <button type="button" data-tab="profile">প্রোফাইল</button>
-        <button type="button" data-tab="settings">সেটিংস</button>
-      </nav>
-
       <main class="app-main">
         <!-- ============ App-style Admin Home ============ -->
         <section class="tab-panel" id="tab-home">
@@ -1495,14 +1465,20 @@
           tabs?.activate?.(key);
         });
       });
-      const syncAdminNav = () => {
-        const current = document.querySelector('.top-tab-bar button[aria-selected="true"]')?.dataset.tab;
+      // Grid navigation (admin home tiles) drives the same tab panels; keep the
+      // bottom navigation highlight and the notification bell in sync with it.
+      const syncAdminNav = (key) => {
         document.querySelectorAll('.bottom-nav button[data-tab]').forEach((b) => {
-          b.setAttribute('aria-current', String(b.dataset.tab === current));
+          b.setAttribute('aria-current', String(b.dataset.tab === key));
         });
-        refreshAdminBell();
       };
-      document.querySelector('.top-tab-bar')?.addEventListener('click', syncAdminNav);
+      window.addEventListener('tabchange', (event) => {
+        syncAdminNav(event.detail?.tab);
+        refreshAdminBell();
+      });
+      // Initial highlight only. The bell is already correct from renderOverview();
+      // re-checking it here would surface the just-logged "viewed dashboard".
+      syncAdminNav(tabs?.current);
     </script>
   </body>
 </html>
