@@ -238,20 +238,29 @@ test('every report in the report centre renders without error', async () => {
   const { doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'reports'
   });
+  const win = doc.defaultView;
   const sel = doc.getElementById('report-type');
   assert.ok(sel, 'report selector exists');
   const options = [...sel.options];
   assert.ok(options.length >= 15, `spec 45 asks for 15+ reports, found ${options.length}`);
 
   const table = doc.getElementById('report-table');
+  // No data is shown before Generate — only a hint.
+  assert.match(table.textContent, /Generate/, 'placeholder shown before Generate');
+
   for (const opt of options) {
     sel.value = opt.value;
-    sel.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+    doc.getElementById('report-generate')
+      .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 50));
     // a report either renders rows or shows an honest empty state — never blanks out
     const body = table.querySelector('tbody');
     const rendered = body.children.length > 0 || /নেই|কোনো/.test(table.textContent);
     assert.ok(rendered, `report "${opt.textContent}" (${opt.value}) rendered rows or an empty state`);
     assert.ok(table.querySelector('thead th'), `report "${opt.value}" has column headers`);
+    assert.ok(doc.getElementById('document-preview-modal').classList.contains('active'),
+      `report "${opt.value}" opened the preview`);
   }
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
@@ -304,6 +313,7 @@ test('student profile sheet shows ID card, fee ledger and results', async () => 
   assert.ok(card.textContent.includes('2026-09-002'), 'shows the student id');
   assert.ok(card.textContent.includes('সুমাইয়া ইসলাম'), 'shows the student name');
   assert.ok(card.textContent.includes('নবম'), 'shows the class');
+  assert.equal(card.textContent.includes('সক্রিয়'), false, 'active/inactive status is not on the ID card');
 
   // fee ledger: this student has 1200 outstanding in the seed data
   assert.match(body.textContent, /ফি লেজার/);
@@ -600,14 +610,21 @@ test('the report class filter yields only that class data', async () => {
   const win = doc.defaultView;
   const sel = doc.getElementById('report-type');
   const classSel = doc.getElementById('report-class');
+  const generate = doc.getElementById('report-generate');
+  const tableRows = () => [...doc.querySelectorAll('#report-table tbody tr')].map((r) => r.textContent);
 
   sel.value = 'students';
   sel.dispatchEvent(new win.Event('change', { bubbles: true }));
 
-  // One specific class: only its students are rendered in the on-screen table.
+  // Nothing is shown before Generate, even after picking type + class.
   classSel.value = 'নবম';
   classSel.dispatchEvent(new win.Event('change', { bubbles: true }));
-  let rows = [...doc.querySelectorAll('#report-table tbody tr')].map((r) => r.textContent);
+  assert.match(doc.getElementById('report-table').textContent, /Generate/, 'no data before Generate');
+
+  // One specific class: only its students are rendered after Generate.
+  generate.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  let rows = tableRows();
   assert.equal(rows.length, 2, 'only the নবম students are shown');
   assert.ok(rows.every((t) => t.includes('নবম')), 'every rendered row belongs to নবম');
   assert.ok(!rows.some((t) => t.includes('নাফিস ইকবাল')), 'a দশম student is excluded');
@@ -615,7 +632,9 @@ test('the report class filter yields only that class data', async () => {
   // All classes: every seeded student appears.
   classSel.value = 'সব ক্লাস';
   classSel.dispatchEvent(new win.Event('change', { bubbles: true }));
-  rows = [...doc.querySelectorAll('#report-table tbody tr')];
+  generate.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+  rows = tableRows();
   assert.equal(rows.length, 4, 'all four seeded students are shown without a filter');
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));

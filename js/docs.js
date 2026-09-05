@@ -429,7 +429,10 @@ function columnWidths(ctx, columns, rows, usable) {
     const scale = usable / total;
     return req.map((w) => Math.max(48, w * scale));
   }
-  return req;
+  // Spread any leftover space across the columns so the table always spans the
+  // full page width — a short report must not sit squeezed onto one side.
+  const extra = (usable - total) / columns.length;
+  return req.map((w) => w + extra);
 }
 
 function cellLines(ctx, columns, widths, row) {
@@ -808,8 +811,7 @@ export async function renderAdmissionFormCanvases(student, opts = {}) {
     ['স্কুল / কলেজ', student.school],
     ['অভিভাবকের নাম', student.guardian],
     ['অভিভাবকের মোবাইল', student.phone || student.guardianPhone],
-    ['ভর্তির তারিখ', student.admissionDate],
-    ['অবস্থা', student.status]
+    ['ভর্তির তারিখ', student.admissionDate]
   ];
   return renderReportCanvases({
     settings: opts.settings || {},

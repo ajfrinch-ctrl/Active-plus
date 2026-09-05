@@ -912,7 +912,6 @@
               ${field('অভিভাবকের নাম', student.guardian || '—')}
               ${field('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}
               ${field('ভর্তির তারিখ', student.admissionDate || '—')}
-              ${field('অবস্থা', student.status || '—')}
             </div>
             <div class="af-sign">
               <div class="af-sign-col"><div class="af-line"></div><div>অভিভাবকের স্বাক্ষর</div></div>
@@ -982,7 +981,7 @@
             <div class="meta">${escapeHtml(st.id)}</div>
             <div class="meta">${escapeHtml(st.className || '')}${st.section ? ` · ${escapeHtml(st.section)}` : ''}${st.roll ? ` · রোল ${escapeHtml(st.roll)}` : ''}</div>
             <div class="meta">${escapeHtml(st.phone || '')}</div>
-            <div class="meta">ভর্তি: ${escapeHtml(st.admissionDate || '—')} · ${escapeHtml(st.status || '')}</div>
+            <div class="meta">ভর্তি: ${escapeHtml(st.admissionDate || '—')}</div>
           </div>
 
           <h3 style="margin-top:1rem">অভিভাবক তথ্য</h3>

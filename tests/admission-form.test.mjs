@@ -135,6 +135,9 @@ test('admission form renders org header + student details and prints a PDF', asy
   assert.ok(sheet.textContent.includes('নতুন ভর্তি শিক্ষার্থী'), 'student name present');
   assert.match(sheet.textContent, /ভর্তি ফরম/);
   assert.ok(sheet.textContent.includes('অভিভাবকের স্বাক্ষর'), 'signature area present');
+  // The student's active/inactive status must never appear on the form.
+  assert.equal(sheet.textContent.includes('অবস্থা'), false, 'no status field on the admission form');
+  assert.equal(sheet.textContent.includes('সক্রিয়'), false, 'no active/inactive status on the admission form');
 
   // Preview-first: the PDF button opens the shared document preview (it must
   // never call window.print() directly).

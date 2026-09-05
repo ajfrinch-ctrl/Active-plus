@@ -657,8 +657,17 @@ function mountReports(session) {
     const { r, rows } = filteredRows();
     renderTable('#report-table', r.cols, rows);
   };
-  sel.addEventListener('change', render);
-  classSel.addEventListener('change', render);
+
+  // No data is shown before Generate — entering the Reports panel shows only a
+  // hint. Selecting a different type/class clears any previously generated data.
+  const showPlaceholder = () => {
+    const table = document.getElementById('report-table');
+    if (table) {
+      table.innerHTML = '<thead><tr></tr></thead><tbody><tr><td colspan="8"><div class="empty-state">রিপোর্ট Generate করলে তথ্য এখানে দেখাবে।</div></td></tr></tbody>';
+    }
+  };
+  sel.addEventListener('change', showPlaceholder);
+  classSel.addEventListener('change', showPlaceholder);
 
   document.getElementById('report-csv').addEventListener('click', () => {
     const { r, cls, rows } = filteredRows();
@@ -695,9 +704,11 @@ function mountReports(session) {
     return canvases;
   };
 
-  // Generate → Preview → Download PDF (never a direct download).
+  // Generate → Preview → Download PDF (never a direct download). Only after
+  // Generate is the on-screen table populated, alongside the preview popup.
   document.getElementById('report-generate').addEventListener('click', async () => {
     const { r, cls, rows } = filteredRows();
+    render(); // show the filtered data on screen
     try {
       const canvases = await buildDocument(r, cls, rows);
       const clsLabel = (cls && cls !== ALL_CLASSES) ? classFileLabel(cls) : 'All-Classes';
@@ -714,7 +725,7 @@ function mountReports(session) {
     }
   });
 
-  render();
+  showPlaceholder();
 }
 
 /* ---------------- Users & permissions ---------------- */

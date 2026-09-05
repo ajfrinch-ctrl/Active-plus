@@ -181,3 +181,36 @@ test('canvas renderers draw and paginate without any SVG foreignObject', async (
     delete globalThis.document;
   }
 });
+
+test('short tables stretch to span the full page width (no one-sided layout)', async () => {
+  // Record strokeRect calls so we can assert the table border reaches the right
+  // margin even for a two-column document (e.g. the admission form).
+  const rects = [];
+  const fakeCtx = {
+    fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textBaseline: 'top', textAlign: 'left',
+    fillText: () => {},
+    fillRect: (x, y, w, h) => rects.push(['fill', x, w]),
+    strokeRect: (x, y, w, h) => rects.push(['stroke', x, w]),
+    beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {}, drawImage: () => {},
+    measureText: (t) => ({ width: String(t).length * 12 })
+  };
+  const makeCanvas = (w, h) => ({ width: w, height: h, getContext: () => fakeCtx });
+  globalThis.document = {
+    baseURI: 'http://localhost/',
+    createElement: (tag) => (tag === 'canvas' ? makeCanvas(0, 0) : { style: {} })
+  };
+  try {
+    const { renderAdmissionFormCanvases } = await import('../js/docs.js');
+    const [canvas] = await renderAdmissionFormCanvases(
+      { id: 'S1', name: 'রহিম', className: 'নবম', roll: '০১', guardian: 'করিম', phone: '০১৭১১-০০০০০১' },
+      { settings: { orgName: 'Active Plus' } }
+    );
+    assert.equal(canvas.width, 1240, 'A4 page');
+    const usable = 1240 - 60 * 2; // page width minus the left/right margins
+    const tableStrokes = rects.filter(([k, x]) => k === 'stroke' && x === 60);
+    assert.ok(tableStrokes.some(([, , w]) => w === usable),
+      `the table border spans the full ${usable}px usable width (strokes: ${JSON.stringify(tableStrokes)})`);
+  } finally {
+    delete globalThis.document;
+  }
+});
