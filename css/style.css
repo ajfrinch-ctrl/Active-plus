@@ -5,27 +5,34 @@
    ========================================================================== */
 
 :root {
-  --primary: #2d3748;
-  --primary-dark: #232c3a;
-  --secondary: #4a5568;
-  --accent: #4299e1;
-  --accent-dark: #2b6cb0;
-  --success: #38a169;
-  --warning: #d69e2e;
-  --error: #e53e3e;
-  --light: #edf2f7;
-  --dark: #1a202c;
-  --white: #ffffff;
+  color-scheme: dark;
 
-  /* Previously referenced but never declared — declared now so borders and
-     secondary text render instead of falling back to `unset`. */
-  --border: rgba(255, 255, 255, 0.12);
-  --border-strong: rgba(255, 255, 255, 0.2);
-  --text-light: #cbd5e0;
-  --text-muted: #a0aec0;
+  /* ---- Full dark (AMOLED-friendly) palette ---- */
+  --bg: #05070a;            /* page background */
+  --primary: #05070a;       /* app background */
+  --primary-dark: #0b0f15;  /* header / raised chrome */
+  --secondary: #12171f;     /* modals, toasts, sheets */
+  --elevated: #161c25;
 
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-hover: rgba(255, 255, 255, 0.09);
+  --accent: #4c9ffe;
+  --accent-dark: #2f7fd6;
+  --success: #35c07a;
+  --warning: #e0a92c;
+  --error: #f2555a;
+  --light: #e6ebf2;
+  --dark: #000000;
+  --white: #f2f5f9;         /* soft white — easier on the eyes at night */
+  --brand: #4c9ffe;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #e6ebf2;
+  --text-light: #c3ccd8;
+  --text-muted: #8b95a4;
+
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --surface-solid: #10151c;
 
   --radius-sm: 8px;
   --radius: 12px;
@@ -40,6 +47,14 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 }
+
+/* Dark scrollbars + form controls (Android WebView / Chrome) */
+html { background: var(--bg); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #232a34; border-radius: 999px; }
+::selection { background: rgba(76, 159, 254, 0.35); color: #fff; }
+input, select, textarea, button { color-scheme: dark; }
 
 *,
 *::before,
@@ -216,7 +231,7 @@ a { color: var(--accent); }
 .auth-head { text-align: center; margin-bottom: 1.25rem; }
 .logo {
   width: 84px; height: 84px; margin: 0 auto 1rem;
-  background: var(--white);
+  background: #ffffff;
   border-radius: 20px; display: grid; place-items: center;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
   padding: 8px;
@@ -312,7 +327,7 @@ a { color: var(--accent); }
   background: rgba(255, 255, 255, 0.14);
   box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.25);
 }
-.form-select option { color: #1a202c; }
+.form-select option { background: var(--surface-solid); color: var(--text); }
 .form-textarea { min-height: 120px; resize: vertical; }
 
 .input-wrap input { padding-right: 3.25rem; }
@@ -659,7 +674,7 @@ a { color: var(--accent); }
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast.success { background: var(--success); color: var(--white); border-color: rgba(255, 255, 255, 0.2); }
 .toast.error { background: var(--error); color: var(--white); border-color: rgba(255, 255, 255, 0.2); }
-.toast.warning { background: var(--warning); color: #1a202c; border-color: rgba(255, 255, 255, 0.2); }
+.toast.warning { background: var(--warning); color: #0b0f15; border-color: rgba(255, 255, 255, 0.2); }
 .toast.info { background: var(--secondary); }
 
 /* --------------------------------------------------------------------------

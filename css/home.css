@@ -235,11 +235,12 @@ body.home-body {
 
 /* Desktop: centre the mobile experience, never stretch it edge to edge */
 @media (min-width: 1024px) {
-  body.home-body { background: var(--bg, #f6f7fb); }
+  body.home-body { background: var(--bg); }
   .home {
     max-width: 760px; margin: 1.5rem auto; padding: 1.5rem 1.5rem calc(88px + var(--safe-bottom));
-    border-radius: 28px; background: var(--surface, #fff);
-    box-shadow: 0 18px 50px rgb(15 23 42 / 10%);
+    border-radius: 28px; background: var(--surface-solid);
+    box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+    border: 1px solid var(--border);
   }
   .bottom-nav .inner { max-width: 760px; }
   .feature-grid { grid-template-columns: repeat(4, 1fr); }
@@ -249,7 +250,7 @@ body.home-body {
 /* Clickable info rows must be comfortable touch targets */
 .info-row[role="button"] { min-height: 44px; border-radius: 12px; }
 .info-row[role="button"]:hover, .info-row[role="button"]:focus-visible {
-  background: color-mix(in srgb, var(--text) 6%, transparent); outline: none;
+  background: var(--surface-hover); outline: none;
 }
 
 /* ---------- Admin home: analytics dashboard + grouped nav cards ---------- */
