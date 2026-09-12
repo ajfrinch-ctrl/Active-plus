@@ -11,9 +11,9 @@
  * Every figure is computed live through analytics() and the collections
  * themselves — nothing is hard-coded.
  */
-import { escapeHtml, mountConnectionStatus } from './app.js';
+import { escapeHtml, safeUrl, mountConnectionStatus } from './app.js';
 import {
-  db, analytics, dueFees, getDbStatus, DAY_BN, orgInfo, mobileDigits
+  db, analytics, dueFees, getDbStatus, DAY_BN, orgInfo, mobileDigits, sharedNotices
 } from './data.js';
 
 const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
@@ -108,7 +108,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
         <span class="l">${icon} ${label}</span>
         ${value
           ? `<span class="v">${href
-            ? `<a href="${escapeHtml(href)}">${escapeHtml(value)}</a>`
+            ? `<a href="${escapeHtml(safeUrl(href))}">${escapeHtml(value)}</a>`
             : escapeHtml(value)}</span>`
           : '<span class="v empty">যোগ করুন</span>'}
       </div>`;
@@ -180,7 +180,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
       taka(a.totalDue), 'মোট বকেয়া', 'dues'),
     announcements: () => navCard(
       '📢', 'ঘোষণা', 'View latest announcements',
-      bn(db.notices.list().length), 'টি নোটিশ', 'notices'),
+      bn(sharedNotices().length), 'টি নোটিশ', 'notices'),
     'recent-activities': () => navCard(
       '📝', 'সাম্প্রতিক কার্যক্রম', 'View recent system activities',
       bn(db.activityLogs.list().length), 'টি কার্যক্রম', 'activity')

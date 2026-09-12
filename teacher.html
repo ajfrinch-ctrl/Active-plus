@@ -59,8 +59,8 @@
         <!-- ============ My students (assigned classes only) ============ -->
         <section class="tab-panel" id="tab-students" hidden>
           <div class="card">
-            <div class="form-group"><input class="form-input" id="teacher-student-search" placeholder="নাম বা আইডি দিয়ে খুঁজুন…"></div>
-            <div class="form-group"><select class="form-input" id="teacher-student-class"><option value="">সব ক্লাস</option></select></div>
+            <div class="form-group"><input class="form-input" id="teacher-student-search" placeholder="নাম বা আইডি দিয়ে খুঁজুন…" aria-label="নাম বা আইডি দিয়ে খুঁজুন"></div>
+            <div class="form-group"><select class="form-input" id="teacher-student-class" aria-label="ক্লাস অনুযায়ী ছাঁকুন"><option value="">সব ক্লাস</option></select></div>
             <div class="list" id="teacher-student-list"></div>
           </div>
         </section>
@@ -70,11 +70,11 @@
           <div class="card">
             <h2>অ্যাসাইনমেন্ট দিন</h2>
             <form id="teacher-assignment-form">
-              <div class="form-group"><label>শিরোনাম</label><input class="form-input" name="title" required></div>
-              <div class="form-group"><label>ক্লাস</label><select class="form-input" name="className" id="asg-class"></select></div>
-              <div class="form-group"><label>বিবরণ</label><textarea class="form-input" name="description"></textarea></div>
-              <div class="form-group"><label>শেষ তারিখ</label><input class="form-input" name="dueDate" required></div>
-              <div class="form-group"><label>নম্বর</label><input class="form-input" name="marks" type="number" min="1" value="10"></div>
+              <div class="form-group"><label for="asg-title">শিরোনাম</label><input class="form-input" id="asg-title" name="title" required></div>
+              <div class="form-group"><label for="asg-class">ক্লাস</label><select class="form-input" name="className" id="asg-class"></select></div>
+              <div class="form-group"><label for="asg-desc">বিবরণ</label><textarea class="form-input" id="asg-desc" name="description"></textarea></div>
+              <div class="form-group"><label for="asg-due">শেষ তারিখ</label><input class="form-input" id="asg-due" name="dueDate" required></div>
+              <div class="form-group"><label for="asg-marks">নম্বর</label><input class="form-input" id="asg-marks" name="marks" type="number" min="1" value="10"></div>
               <button type="submit" class="btn btn-block">অ্যাসাইনমেন্ট প্রকাশ করুন</button>
             </form>
           </div>
@@ -86,12 +86,12 @@
           <div class="card">
             <h2>ম্যাটেরিয়াল আপলোড</h2>
             <form id="teacher-material-form">
-              <div class="form-group"><label>শিরোনাম</label><input class="form-input" name="title" required></div>
-              <div class="form-group"><label>ক্লাস</label><select class="form-input" name="className" id="mat-class"></select></div>
-              <div class="form-group"><label>বিষয়</label><input class="form-input" name="subject"></div>
-              <div class="form-group"><label>অধ্যায়</label><input class="form-input" name="chapter"></div>
-              <div class="form-group"><label>বিবরণ</label><textarea class="form-input" name="description"></textarea></div>
-              <div class="form-group"><label>ফাইল লিংক</label><input class="form-input" name="link" type="url" placeholder="https://…"></div>
+              <div class="form-group"><label for="mat-title">শিরোনাম</label><input class="form-input" id="mat-title" name="title" required></div>
+              <div class="form-group"><label for="mat-class">ক্লাস</label><select class="form-input" name="className" id="mat-class"></select></div>
+              <div class="form-group"><label for="mat-subject">বিষয়</label><input class="form-input" id="mat-subject" name="subject"></div>
+              <div class="form-group"><label for="mat-chapter">অধ্যায়</label><input class="form-input" id="mat-chapter" name="chapter"></div>
+              <div class="form-group"><label for="mat-desc">বিবরণ</label><textarea class="form-input" id="mat-desc" name="description"></textarea></div>
+              <div class="form-group"><label for="mat-link">ফাইল লিংক</label><input class="form-input" id="mat-link" name="link" type="url" placeholder="https://…"></div>
               <button type="submit" class="btn btn-block">প্রকাশ করুন</button>
             </form>
           </div>
@@ -122,7 +122,7 @@
           </div>
           <div class="card">
             <h2>CSV/Excel আপলোড</h2>
-            <div class="form-group"><input type="file" id="tqb-file" class="form-input" accept=".csv,text/csv"></div>
+            <div class="form-group"><input type="file" id="tqb-file" class="form-input" accept=".csv,text/csv" aria-label="CSV/Excel ফাইল নির্বাচন"></div>
             <div id="tqb-report"></div>
           </div>
           <div id="tqb-preview"></div>
@@ -376,12 +376,13 @@
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
     <script type="module">
-      import { initApp, activeTabs, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, requireOnline } from './js/app.js';
+      import { initApp, activeTabs, renderTable, statGrid, escapeHtml, safeUrl, openModal, closeModal, showToast, requireOnline } from './js/app.js';
       import { db, newId, todayBn, teacherProfile, teacherStudents, teacherMaterials, teacherExams,
         teacherPendingResults, teacherPendingAssignments, submissionsFor, submitAssignment,
         checkSubmission, assignmentStatus, logActivity, timeAgo, CLASS_OPTIONS,
         can, assertCan, teacherCanAccessClass, parseMcqPaste, parseMcqCsv,
-        downloadText, PERMISSIONS, teacherUnreadCount, markTeacherNotificationsRead, getDbStatus } from './js/data.js';
+        downloadText, PERMISSIONS, teacherUnreadCount, markTeacherNotificationsRead, getDbStatus,
+        sharedNotices } from './js/data.js';
       import { updateProfile } from './js/auth.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { initTeacherHome } from './js/teacher-home.js';
@@ -517,8 +518,9 @@
         /* -------- Class-targeted notices -------- */
         const noticeList = document.getElementById('teacher-notice-list');
         const renderNotices = () => {
-          // Newest 50; notices accumulate for the life of the centre (spec 62).
-          const rows = db.notices.list().slice(0, 50);
+          // Newest 50 shared notices (spec 62). A payment receipt is personal to
+          // one student, so it never appears on a class board.
+          const rows = sharedNotices().slice(-50).reverse();
           noticeList.innerHTML = rows.length
             ? rows.map((n) => `
               <div class="list-item">
@@ -587,7 +589,7 @@
                   ${n.reply ? `<div class="alert alert-success" style="margin-top:.5rem">উত্তর: ${escapeHtml(n.reply)}</div>` : ''}
                 </div>
                 <form data-reply-form="${escapeHtml(n.id)}" style="margin-top:.5rem">
-                  <div class="form-group"><input class="form-input" name="reply" placeholder="উত্তর লিখুন…" value="${escapeHtml(n.reply || '')}"></div>
+                  <div class="form-group"><input class="form-input" name="reply" placeholder="উত্তর লিখুন…" aria-label="উত্তর লিখুন" value="${escapeHtml(n.reply || '')}"></div>
                   <button type="submit" class="btn btn-small">উত্তর পাঠান</button>
                 </form>
               </div>`).join('')
@@ -729,8 +731,8 @@
                 </div>
                 ${sub.checked ? '' : `
                   <form data-check-form="${escapeHtml(sub.id)}" style="margin-top:.5rem">
-                    <div class="form-group"><input class="form-input" name="marks" type="number" min="0" max="${asg?.marks || 100}" placeholder="নম্বর"></div>
-                    <div class="form-group"><input class="form-input" name="feedback" placeholder="মন্তব্য"></div>
+                    <div class="form-group"><input class="form-input" name="marks" type="number" min="0" max="${asg?.marks || 100}" placeholder="নম্বর" aria-label="নম্বর"></div>
+                    <div class="form-group"><input class="form-input" name="feedback" placeholder="মন্তব্য" aria-label="মন্তব্য"></div>
                     <button type="submit" class="btn btn-small btn-success">দেখেছি — নম্বর দিন</button>
                   </form>`}
               </div>`;
@@ -785,7 +787,7 @@
                 <div class="li-title">${escapeHtml(m.title)}</div>
                 <div class="li-sub">${escapeHtml(m.className)} · ${escapeHtml(m.subject || '')} ${m.chapter ? `· ${escapeHtml(m.chapter)}` : ''}</div>
               </div>
-              ${m.link ? `<a class="btn btn-small" href="${escapeHtml(m.link)}" target="_blank" rel="noopener">খুলুন</a>` : '<span class="badge">নোট</span>'}
+              ${m.link ? `<a class="btn btn-small" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">খুলুন</a>` : '<span class="badge">নোট</span>'}
             </div>`).join('') : '<div class="empty-state">কোনো ম্যাটেরিয়াল নেই।</div>';
         };
         renderMaterials();

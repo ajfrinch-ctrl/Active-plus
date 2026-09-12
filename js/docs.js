@@ -813,7 +813,7 @@ export async function renderAdmissionFormCanvases(student, opts = {}) {
     ['ব্যাচ', student.batch],
     ['স্কুল / কলেজ', student.school],
     ['অভিভাবকের নাম', student.guardian],
-    ['অভিভাবকের মোবাইল', student.phone || student.guardianPhone],
+    ['অভিভাবকের মোবাইল', student.guardianPhone || student.phone],
     ['ভর্তির তারিখ', student.admissionDate]
   ];
   return renderReportCanvases({

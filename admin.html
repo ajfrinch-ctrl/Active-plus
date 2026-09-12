@@ -269,12 +269,12 @@
           <div class="form-group"><label for="qb-exam">পরীক্ষা নির্বাচন</label><select id="qb-exam" class="form-input form-select"></select></div>
           <div class="card">
             <h3>পেস্ট করে ইমপোর্ট</h3>
-            <div class="form-group"><textarea id="qb-paste" class="form-input form-textarea" placeholder="প্রশ্ন&#10;A. অপশন&#10;B. অপশন&#10;C. অপশন&#10;D. অপশন&#10;সঠিক: B"></textarea></div>
+            <div class="form-group"><textarea id="qb-paste" aria-label="পেস্ট করে প্রশ্ন ইমপোর্ট" class="form-input form-textarea" placeholder="প্রশ্ন&#10;A. অপশন&#10;B. অপশন&#10;C. অপশন&#10;D. অপশন&#10;সঠিক: B"></textarea></div>
             <div class="row-actions"><button type="button" class="btn btn-secondary" id="qb-parse">Parse</button><button type="button" class="btn btn-small" id="qb-template">স্যাম্পল টেমপ্লেট</button></div>
           </div>
           <div class="card">
             <h3>CSV/Excel আপলোড</h3>
-            <div class="form-group"><input type="file" id="qb-file" class="form-input" accept=".csv,text/csv"></div>
+            <div class="form-group"><input type="file" id="qb-file" class="form-input" accept=".csv,text/csv" aria-label="CSV/Excel ফাইল নির্বাচন"></div>
           </div>
           <div id="qb-preview"></div>
           <button type="button" class="btn btn-block" id="qb-import">নিশ্চিত করে ইমপোর্ট করুন</button>
@@ -340,7 +340,7 @@
 
         <section class="tab-panel" id="tab-activity" hidden>
           <h2 class="section-title">অ্যাক্টিভিটি লগ</h2>
-          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…"></div>
+          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…" aria-label="কার্যক্রম ফিল্টার করুন"></div>
           <div class="table-wrap"><table class="table" id="activity-table"><thead><tr></tr></thead><tbody></tbody></table></div>
         </section>
 
@@ -451,7 +451,7 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label for="student-phone">অভিভাবকের মোবাইল</label>
+              <label for="student-phone">শিক্ষার্থীর মোবাইল</label>
               <input class="form-input" id="student-phone" name="phone" inputmode="tel" placeholder="০১XXXXXXXXX">
             </div>
             <div class="form-group">
@@ -460,6 +460,12 @@
                 <option value="সক্রিয়">সক্রিয়</option>
                 <option value="বকেয়া">বকেয়া</option>
               </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-guardian-phone">অভিভাবকের মোবাইল</label>
+              <input class="form-input" id="student-guardian-phone" name="guardianPhone" inputmode="tel" placeholder="০১XXXXXXXXX">
             </div>
           </div>
           <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001</p>
@@ -690,7 +696,7 @@
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan } from './js/data.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, sharedNotices, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
       import { receiptSummary, shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from './js/docs.js';
@@ -737,7 +743,7 @@
         return lines.join('\n');
       };
       const openWhatsApp = (st) => {
-        const phone = st.phone || st.guardianPhone;
+        const phone = st.guardianPhone || st.phone; // the message is for the guardian
         if (!waNumber(phone)) { showToast('মোবাইল নম্বর পাওয়া যায়নি।', 'error'); return; }
         const url = waLink(phone, admissionMessage(st));
         window.open(url, '_blank', 'noopener');
@@ -789,7 +795,8 @@
         document.getElementById('income-summary').textContent =
           `সংগৃহীত ৳${bn(collected.toLocaleString('en-US'))} / প্রত্যাশিত ৳${bn(expected.toLocaleString('en-US'))}`;
         document.getElementById('income-bar').style.width = `${expected ? Math.min(100, Math.round((collected / expected) * 100)) : 0}%`;
-        document.getElementById('latest-notice').textContent = db.notices.list()[0]?.title || '—';
+        // Newest shared notice: personal payment receipts never belong here.
+        document.getElementById('latest-notice').textContent = sharedNotices().slice(-1)[0]?.title || '—';
         document.getElementById('student-count').textContent = bn(students.length);
         refreshAdminBell();
       };
@@ -844,6 +851,7 @@
           studentForm.elements.section.value = student.section || '';
           studentForm.elements.batch.value = student.batch || '';
           studentForm.elements.guardian.value = student.guardian || '';
+          studentForm.elements.guardianPhone.value = student.guardianPhone || '';
           studentForm.elements.admissionDate.value = student.admissionDate || '';
           studentForm.elements.photo.value = student.photo || '';
           studentForm.elements.status.value = student.status || 'সক্রিয়';
@@ -870,10 +878,11 @@
           section: String(data.get('section') || '').trim(),
           batch: String(data.get('batch') || '').trim(),
           guardian: String(data.get('guardian') || '').trim(),
+          guardianPhone: String(data.get('guardianPhone') || '').trim(),
           admissionDate: String(data.get('admissionDate') || '').trim(),
           photo: String(data.get('photo') || '').trim(),
           roll: String(data.get('roll')),
-          phone: String(data.get('phone') || '—').trim(),
+          phone: String(data.get('phone') || '').trim(), // never store a dash as a phone number
           status: String(data.get('status'))
         };
         if (!record.name) { showToast('শিক্ষার্থীর নাম আবশ্যক।', 'error'); return; }
@@ -914,7 +923,7 @@
           ${info('শ্রেণি', `${student.className || '—'}${student.section ? ` · ${student.section}` : ''}${student.roll ? ` · রোল ${student.roll}` : ''}`)}
           ${student.school ? info('স্কুল/কলেজ', student.school) : ''}
           ${student.guardian ? info('অভিভাবক', student.guardian) : ''}
-          ${info('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}`;
+          ${info('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}`;
         openModal('admission-modal');
       };
       document.getElementById('admission-wa')?.addEventListener('click', () => {
@@ -951,7 +960,7 @@
               ${field('ব্যাচ', student.batch || '—')}
               ${field('স্কুল / কলেজ', student.school || '—')}
               ${field('অভিভাবকের নাম', student.guardian || '—')}
-              ${field('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}
+              ${field('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}
               ${field('ভর্তির তারিখ', student.admissionDate || '—')}
             </div>
             <div class="af-sign">
@@ -1009,7 +1018,7 @@
         const paid = db.payments.list().filter((p) => p.studentId === id);
         const dues = dueFees().filter((d) => d.studentId === id);
         const paidTotal = paid.reduce((s, p) => s + Number(p.amount || 0), 0);
-        const dueTotal = dues.reduce((s, d) => s + Number(d.amount || 0), 0);
+        const dueTotal = dues.reduce((s, d) => s + Number(d.remaining ?? d.amount) || 0, 0);
         const results = db.examResults.list().filter((r) => r.studentId === id);
         const perf = performanceFor(st);
         const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(String(value ?? '—'))}</span></div>`;
@@ -1293,7 +1302,7 @@
           { key: 'student', label: 'নাম', render: (row) => escapeHtml(row.student?.name || '—') },
           { key: 'className', label: 'শ্রেণি', render: (row) => escapeHtml(row.student?.className || '—') },
           { key: 'month', label: 'মাস' },
-          { key: 'amount', label: 'পরিমাণ' },
+          { key: 'amount', label: 'পরিমাণ', render: (row) => escapeHtml(String(row.remaining ?? row.amount)) },
           { key: '_pay', label: 'অ্যাকশন', render: (row) => `<button type="button" class="btn btn-small btn-success" data-pay="${escapeHtml(row.id)}">পেমেন্ট নিন</button>` }
         ], dues, 'সব বকেয়া পরিশোধিত 🎉');
 
@@ -1330,7 +1339,8 @@
         document.getElementById('pay-fee-id').value = fee.id;
         document.getElementById('pay-student').value = `${student?.name || fee.studentId} (${fee.studentId})`;
         document.getElementById('pay-month').value = fee.month || '';
-        document.getElementById('pay-amount').value = fee.amount || '';
+        document.getElementById('pay-amount').value = dueRemaining(fee) || '';
+        document.getElementById('pay-amount').max = String(dueRemaining(fee));
         document.getElementById('pay-date').value = todayBn();
         document.getElementById('pay-reference').value = '';
         document.getElementById('pay-remarks').value = '';
@@ -1348,17 +1358,28 @@
         if (!Number.isFinite(amount) || amount <= 0) { showToast('সঠিক পরিমাণ লিখুন।', 'error'); return; }
         if (!date) { showToast('তারিখ দিন।', 'error'); return; }
 
-        const result = receivePayment(feeId, session.name);
-        if (!result) { showToast('এই বকেয়া ইতিমধ্যে পরিশোধিত।', 'error'); return; }
-        // enrich the payment with the captured details + a unique receipt number
-        const receiptNo = nextReceiptNo();
-        db.payments.update(result.payment.id, {
+        // Validate against what is really owed *before* anything is written:
+        // the old flow marked the fee পরিশোধিত first and only then copied the
+        // typed amount onto the payment, so ৳50 closed a ৳1200 due.
+        const fee = db.fees.find(feeId);
+        const remaining = dueRemaining(fee);
+        if (!fee || fee.status === 'পরিশোধিত' || remaining <= 0) {
+          showToast('এই বকেয়া ইতিমধ্যে পরিশোধিত।', 'error'); return;
+        }
+        if (amount > remaining) {
+          showToast(`বকেয়ার চেয়ে বেশি নেওয়া যাবে না — বাকি আছে ৳${bn(remaining)}।`, 'error'); return;
+        }
+        const result = receivePayment(feeId, session.name, {
           amount, date,
           method: String(d.get('method') || 'নগদ'),
           reference: String(d.get('reference') || ''),
           remarks: String(d.get('remarks') || ''),
-          receiptNo
+          receiptNo: nextReceiptNo()
         });
+        if (!result) { showToast('পেমেন্ট সংরক্ষণ করা যায়নি — পরিমাণটি বকেয়ার সঙ্গে মেলেনি।', 'error'); return; }
+        if (!result.settled) {
+          showToast(`আংশিক পেমেন্ট সংরক্ষিত হয়েছে — বাকি ৳${bn(result.remaining)}।`, 'warning');
+        }
         logActivity({ user: session.name, role: session.role, action: 'recorded payment', target: `${result.payment.studentId} ৳${amount}` });
         closeModal('payment-modal');
         renderDues(); renderStudents(); renderOverview();

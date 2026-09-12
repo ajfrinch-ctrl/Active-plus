@@ -94,7 +94,7 @@ test('database status never exposes credentials', () => {
   const status = getDbStatus();
   assert.ok('connected' in status && 'mode' in status && 'lastSync' in status && 'pending' in status);
   assert.deepEqual(Object.keys(status).sort(),
-    ['configured', 'connected', 'error', 'lastSync', 'mode', 'online', 'pending'].sort());
+    ['configured', 'connected', 'error', 'lastSync', 'mode', 'online', 'persisted', 'pending'].sort());
   assert.equal(/AIza|apiKey|databaseURL|authDomain/.test(JSON.stringify(status)), false);
 });
 

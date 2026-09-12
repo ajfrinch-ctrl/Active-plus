@@ -71,7 +71,7 @@ function mountDashboard(session) {
       <div class="card"><h3>আসন্ন পরীক্ষা</h3><p>${db.exams.list().slice(0, 3).map((e) => escapeHtml(e.title)).join(' · ') || '—'}</p></div>
       <div class="card"><h3>সাম্প্রতিক ভর্তি</h3><p>${recent(db.students.list(), 3).map((s) => escapeHtml(s.name)).join(' · ') || '—'}</p></div>
       <div class="card"><h3>সাম্প্রতিক পেমেন্ট</h3><p>${recent(db.payments.list(), 3).map((p) => `৳${bn(p.amount)}`).join(' · ') || '—'}</p></div>
-      <div class="card"><h3>ঝুলন্ত অ্যাসাইনমেন্ট</h3><p>${bn(db.assignments.list().length)}</p></div>
+      <div class="card"><h3>ঝুলন্ত অ্যাসাইনমেন্ট</h3><p>${bn(analytics().pendingAssignments)}</p></div>
       <div class="card"><h3>সাম্প্রতিক অ্যাডমিন কার্যক্রম</h3><p>${activityLogs().slice(0, 3).map((l) => escapeHtml(l.action)).join(' · ') || '—'}</p></div>
     </div>`;
 
@@ -83,6 +83,11 @@ function mountDashboard(session) {
     el.textContent = mode === 'local'
       ? `ডেটাবেস: লোকাল মোড (সংযুক্ত) · শেষ সিঙ্ক: ${todayBn()}`
       : connected ? `ডেটাবেস: সংযুক্ত · শেষ সিঙ্ক: ${todayBn()}` : 'ডেটাবেস: বিচ্ছিন্ন (অফলাইন)';
+  }).catch(() => {
+    // A rejected probe must not become an unhandled rejection (and must not
+    // leave the status card claiming a connection it never verified).
+    const el = document.getElementById('db-status');
+    if (el) { el.className = 'alert alert-error'; el.textContent = 'ডেটাবেস: সংযোগ যাচাই করা যায়নি'; }
   });
   logActivity({ user: session.name, role: session.role, action: 'viewed dashboard' });
 }
@@ -608,7 +613,7 @@ function mountReports(session) {
     due: {
       label: 'বকেয়া তালিকা', classScoped: true,
       cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'পরিমাণ' }],
-      rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.amount), _amount: Number(f.amount) || 0 })),
+      rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.remaining ?? f.amount), _amount: Number(f.remaining ?? f.amount) || 0 })),
       summary: (rows) => [{ label: 'মোট বকেয়া', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
     },
     payments: {
@@ -623,7 +628,7 @@ function mountReports(session) {
       rows: () => db.students.list().map((st) => ({
         studentId: st.id, name: st.name, className: st.className,
         paid: taka(db.payments.list().filter((p) => p.studentId === st.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)),
-        due: taka(dueFees().filter((d) => d.studentId === st.id).reduce((sum, d) => sum + Number(d.amount || 0), 0))
+        due: taka(dueFees().filter((d) => d.studentId === st.id).reduce((sum, d) => sum + Number(d.remaining ?? d.amount) || 0, 0))
       })),
       summary: () => []
     },

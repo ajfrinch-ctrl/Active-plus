@@ -107,8 +107,14 @@ student's own records — no hard-coded statistics anywhere:
 | Notices, Teacher's Tip, banners | admin-managed `notices`, `tips`, `banners` |
 
 Every card answers with the student's own rows only; the data layer filters by
-class/batch before anything reaches the UI, and `database.rules.json` enforces
-the same boundaries server-side once Firebase is deployed.
+class/batch before anything reaches the UI.
+
+> **Security status (read before using real data).** Those filters run *in the
+> browser*, and so does the whole database: everything lives in `localStorage` on
+> the device. Anyone with DevTools on that device can read or rewrite it, so
+> client-side scoping is a UX boundary, not a security one.
+> `database.rules.json` is written to enforce the same boundaries server-side but
+> is **not effective yet** — see *Configuring Firebase* below.
 
 ## Teacher Home
 
@@ -179,10 +185,11 @@ settings, backup). Admins hold all of them; teachers get a teaching-only
 subset; students get none.
 
 Rights are enforced at the **data layer** — `can()` and `assertCan()` guard
-every write — not merely by hiding buttons, and `database.rules.json` repeats
-the boundaries server-side once Firebase is deployed. Search is scoped the same
-way: a teacher searching never sees another class's students, and a student
-never sees anyone but themselves.
+every write — not merely by hiding buttons. Search is scoped the same way: a
+teacher searching never sees another class's students, and a student never sees
+anyone but themselves. Both are enforced in browser code, so they protect against
+mistakes rather than a determined user with DevTools (see the security note under
+*Student Home*).
 
 ### Institute profile (Settings)
 
@@ -247,6 +254,18 @@ Database and signs in against it; until then it runs in local mode so nothing
 breaks on GitHub Pages.
 
 ### Deploy the security rules
+
+> **Cloud mode is not production-ready yet.** Two things must be fixed first:
+>
+> 1. Nothing writes `roles/<uid>/role`, which every rule checks — so after
+>    `firebase deploy` *all* clients (including the admin) are denied the
+>    mirrored store. Bootstrap that node from a trusted place (a Cloud Function
+>    or the console) before relying on the rules.
+> 2. The client only reads/writes the single `activeplus/data` mirror, so the
+>    per-collection rules below are not exercised yet, and a whole-store `set()`
+>    means concurrent edits overwrite each other (last write wins).
+>
+> Until then treat the app as single-device local storage.
 
 `database.rules.json` holds the Realtime Database rules. Deploy them with
 `firebase deploy --only database` (or paste them into the console under

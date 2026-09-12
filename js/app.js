@@ -115,6 +115,28 @@ export function escapeHtml(value) {
   }[char]));
 }
 
+const SAFE_URL_SCHEMES = ['http', 'https', 'mailto', 'tel', 'sms'];
+
+/**
+ * A link target that is safe to put in an href.
+ *
+ * Material/banner links come from a teacher's keyboard, so `javascript:` (or
+ * `data:`) pasted there would run script in the portal of every student who
+ * clicks it. Anything that is not a relative path or one of the schemes above
+ * is replaced with `fallback`.
+ */
+export function safeUrl(value, fallback = '#') {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  // Browsers strip whitespace/control characters inside a scheme, so strip them
+  // here too — "java\tscript:" must not slip through the check below.
+  const cleaned = raw.replace(/[\u0000-\u0020\u007f-\u00a0]+/g, '');
+  if (!cleaned || cleaned.startsWith('//')) return fallback; // protocol-relative → off-site
+  const scheme = cleaned.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (!scheme) return cleaned;                               // relative path or #anchor
+  return SAFE_URL_SCHEMES.includes(scheme[1].toLowerCase()) ? cleaned : fallback;
+}
+
 /**
  * Renders rows into a <tbody>. `columns` = [{ key, label, render? }].
  */
@@ -186,13 +208,45 @@ export function statGrid(selector, stats) {
   return host;
 }
 
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const openModals = new Map(); // id → { opener, release }
+
+/** Keeps Tab inside the dialog so keyboard users cannot land on the page behind it. */
+function trapFocus(modal) {
+  const handler = (event) => {
+    if (event.key !== 'Tab') return;
+    const items = Array.from(modal.querySelectorAll(FOCUSABLE))
+      .filter((el) => !el.disabled && el.getAttribute('tabindex') !== '-1');
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    if (!modal.contains(active)) { event.preventDefault(); first.focus(); return; }
+    if (event.shiftKey && active === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+  };
+  modal.addEventListener('keydown', handler);
+  return () => modal.removeEventListener('keydown', handler);
+}
+
 export function openModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return null;
+  const content = modal.querySelector('.modal-content') || modal;
+  if (!content.getAttribute('role')) content.setAttribute('role', 'dialog');
+  content.setAttribute('aria-modal', 'true');
+  const heading = content.querySelector('h1, h2, h3');
+  if (heading) {
+    if (!heading.id) heading.id = `${id}-title`;
+    content.setAttribute('aria-labelledby', heading.id);
+  }
   modal.classList.add('active');
   modal.setAttribute('aria-hidden', 'false');
   document.body.classList.add('modal-open'); // print uses this to drop the app shell
   document.body.style.overflow = 'hidden';
+  if (!openModals.has(id)) {
+    openModals.set(id, { opener: document.activeElement || null, release: trapFocus(modal) });
+  }
   const focusable = modal.querySelector('input, select, textarea, button:not(.modal-close)');
   if (focusable) setTimeout(() => focusable.focus(), 120);
   return modal;
@@ -203,6 +257,17 @@ export function closeModal(id) {
   if (!modal) return null;
   modal.classList.remove('active');
   modal.setAttribute('aria-hidden', 'true');
+  const opened = openModals.get(id);
+  if (opened) {
+    openModals.delete(id);
+    opened.release();
+    // Give focus back to whatever opened the dialog instead of dropping it on <body>.
+    try {
+      if (opened.opener && typeof opened.opener.focus === 'function' && document.contains(opened.opener)) {
+        opened.opener.focus();
+      }
+    } catch (e) { /* detached opener */ }
+  }
   if (!document.querySelector('.modal-overlay.active')) {
     document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
@@ -277,9 +342,32 @@ let activeTabsController = null;
 /** The tab controller created by the most recent initApp() call, if any. */
 export function activeTabs() { return activeTabsController; }
 
+/**
+ * One honest message when something unexpected throws, instead of a panel that
+ * quietly stops updating. Mounted once per page by initApp().
+ */
+let errorGuardsMounted = false;
+export function initErrorGuards() {
+  if (errorGuardsMounted || typeof window === 'undefined') return;
+  errorGuardsMounted = true;
+  const report = () => {
+    try { showToast('অপ্রত্যাশিত সমস্যা হয়েছে — কাজটি সংরক্ষিত নাও হতে পারে, পেজটি রিফ্রেশ করুন।', 'error', 6000); }
+    catch (e) { /* no toast host yet */ }
+  };
+  window.addEventListener('error', (event) => {
+    console.error('[Active Plus]', event.error || event.message);
+    report();
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('[Active Plus] unhandled rejection:', event.reason);
+    report();
+  });
+}
+
 export function initApp({ roles = [], tabs = true } = {}) {
   const session = requireRole(roles);
   if (!session) return null;
+  initErrorGuards();
   mountHeader(session);
   logoutButton('#logout-btn');
   initModals();

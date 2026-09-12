@@ -275,6 +275,17 @@ export function mountExamTaker({ listSelector, student }) {
     const exam = db.exams.find(examId);
     if (!exam) return;
     const player = document.getElementById('exam-player');
+    const backToList = (message, type = 'warning') => {
+      player.hidden = true;
+      list.hidden = false;
+      if (message) showToast(message, type);
+      render();
+    };
+    // Hiding the Start button is only paint. Guard the data path as well, so a
+    // closed window cannot be sat and a retake cannot add a second result.
+    const window_ = examWindow(exam);
+    if (window_ && !window_.canStart) { backToList('এই পরীক্ষার সময় শেষ বা এখনো শুরু হয়নি।'); return; }
+    if (examResultFor(examId, student.id)) { backToList('আপনি এই পরীক্ষাটি আগেই দিয়েছেন।'); return; }
     player.hidden = false;
     list.hidden = true;
     player.innerHTML = `

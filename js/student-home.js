@@ -4,7 +4,7 @@
  * All data computed live from the layered store; nothing hard-coded.
  */
 
-import { initApp, escapeHtml, showToast, openModal, closeModal, getAuthMode } from './app.js';
+import { initApp, escapeHtml, safeUrl, showToast, openModal, closeModal, getAuthMode } from './app.js';
 import { signOut } from './auth.js';
 import {
   db, noticesFor, suggestionsFor, examsFor, examResultFor, scoreExam,
@@ -559,7 +559,7 @@ export function initStudentHome() {
     showDetail(m.title, `
       <p>${escapeHtml(m.subject)} · ${escapeHtml(m.className)} · ${escapeHtml(m.date)}</p>
       <p style="white-space:pre-wrap;margin-top:.5rem">${escapeHtml(m.description || '')}</p>
-      ${m.link ? `<a class="btn btn-secondary btn-block" href="${escapeHtml(m.link)}" target="_blank" rel="noopener" style="margin-top:.75rem">ফাইল খুলুন / ডাউনলোড</a>` : ''}
+      ${m.link ? `<a class="btn btn-secondary btn-block" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="margin-top:.75rem">ফাইল খুলুন / ডাউনলোড</a>` : ''}
       ${isDone
         ? '<p class="meta" style="margin-top:.75rem">আপনি এটি সম্পন্ন করেছেন ✓</p>'
         : '<button type="button" class="btn btn-block" id="mark-complete" style="margin-top:.75rem">সম্পন্ন হিসেবে চিহ্নিত করুন</button>'}`);
@@ -643,7 +643,7 @@ export function initStudentHome() {
       <div class="hcard" id="more-downloads"><div class="h-title">ডাউনলোড সেন্টার</div>${
         downloadable.length
           ? downloadable.map((m) => m.link
-              ? `<a class="info-row" href="${escapeHtml(m.link)}" target="_blank" rel="noopener" style="text-decoration:none"><span class="l">⬇️ ${escapeHtml(m.title)}</span><span class="v">ডাউনলোড</span></a>`
+              ? `<a class="info-row" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="text-decoration:none"><span class="l">⬇️ ${escapeHtml(m.title)}</span><span class="v">ডাউনলোড</span></a>`
               : `<div class="info-row" role="button" tabindex="0" data-mat2="${escapeHtml(m.id)}" style="cursor:pointer"><span class="l">📄 ${escapeHtml(m.title)}</span><span class="v">${escapeHtml(m.type || '')}</span></div>`).join('')
           : '<p>আপনার ক্লাসের জন্য ডাউনলোডযোগ্য ফাইল নেই।</p>'}</div>
 
@@ -804,7 +804,10 @@ export function initStudentHome() {
 
   /** Class leaderboard, shown only when the admin leaves it enabled. */
   function leaderboardCard() {
-    if (!db.settings.get().leaderboard) return '';
+    const settings = db.settings.get();
+    // The admin switch that exists in the UI is homeCards.leaderboard; an
+    // explicit settings.leaderboard still wins (older stores, tests).
+    if (!(settings.leaderboard ?? settings.homeCards?.leaderboard)) return '';
     const mine = leaderboard().filter((r) => r.className === student.className);
     if (!mine.length) return '';
     const top = mine.slice(0, 5);

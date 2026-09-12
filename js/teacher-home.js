@@ -9,13 +9,13 @@
  * routine, assignments, exams, results — so nothing is hard-coded and no
  * teacher ever sees a class they are not assigned to.
  */
-import { escapeHtml, mountConnectionStatus } from './app.js';
+import { escapeHtml, safeUrl, mountConnectionStatus } from './app.js';
 import {
   db, greetingByHour, todayBn, DAY_BN, newId,
   teacherProfile, teacherStudents, teacherDayClasses, teacherPendingAssignments,
   teacherExams, teacherPendingResults, teacherMaterials, todayTeaching,
   teacherNextClass, teacherPerformance, activeBanners, latestNotifications,
-  timeAgo, submissionsFor, logActivity, examWindow, getDbStatus
+  timeAgo, submissionsFor, logActivity, examWindow, getDbStatus, sharedNotices
 } from './data.js';
 
 const FEATURES = [
@@ -144,7 +144,8 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
   };
 
   const noticeCard = () => {
-    const latest = db.notices.list().slice(-1)[0];
+    // Payment receipts are personal to one student — never show them here.
+    const latest = sharedNotices().slice(-1)[0];
     return `<div class="hcard"><div class="h-title">📢 সর্বশেষ নোটিশ</div>${
       latest ? `<p><strong>${escapeHtml(latest.title)}</strong></p><p class="meta">${escapeHtml(latest.date || '')} · ${escapeHtml(latest.audience || '')}</p>
         <button type="button" class="btn btn-block" data-goto="notice">সব নোটিশ</button>` : '<p>কোনো নোটিশ নেই।</p>'}</div>`;
@@ -165,7 +166,7 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     return `<div class="carousel"><div class="carousel-track">${banners.map((b) => `
       <div class="banner"${b.image ? ` style="background-image:url('${escapeHtml(b.image)}')"` : ''}>
         <strong>${escapeHtml(b.title)}</strong>${b.subtitle ? `<span>${escapeHtml(b.subtitle)}</span>` : ''}
-        ${b.link ? `<a class="btn btn-small" href="${escapeHtml(b.link)}" target="_blank" rel="noopener">বিস্তারিত</a>` : ''}
+        ${b.link ? `<a class="btn btn-small" href="${escapeHtml(safeUrl(b.link))}" target="_blank" rel="noopener">বিস্তারিত</a>` : ''}
       </div>`).join('')}</div></div>`;
   };
 
