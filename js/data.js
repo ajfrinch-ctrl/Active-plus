@@ -335,6 +335,86 @@ export const db = {
 };
 
 /* ------------------------------------------------------------------ */
+/* Institution profile                                                 */
+/* ------------------------------------------------------------------ */
+/* The name, address, mobile and email an admin writes in Settings are  */
+/* the identity printed on every receipt, report, admission form, ID    */
+/* card and shown in the student/teacher portals — so they are read,    */
+/* validated and normalised in one place instead of per document.       */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+
+/** Digits only — Bengali numerals are accepted wherever the app asks for one. */
+export function mobileDigits(value) {
+  return bnDigitsToAscii(String(value ?? '')).replace(/\D/g, '');
+}
+
+/** Bangladeshi mobile: 11 digits from 01, with or without the 880 country code. */
+export function isValidMobile(value) {
+  const digits = mobileDigits(value);
+  if (!digits) return false;
+  // +8801711000000 and 01711000000 are the same number — compare the local form.
+  const local = digits.startsWith('880') ? `0${digits.slice(3)}` : digits;
+  return local.length === 11 && local.startsWith('01');
+}
+
+export function isValidEmail(value) {
+  return EMAIL_RE.test(String(value ?? '').trim());
+}
+
+/**
+ * The institution identity used by every letterhead, document and portal.
+ * Always complete: the seed fills anything the admin has not written yet.
+ */
+export function orgInfo() {
+  const s = db.settings.get();
+  const trim = (v) => String(v ?? '').trim();
+  const mobile = trim(s.mobile);
+  const email = trim(s.email);
+  return {
+    name: trim(s.orgName) || 'Active Plus',
+    address: trim(s.address),
+    mobile,
+    email,
+    website: trim(s.website),
+    academicYear: trim(s.academicYear),
+    /** One-line "mobile · email" for letterheads and document headers. */
+    contactLine: [mobile, email].filter(Boolean).join(' · ')
+  };
+}
+
+/**
+ * Validate and store the institution profile written in admin Settings.
+ *
+ * Nothing is saved unless every field is usable, so a document can never be
+ * exported with a half-filled letterhead. Returns `{ ok, errors, org }` where
+ * each error is `{ field, message }` in Bengali — the data layer never touches
+ * the DOM, the caller decides where to show them.
+ */
+export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}) {
+  const name = String(input.orgName ?? '').trim();
+  const address = String(input.address ?? '').trim();
+  const mobile = String(input.mobile ?? '').trim();
+  const email = String(input.email ?? '').trim();
+
+  const errors = [];
+  const fail = (field, message) => errors.push({ field, message });
+
+  if (!name) fail('orgName', 'প্রতিষ্ঠানের নাম লিখুন।');
+  if (!address) fail('address', 'প্রতিষ্ঠানের ঠিকানা লিখুন।');
+  if (!mobile) fail('mobile', 'মোবাইল নম্বর লিখুন।');
+  else if (!isValidMobile(mobile)) fail('mobile', 'সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যা, ০১ দিয়ে শুরু (যেমন ০১৭০০-০০০০০০)।');
+  if (!email) fail('email', 'ইমেইল ঠিকানা লিখুন।');
+  else if (!isValidEmail(email)) fail('email', 'সঠিক ইমেইল ঠিকানা দিন (যেমন info@example.com)।');
+
+  if (errors.length) return { ok: false, errors, org: orgInfo() };
+
+  db.settings.update({ orgName: name, address, mobile, email });
+  logActivity({ user, role, action: 'updated institute profile', target: name });
+  return { ok: true, errors: [], org: orgInfo() };
+}
+
+/* ------------------------------------------------------------------ */
 /* Domain helpers                                                      */
 /* ------------------------------------------------------------------ */
 

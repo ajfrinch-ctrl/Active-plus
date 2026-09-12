@@ -234,6 +234,20 @@ test('teacher portal boots and shows the student query inbox', async () => {
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
+/**
+ * Waits for an asynchronous UI effect instead of sleeping a fixed 50ms. The
+ * report preview is built from canvas pages, so its exact latency depends on
+ * the machine — a fixed sleep makes the suite flaky without testing anything.
+ */
+async function waitFor(predicate, { timeout = 4000, step = 10 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (predicate()) return true;
+    await new Promise((r) => setTimeout(r, step));
+  }
+  return predicate();
+}
+
 test('every report in the report centre renders without error', async () => {
   const { doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'reports'
@@ -253,13 +267,13 @@ test('every report in the report centre renders without error', async () => {
     sel.dispatchEvent(new win.Event('change', { bubbles: true }));
     doc.getElementById('report-generate')
       .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 50));
     // a report either renders rows or shows an honest empty state — never blanks out
     const body = table.querySelector('tbody');
     const rendered = body.children.length > 0 || /নেই|কোনো/.test(table.textContent);
     assert.ok(rendered, `report "${opt.textContent}" (${opt.value}) rendered rows or an empty state`);
     assert.ok(table.querySelector('thead th'), `report "${opt.value}" has column headers`);
-    assert.ok(doc.getElementById('document-preview-modal').classList.contains('active'),
+    const preview = doc.getElementById('document-preview-modal');
+    assert.ok(await waitFor(() => preview.classList.contains('active')),
       `report "${opt.value}" opened the preview`);
   }
 

@@ -101,7 +101,7 @@ export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
         <div style="border-top:1px solid #111827;padding-top:6px;font-size:12px;color:#374151">শিক্ষার্থী / অভিভাবকের স্বাক্ষর</div>
       </div>
     </div>
-    <div style="text-align:center;margin-top:18px;font-size:11px;color:#9ca3af">ধন্যবাদ — Active Plus</div>
+    <div style="text-align:center;margin-top:18px;font-size:11px;color:#9ca3af">ধন্যবাদ — ${esc(org.orgName || 'Active Plus')}</div>
   </div>`;
 }
 
@@ -236,7 +236,7 @@ function receiptPass(ctx, width, pay, opts, paint) {
     setFont(ctx, 15, 400);
     ctx.textAlign = 'center';
     ctx.fillStyle = FAINT;
-    ctx.fillText('ধন্যবাদ — Active Plus', width / 2, y);
+    ctx.fillText(`ধন্যবাদ — ${org.orgName || 'Active Plus'}`, width / 2, y);
   }
   y += 26;
 
@@ -305,6 +305,8 @@ export function classFileLabel(className) {
 export function buildReportHtml({ settings, title, subtitle, columns, rows, logo }) {
   const org = settings || {};
   const logoSrc = logo || absUrl('assets/logo.png');
+  // The institute contact line the admin wrote in Settings (mobile · email).
+  const contact = [org.mobile, org.email].filter(Boolean).map(esc).join(' · ');
   const head = columns.map((c) =>
     `<th style="padding:9px 8px;border:1px solid #d3d9e0;background:#eef2f7;text-align:left;font-size:12px;font-weight:700;color:#111827">${esc(c.label)}</th>`).join('');
   const body = rows.map((r) =>
@@ -317,7 +319,8 @@ export function buildReportHtml({ settings, title, subtitle, columns, rows, logo
     <div style="text-align:center;border-bottom:3px solid #2563eb;padding-bottom:14px">
       <img src="${logoSrc}" alt="" style="width:58px;height:58px;object-fit:contain;margin-bottom:6px">
       <div style="font-size:20px;font-weight:800">${esc(org.orgName || 'Active Plus')}</div>
-      <div style="font-size:12px;color:#6b7280">${esc(org.address || '')}${org.mobile ? ` · ${esc(org.mobile)}` : ''}</div>
+      <div style="font-size:12px;color:#6b7280">${esc(org.address || '')}</div>
+      ${contact ? `<div style="font-size:12px;color:#6b7280">${contact}</div>` : ''}
       <div style="font-size:16px;font-weight:800;margin-top:10px">${esc(title)}</div>
       ${subtitle ? `<div style="font-size:13px;color:#374151">${esc(subtitle)}</div>` : ''}
     </div>
@@ -326,7 +329,7 @@ export function buildReportHtml({ settings, title, subtitle, columns, rows, logo
       <tbody>${body || empty}</tbody>
     </table>
     <div style="margin-top:auto;padding-top:20px;text-align:center;font-size:11px;color:#9ca3af">
-      Active Plus · ${new Date().toLocaleDateString('bn-BD')}
+      ${esc(org.orgName || 'Active Plus')} · ${new Date().toLocaleDateString('bn-BD')}
     </div>
   </div>`;
 }

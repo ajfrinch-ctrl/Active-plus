@@ -229,6 +229,14 @@ a { color: var(--accent); }
 .auth-head h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.25; }
 .subtitle { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; }
 
+/* Login screen: the institute profile written in admin Settings. */
+.org-line { margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+.org-line strong {
+  display: block; color: var(--text-light);
+  font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.125rem;
+}
+.org-line[hidden] { display: none; }
+
 .login-card {
   background: var(--surface);
   backdrop-filter: blur(10px);
@@ -334,6 +342,34 @@ a { color: var(--accent); }
 .form-error.visible { display: block; }
 
 .form-row { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+
+/* A field the admin must fix before saving: red outline + the message below. */
+.input-invalid,
+.form-group input.input-invalid,
+.form-group textarea.input-invalid {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.18);
+}
+.form-textarea.rows-2 { min-height: 4.5rem; }
+
+/* Admin → Settings: a live mirror of the letterhead the institute profile
+   (name, address, mobile · email) produces on receipts, reports and forms. */
+.org-preview { margin-bottom: 1rem; }
+.org-preview .op-label {
+  font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 0.375rem; text-align: left;
+}
+.org-preview .op-sheet {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: #ffffff; color: #111827;
+  border-radius: var(--radius-sm); padding: 0.75rem;
+  border-bottom: 3px solid var(--accent);
+  text-align: left;
+}
+.org-preview .op-sheet img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+.org-preview .op-org { font-size: 1rem; font-weight: 800; line-height: 1.25; word-break: break-word; }
+.org-preview .op-line { font-size: 0.75rem; color: #6b7280; word-break: break-word; }
+.org-preview .op-line:empty { display: none; }
 
 .btn-login,
 .btn {

@@ -22,6 +22,7 @@
       <div>
         <div class="ph-title" id="ph-org">Active Plus</div>
         <div class="ph-sub" id="ph-addr"></div>
+        <div class="ph-sub" id="ph-contact"></div>
       </div>
       <div class="ph-right"><strong id="ph-date"></strong><span id="ph-label">রিপোর্ট</span></div>
     </div>
@@ -149,15 +150,50 @@
         <!-- ======================= Settings ======================= -->
         <section class="tab-panel" id="tab-settings" hidden>
           <h2 class="section-title">প্রতিষ্ঠান সেটিংস</h2>
-          <form id="settings-form" class="card">
+          <!-- novalidate: the institute fields are checked in Bengali by
+               saveOrgInfo() instead of the browser's own English bubbles. -->
+          <form id="settings-form" class="card" novalidate>
+            <h3>প্রতিষ্ঠানের তথ্য</h3>
+            <p class="form-hint">এই নাম, ঠিকানা, মোবাইল নম্বর ও ইমেইল রিপোর্ট, রিসিট, ভর্তি ফরম, আইডি কার্ড, প্রিন্ট হেডার এবং শিক্ষার্থী ও শিক্ষক পোর্টালে ব্যবহার হয়।</p>
             <div class="form-group">
               <label for="set-org">প্রতিষ্ঠানের নাম</label>
-              <input class="form-input" id="set-org" name="orgName" required>
+              <input class="form-input" id="set-org" name="orgName" required
+                     placeholder="যেমন: অ্যাক্টিভ প্লাস কোচিং সেন্টার" autocomplete="organization">
             </div>
             <div class="form-group">
               <label for="set-address">ঠিকানা</label>
-              <input class="form-input" id="set-address" name="address">
+              <textarea class="form-input form-textarea rows-2" id="set-address" name="address" rows="2"
+                        placeholder="যেমন: ২য় তলা, মদিনা প্লাজা, মিরপুর-১০, ঢাকা"></textarea>
             </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="set-mobile">মোবাইল নম্বর</label>
+                <input class="form-input" id="set-mobile" name="mobile" type="tel" inputmode="tel"
+                       placeholder="যেমন: ০১৭০০-০০০০০০" autocomplete="tel">
+                <p class="form-hint">১১ সংখ্যার নম্বর (০১… দিয়ে শুরু)। বাংলা বা ইংরেজি সংখ্যায় লেখা যাবে।</p>
+              </div>
+              <div class="form-group">
+                <label for="set-email">ইমেইল</label>
+                <input class="form-input" id="set-email" name="email" type="email" inputmode="email"
+                       placeholder="যেমন: info@activeplus.edu" autocomplete="email">
+              </div>
+            </div>
+            <p class="form-error" id="org-error" role="alert"></p>
+
+            <!-- Live mirror of the document letterhead, so the admin sees the edit. -->
+            <div class="org-preview" id="org-preview">
+              <div class="op-label">ডকুমেন্টে যেভাবে দেখাবে</div>
+              <div class="op-sheet">
+                <img src="assets/logo.png" alt="">
+                <div>
+                  <div class="op-org" id="op-org">Active Plus</div>
+                  <div class="op-line" id="op-address"></div>
+                  <div class="op-line" id="op-contact"></div>
+                </div>
+              </div>
+            </div>
+
+            <h3>অন্যান্য সেটিংস</h3>
             <div class="form-group">
               <label for="set-fee">মাসিক ফি (৳)</label>
               <input class="form-input" id="set-fee" name="monthlyFee" type="number" min="0">
@@ -654,7 +690,7 @@
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo } from './js/data.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
       import { receiptSummary, shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from './js/docs.js';
@@ -712,21 +748,26 @@
       const onlineFor = (action) => requireOnline(action, getDbStatus);
 
       /* ------------------------------------------------------------ */
-      /* Report letterhead: logo + organisation name for every print.  */
-      /* Hidden on screen; shown when printing/exporting a PDF.       */
+      /* Report letterhead: logo + organisation identity for every      */
+      /* print. Hidden on screen; shown when printing/exporting a PDF.  */
+      /* It always carries the institute profile written in Settings:   */
+      /* name, address and the "mobile · email" contact line.           */
       /* ------------------------------------------------------------ */
-      const ensurePrintHeader = (settings = {}) => {
+      const ensurePrintHeader = () => {
+        const org = orgInfo();
         const orgEl = document.getElementById('ph-org');
         const addrEl = document.getElementById('ph-addr');
-        if (orgEl) orgEl.textContent = settings.orgName || 'Active Plus';
-        if (addrEl) addrEl.textContent = settings.address || '';
+        const contactEl = document.getElementById('ph-contact');
+        if (orgEl) orgEl.textContent = org.name;
+        if (addrEl) addrEl.textContent = org.address;
+        if (contactEl) contactEl.textContent = org.contactLine;
       };
 
       /* ------------------------------------------------------------ */
       /* Dashboard                                                     */
       /* ------------------------------------------------------------ */
       const renderOverview = () => {
-        ensurePrintHeader(db.settings.get());
+        ensurePrintHeader();
         const students = db.students.list();
         const teachers = db.teachers.list();
         const batches = db.batches.list();
@@ -1404,10 +1445,52 @@
       /* ------------------------------------------------------------ */
       /* Settings                                                      */
       /* ------------------------------------------------------------ */
+      /* Institute profile: name, address, mobile and email are written */
+      /* here once and reused by every document and portal.             */
+      const ORG_INPUTS = {
+        orgName: 'set-org', address: 'set-address', mobile: 'set-mobile', email: 'set-email'
+      };
+      const orgInput = (field) => document.getElementById(ORG_INPUTS[field]);
+      const orgValue = (field) => (orgInput(field)?.value || '').trim();
+
+      /** Mirror the four fields into the letterhead preview while typing. */
+      const renderOrgPreview = () => {
+        const orgEl = document.getElementById('op-org');
+        const addrEl = document.getElementById('op-address');
+        const contactEl = document.getElementById('op-contact');
+        if (orgEl) orgEl.textContent = orgValue('orgName') || 'প্রতিষ্ঠানের নাম';
+        if (addrEl) addrEl.textContent = orgValue('address');
+        if (contactEl) {
+          contactEl.textContent = [orgValue('mobile'), orgValue('email')].filter(Boolean).join(' · ');
+        }
+      };
+
+      /** Field-level Bengali errors under the form (and a red outline). */
+      const showOrgErrors = (errors = []) => {
+        const box = document.getElementById('org-error');
+        if (box) {
+          box.textContent = errors.map((e) => e.message).join(' ');
+          box.classList.toggle('visible', errors.length > 0);
+        }
+        Object.keys(ORG_INPUTS).forEach((field) => {
+          orgInput(field)?.classList.toggle('input-invalid', errors.some((e) => e.field === field));
+        });
+        if (errors.length) orgInput(errors[0].field)?.focus();
+      };
+
+      Object.values(ORG_INPUTS).forEach((id) => {
+        const el = document.getElementById(id);
+        el?.addEventListener('input', () => { renderOrgPreview(); showOrgErrors([]); });
+      });
+
       const renderSettings = () => {
         const settings = db.settings.get();
-        document.getElementById('set-org').value = settings.orgName || '';
-        document.getElementById('set-address').value = settings.address || '';
+        orgInput('orgName').value = settings.orgName || '';
+        orgInput('address').value = settings.address || '';
+        orgInput('mobile').value = settings.mobile || '';
+        orgInput('email').value = settings.email || '';
+        showOrgErrors([]);
+        renderOrgPreview();
         document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
         document.getElementById('set-challenge').value = settings.dailyChallengeTarget ?? 10;
         const editableFields = settings.studentEditableFields || [];
@@ -1435,10 +1518,26 @@
       document.getElementById('settings-form').addEventListener('submit', (event) => {
         event.preventDefault();
         if (!onlineFor('সেটিংস সংরক্ষণ')) return;
+        try { assertCan(session, 'manageSettings', 'সেটিংস সংরক্ষণ'); }
+        catch (err) { showToast(err.message, 'error'); return; }
         const data = new FormData(event.target);
+
+        // The institute profile is validated first: a bad mobile/email must not
+        // silently reach a printed receipt, so nothing is saved until it passes.
+        const org = saveOrgInfo({
+          orgName: data.get('orgName'),
+          address: data.get('address'),
+          mobile: data.get('mobile'),
+          email: data.get('email')
+        }, { user: session.name, role: session.role });
+        if (!org.ok) {
+          showOrgErrors(org.errors);
+          showToast(org.errors[0].message, 'error');
+          return;
+        }
+        showOrgErrors([]);
+
         db.settings.update({
-          orgName: String(data.get('orgName') || '').trim(),
-          address: String(data.get('address') || '').trim(),
           monthlyFee: Number(data.get('monthlyFee')) || 0
         });
         db.settings.update({
@@ -1451,8 +1550,14 @@
           [...event.target.querySelectorAll('input[name^="home_"]')]
             .map((input) => [input.name.slice(5), input.checked])
         ));
-        showToast('সেটিংস সংরক্ষিত হয়েছে।', 'success');
+
+        // Everything that prints or shows the institute identity picks it up now.
+        renderSettings();
+        ensurePrintHeader();
         renderOverview();
+        adminHome?.render?.();
+        refreshAdminBell();
+        showToast('প্রতিষ্ঠানের তথ্যসহ সেটিংস সংরক্ষিত হয়েছে।', 'success');
       });
 
       document.getElementById('reset-data').addEventListener('click', () => {

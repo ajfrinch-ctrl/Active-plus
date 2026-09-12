@@ -28,6 +28,11 @@
         <div class="logo" aria-hidden="true"><img class="logo-img" src="assets/logo.png" alt="Active Plus"></div>
         <h1>Active Plus</h1>
         <p class="subtitle">Coaching Management System</p>
+        <!-- Filled from the institute profile the admin writes in Settings. -->
+        <p class="org-line" id="org-line" hidden>
+          <strong id="org-line-name"></strong>
+          <span id="org-line-detail"></span>
+        </p>
       </header>
 
       <section class="login-card" aria-labelledby="login-title">
@@ -111,6 +116,7 @@
     <script type="module">
       import { initFirebase, checkConnectionStatus, getAuthMode, showToast } from './js/firebase.js';
       import { signIn, DEMO_ACCOUNTS, homeFor, ROLES, currentSession, handoffUrl } from './js/auth.js';
+      import { orgInfo } from './js/data.js';
 
       const ALLOWED_PAGES = ['student.html', 'teacher.html', 'admin.html'];
 
@@ -133,6 +139,22 @@
       const showError = (message) => {
         errorBox.textContent = message || '';
         errorBox.classList.toggle('visible', Boolean(message));
+      };
+
+      /**
+       * The institute profile the admin writes in Settings (name, address,
+       * mobile, email) also introduces the app here — so a coaching centre sees
+       * its own identity on the login screen, not a hard-coded brand.
+       */
+      const renderOrgLine = () => {
+        const line = document.getElementById('org-line');
+        if (!line) return;
+        const org = orgInfo();
+        const nameEl = document.getElementById('org-line-name');
+        const detailEl = document.getElementById('org-line-detail');
+        if (nameEl) nameEl.textContent = org.name;
+        if (detailEl) detailEl.textContent = [org.address, org.contactLine].filter(Boolean).join(' · ');
+        line.hidden = !org.name;
       };
 
       /** Keeps the "chosen" styling in sync without relying on :has(). */
@@ -229,6 +251,7 @@
       const boot = async () => {
         syncRoleOptions();
         renderDemoAccounts();
+        renderOrgLine();
 
         const session = currentSession();
         if (session) {

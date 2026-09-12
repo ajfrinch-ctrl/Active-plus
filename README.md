@@ -61,14 +61,16 @@ admin.html          admin panel — app-style Home (institute overview, recent
                     batches, subjects, exams, question bank, materials,
                     assignments, submissions, routine, results, fees &
                     payments, notices, notifications, reports, analytics,
-                    users & permissions, activity log, backup/restore
+                    users & permissions, activity log, institute profile
+                    settings, backup/restore
 css/style.css       single mobile-first stylesheet
 js/firebase.js      Firebase integration + offline fallback + toasts
 js/auth.js          local sign-in, sessions, route guards
 js/app.js           shared shell: header, tabs, tables, modals
 js/data.js          persistent data layer (versioned CRUD collections +
-                    payments/suggestions/exams/material progress + domain
-                    helpers such as todayProgress, performanceFor, feeStatusFor)
+                    payments/suggestions/exams/material progress + the
+                    institute profile orgInfo/saveOrgInfo + domain helpers such
+                    as todayProgress, performanceFor, feeStatusFor)
 js/student-home.js  the student Home: sections, bottom navigation, detail views
 js/teacher-home.js  the teacher Home: today's teaching hero, feature grid,
                     quick actions, today's classes, next class
@@ -181,6 +183,31 @@ every write — not merely by hiding buttons, and `database.rules.json` repeats
 the boundaries server-side once Firebase is deployed. Search is scoped the same
 way: a teacher searching never sees another class's students, and a student
 never sees anyone but themselves.
+
+### Institute profile (Settings)
+
+Settings → **প্রতিষ্ঠানের তথ্য** in `admin.html` is where the coaching centre's own
+identity is written and edited:
+
+| Field | Stored as | Validation |
+| ----- | --------- | ---------- |
+| প্রতিষ্ঠানের নাম | `settings.orgName` | required |
+| ঠিকানা | `settings.address` | required |
+| মোবাইল নম্বর | `settings.mobile` | required · 11 digits from `01`, `+880` accepted, Bengali digits accepted |
+| ইমেইল | `settings.email` | required · `name@domain.tld` |
+
+`orgInfo()` / `saveOrgInfo()` in `js/data.js` own these four values: the form
+saves nothing unless every field passes, the failure is reported per field in
+Bengali (message under the form, red outline on the offending input, toast),
+and every accepted edit is written to the activity log. A live letterhead
+preview under the fields mirrors what a document will print as the admin types.
+
+The saved profile is then reused everywhere the institute appears — the print
+letterhead (`ph-org` / `ph-addr` / `ph-contact`), receipts, reports, admission
+forms, ID cards and fee ledgers (`js/docs.js`), the institute card on the admin
+Home (with tap-to-call and tap-to-email links plus an edit shortcut), the login
+screen and the student app's Help card. Nothing outside Settings hard-codes the
+name, address, mobile or email.
 
 ### Admin controls
 
