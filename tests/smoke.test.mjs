@@ -83,7 +83,7 @@ test('without a real config the app boots into local mode, never throwing', asyn
   assert.equal(fb.isAuthenticated(), false);
 });
 
-test('local sign-in: valid, wrong password, and role mismatch', async () => {
+test('local sign-in: valid, wrong password, and auto-detected role', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
   await import('../js/firebase.js');
@@ -99,10 +99,16 @@ test('local sign-in: valid, wrong password, and role mismatch', async () => {
     (err) => err.code === 'wrong-password'
   );
 
-  await assert.rejects(
-    () => auth.signIn('2026-09-001', 'Student@123', 'admin'),
-    (err) => err.code === 'role-mismatch'
-  );
+  // Single login: the role always comes from the account itself. A stale or
+  // wrong hint (old callers/tests) is ignored, never escalated to.
+  const hinted = await auth.signIn('2026-09-001', 'Student@123', 'admin');
+  assert.equal(hinted.role, 'student', 'role hint cannot override the account role');
+
+  const hintless = await auth.signIn('teacher@activeplus.edu', 'Teacher@123');
+  assert.equal(hintless.role, 'teacher', 'role is detected without any hint');
+
+  const admin = await auth.signIn('admin@activeplus.edu', 'Admin@123');
+  assert.equal(admin.role, 'admin', 'admin is detected without any hint');
 });
 
 test('requireRole guards: guest redirected, right role passes, wrong role bounced home', async () => {
@@ -180,13 +186,14 @@ test('index.html: login UI nests correctly (button no longer swallows the page)'
 
   const container = document.querySelector('.auth-shell');
   assert.ok(container.contains(btn), 'login button inside .auth-shell');
-  assert.ok(container.contains(document.querySelector('.role-options')), 'role options inside .auth-shell');
   assert.ok(container.contains(document.getElementById('status-bar')), 'status bar inside .auth-shell');
   const card = document.querySelector('.login-card');
   assert.ok(card.contains(document.getElementById('status-bar')), 'status bar inside login-card');
 
-  const radios = document.querySelectorAll('input[name="role"]');
-  assert.equal(radios.length, 3, 'three role radios');
+  // Single login: no role selector of any kind.
+  assert.equal(document.querySelector('.role-options'), null, 'no role selector fieldset');
+  assert.equal(document.querySelectorAll('input[name="role"]').length, 0, 'no role radios');
+  assert.ok(document.querySelector('.login-note'), 'single-login note present');
   assert.ok(document.querySelector('form#login-form'), 'login form present');
 });
 

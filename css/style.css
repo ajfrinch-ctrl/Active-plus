@@ -267,11 +267,8 @@ a { color: var(--accent); }
   padding: 1.25rem;
 }
 
-/* Role selector — real buttons, keyboard + screen-reader friendly */
-.role-options { margin-bottom: 1.25rem; border: 0; min-width: 0; }
-.role-options legend {
-  font-size: 0.8125rem; color: var(--text-light); margin-bottom: 0.5rem; padding: 0;
-}
+/* Role option tiles — reused by quiz options and the admin permission matrix
+   (the login page itself no longer has a role selector). */
 .role-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -426,6 +423,15 @@ a { color: var(--accent); }
 .btn-warning:hover { background: #c99624; }
 .btn-error { background: var(--error-fill); }
 .btn-error:hover { background: #a3252c; }
+
+/* Single-login note under the submit button. */
+.login-note {
+  margin: 0.875rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-light);
+  text-align: center;
+}
 .btn-small { padding: 0.5rem 0.875rem; font-size: 0.8125rem; min-height: 38px; width: auto; }
 .btn-block { width: 100%; }
 

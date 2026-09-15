@@ -55,9 +55,9 @@ test('login from index.html hands off to the student home', async () => {
   writeFileSync(tmp, inlineModuleScripts(read('index.html'))[0]);
   try { await import(`file://${tmp}`); } finally { unlinkSync(tmp); }
 
-  // fill the actual form and submit it
+  // fill the actual form and submit it (no role picker — the role is detected)
   const doc = dom.window.document;
-  doc.querySelector('input[name="role"][value="student"]').checked = true;
+  assert.equal(doc.querySelector('input[name="role"]'), null, 'login form has no role picker');
   doc.getElementById('login-input').value = '2026-09-001';
   doc.getElementById('login-password').value = 'Student@123';
   doc.getElementById('login-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));

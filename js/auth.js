@@ -22,6 +22,7 @@ import {
   signOut as firebaseSignOut,
   validateStudentId,
   setUserRole as persistRole,
+  getUserRole as rememberedRole,
   addActivityLog,
   showToast
 } from './firebase.js';
@@ -274,7 +275,7 @@ function saveSession(user) {
 /* ------------------------------------------------------------------ */
 /* Sign in / out                                                       */
 /* ------------------------------------------------------------------ */
-async function localSignIn(identifier, password, role) {
+async function localSignIn(identifier, password) {
   await seedUsers();
   const user = findUser(identifier);
   if (!user) {
@@ -284,36 +285,42 @@ async function localSignIn(identifier, password, role) {
   if (hash !== user.passwordHash) {
     throw new AuthError('wrong-password', 'পাসওয়ার্ড সঠিক নয়। আবার চেষ্টা করুন।');
   }
-  if (role && user.role !== role) {
-    const label = { student: 'শিক্ষার্থী', teacher: 'শিক্ষক', admin: 'অ্যাডমিন' }[user.role] || user.role;
-    throw new AuthError('role-mismatch', `এই অ্যাকাউন্টটি একজন ${label}-এর। উপরে থেকে সঠিক ভূমিকা নির্বাচন করুন।`);
-  }
+  /* One login for everyone: the role always comes from the account itself,
+     never from a picker. The portal is derived from the session role. */
   return saveSession({ ...user, provider: 'local' });
 }
 
 /**
+ * Single sign-in used by every user type.
+ *
  * @param {string} identifier email or student ID
  * @param {string} password
- * @param {'student'|'teacher'|'admin'} role role chosen on the login form
+ * @param {'student'|'teacher'|'admin'} [hint] ignored — accepted only so
+ *        older callers keep working. The role is detected from the account
+ *        itself and the user is routed to the matching portal automatically.
  * @returns {Promise<object>} the saved session
  */
-export async function signIn(identifier, password, role) {
+export async function signIn(identifier, password, hint) {
+  void hint;
   const id = String(identifier || '').trim();
   const pass = String(password || '');
 
   if (!id || !pass) {
     throw new AuthError('missing-fields', 'ইউজারনেইম/স্টুডেন্ট আইডি এবং পাসওয়ার্ড দুটোই দিতে হবে।');
   }
-  if (!ROLES.includes(role)) {
-    throw new AuthError('missing-role', 'লগিন করার আগে একটি ভূমিকা (Student / Teacher / Admin) বেছে নিন।');
-  }
-  if (role === 'student' && !id.includes('@') && !validateStudentId(id)) {
-    console.info('[Active Plus] Student ID does not match YYYY-C-RRR:', id);
+  if (!id.includes('@') && !validateStudentId(id)) {
+    console.info('[Active Plus] Identifier does not match a student ID (YYYY-C-RRR):', id);
   }
 
   if (getAuthMode() === 'firebase' && id.includes('@')) {
     try {
       const credential = await signInWithEmailAndPassword(id, pass);
+      /* Firebase Auth has no role store, so detect it: a local account
+         record first, then the role remembered on this device, then the
+         least-privileged default. */
+      await seedUsers();
+      const known = findUser(id);
+      const role = known?.role || rememberedRole() || 'student';
       const session = saveSession({
         uid: credential.user.uid,
         username: credential.user.email,
@@ -329,7 +336,7 @@ export async function signIn(identifier, password, role) {
     }
   }
 
-  const session = await localSignIn(id, pass, role);
+  const session = await localSignIn(id, pass);
   addActivityLog('login', 'auth');
   return session;
 }

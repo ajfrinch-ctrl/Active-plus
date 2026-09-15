@@ -39,27 +39,6 @@
         <h2 id="login-title" class="sr-only">লগিন ফর্ম</h2>
 
         <form id="login-form" novalidate>
-          <fieldset class="role-options">
-            <legend>আপনি কে?</legend>
-            <div class="role-grid">
-              <label class="role-option">
-                <input type="radio" name="role" value="student" checked>
-                <span class="role-emoji" aria-hidden="true">🎓</span>
-                <span>শিক্ষার্থী</span>
-              </label>
-              <label class="role-option">
-                <input type="radio" name="role" value="teacher">
-                <span class="role-emoji" aria-hidden="true">🧑‍🏫</span>
-                <span>শিক্ষক</span>
-              </label>
-              <label class="role-option">
-                <input type="radio" name="role" value="admin">
-                <span class="role-emoji" aria-hidden="true">🛡️</span>
-                <span>অ্যাডমিন</span>
-              </label>
-            </div>
-          </fieldset>
-
           <div class="form-group">
             <label for="login-input">ইমেইল অথবা স্টুডেন্ট আইডি</label>
             <input
@@ -93,6 +72,8 @@
           <p class="form-error" id="login-error" role="alert" aria-live="assertive"></p>
 
           <button type="submit" class="btn-login" id="login-btn">লগিন করুন</button>
+
+          <p class="login-note">একটাই লগইন — আপনার অ্যাকাউন্ট বুঝে শিক্ষার্থী, শিক্ষক বা অ্যাডমিন পোর্টালে নিয়ে যাওয়া হবে।</p>
         </form>
 
         <div class="status-bar" id="status-bar" aria-live="polite">
@@ -115,7 +96,7 @@
 
     <script type="module">
       import { initFirebase, checkConnectionStatus, getAuthMode, showToast } from './js/firebase.js';
-      import { signIn, DEMO_ACCOUNTS, homeFor, ROLES, currentSession, handoffUrl } from './js/auth.js';
+      import { signIn, DEMO_ACCOUNTS, homeFor, currentSession, handoffUrl } from './js/auth.js';
       import { orgInfo } from './js/data.js';
 
       const ALLOWED_PAGES = ['student.html', 'teacher.html', 'admin.html'];
@@ -128,8 +109,6 @@
       const statusText = document.getElementById('status-text');
       const statusBar = document.getElementById('status-bar');
       const togglePassword = document.getElementById('toggle-password');
-
-      const selectedRole = () => form.elements.role?.value || 'student';
 
       const setStatus = (message, tone = '') => {
         statusText.textContent = message;
@@ -155,14 +134,6 @@
         if (nameEl) nameEl.textContent = org.name;
         if (detailEl) detailEl.textContent = [org.address, org.contactLine].filter(Boolean).join(' · ');
         line.hidden = !org.name;
-      };
-
-      /** Keeps the "chosen" styling in sync without relying on :has(). */
-      const syncRoleOptions = () => {
-        document.querySelectorAll('.role-option').forEach((label) => {
-          const radio = label.querySelector('input[type="radio"]');
-          label.toggleAttribute('data-checked', Boolean(radio?.checked));
-        });
       };
 
       const setLoading = (isLoading) => {
@@ -191,22 +162,13 @@
           fill.addEventListener('click', () => {
             input.value = account.username;
             password.value = account.password;
-            const radio = form.elements.role?.value;
-            const target = form.querySelector(`input[name="role"][value="${account.role}"]`);
-            if (target) { target.checked = true; syncRoleOptions(); }
             showError('');
             password.focus();
-            void radio;
           });
           item.append(info, fill);
           list.appendChild(item);
         });
       };
-
-      form.elements.role?.addEventListener?.('change', syncRoleOptions);
-      form.querySelectorAll('input[name="role"]').forEach((radio) => {
-        radio.addEventListener('change', () => { syncRoleOptions(); showError(''); });
-      });
 
       togglePassword.addEventListener('click', () => {
         const show = password.type === 'password';
@@ -222,21 +184,18 @@
 
         const identifier = input.value.trim();
         const secret = password.value;
-        const role = selectedRole();
 
         if (!identifier || !secret) {
           showError('ইউজারনেইম/স্টুডেন্ট আইডি এবং পাসওয়ার্ড দুটোই দিন।');
           (!identifier ? input : password).focus();
           return;
         }
-        if (!ROLES.includes(role)) {
-          showError('একটি ভূমিকা নির্বাচন করুন।');
-          return;
-        }
 
         setLoading(true);
         try {
-          const session = await signIn(identifier, secret, role);
+          /* One login for every user type: signIn() detects the role from the
+             account and we route to that role's own portal. */
+          const session = await signIn(identifier, secret);
           setStatus(`স্বাগতম, ${session.name}!`, 'connected');
           showToast(`সফলভাবে লগিন হয়েছে — ${session.name}`, 'success');
           window.location.replace(handoffUrl(safeNext() || homeFor(session.role), session));
@@ -249,7 +208,6 @@
       });
 
       const boot = async () => {
-        syncRoleOptions();
         renderDemoAccounts();
         renderOrgLine();
 

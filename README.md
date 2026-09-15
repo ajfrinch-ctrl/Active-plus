@@ -34,6 +34,11 @@ Open `http://localhost:8080` and log in.
 The login screen lists these with a one-tap "ব্যবহার করুন" fill button, so the
 app can always be signed into even before Firebase is configured.
 
+There is **one login form for everyone** — no role picker. `signIn()` detects
+the user type from the account itself and the app routes to the matching
+portal (শিক্ষার্থী → `student.html`, শিক্ষক → `teacher.html`,
+অ্যাডমিন → `admin.html`) automatically.
+
 ## Auto-generated IDs
 
 - **Student** — a unique ID is generated automatically on admission as
@@ -47,7 +52,8 @@ app can always be signed into even before Firebase is configured.
 ## Structure
 
 ```
-index.html          login + role selector (mobile-first)
+index.html          single login — detects the user type and routes to the
+                    matching portal (mobile-first)
 student.html        student portal — app-style Home (today's progress, next
                     class/exam, daily challenge, materials, assignments,
                     performance, fees, tips, banners) plus Study / Exam /
