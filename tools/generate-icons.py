@@ -28,7 +28,7 @@ DARK = (41, 41, 41, 255)         # "A"
 ORANGE = (245, 145, 15, 255)     # "+"
 TRANSPARENT = (0, 0, 0, 0)
 WHITE = (255, 255, 255, 255)
-PAGE_BG = (45, 55, 72, 255)      # #2d3748 — for maskable full-bleed icons
+PAGE_BG = (5, 7, 10, 255)        # #05070a — for maskable full-bleed icons (dark theme)
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
