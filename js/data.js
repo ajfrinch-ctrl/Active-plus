@@ -10,8 +10,8 @@
  * examResults.
  */
 
-import { readJSON, writeJSON } from './store.js';
-import { isFirebaseConfigured, ref as fbRef } from './firebase.js';
+import { readJSON, writeJSON, onStoreReset } from './store.js';
+import { isFirebaseConfigured, ref as fbRef, showToast } from './firebase.js';
 
 const DATA_KEY = 'activeplus_data';
 export const DATA_VERSION = 7; // student home: tips, banners, study activity, daily challenge
@@ -20,8 +20,46 @@ export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'এ�
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };
 export const ALL_CLASSES = 'সব';
 
-const MONTH_AGO = 'আগস্ট ২০২৬';
-const MONTH_NOW = 'সেপ্টেম্বর ২০২৬';
+/* Seed dates are derived from today. Hard-coded Bengali dates go stale within
+   days — a September deadline turns every "pending" assignment into "overdue"
+   and closes the demo exam window — so the sample centre always looks alive. */
+const SEED_DIGITS = '০১২৩৪৫৬৭৮৯';
+const BN_MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+  'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
+
+const toBnDigits = (value) => String(value).replace(/\d/g, (d) => SEED_DIGITS[d]);
+
+/** 2026-09-12 → ২০২৬-০৯-১২ (UTC based, exactly like todayBn()). */
+function seedDay(date) {
+  return toBnDigits(date.toISOString().slice(0, 10));
+}
+
+/** A Bengali ISO date `offsetDays` away from today. */
+function daysFromNow(offsetDays) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return seedDay(d);
+}
+
+/** A day in a month relative to this one, clamped so it never lands in the future. */
+function monthDay(monthOffset, day) {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset, 1));
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  if (d.getTime() > now.getTime()) d.setTime(now.getTime());
+  return seedDay(d);
+}
+
+/** 'সেপ্টেম্বর ২০২৬' for a month relative to this one. */
+function monthLabel(monthOffset = 0) {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset, 1));
+  return `${BN_MONTHS[d.getUTCMonth()]} ${toBnDigits(d.getUTCFullYear())}`;
+}
+
+const MONTH_AGO = monthLabel(-1);
+const MONTH_NOW = monthLabel(0);
 
 const SEED = {
   settings: {
@@ -92,17 +130,17 @@ const SEED = {
   ],
   /* Per-student monthly fees. status: পরিশোধিত | বকেয়া */
   fees: [
-    { id: 'fee-001-ago', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৫' },
-    { id: 'fee-001-now', studentId: '2026-09-001', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৯-০২' },
-    { id: 'fee-002-ago', studentId: '2026-09-002', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৬' },
+    { id: 'fee-001-ago', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 5) },
+    { id: 'fee-001-now', studentId: '2026-09-001', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: monthDay(0, 2) },
+    { id: 'fee-002-ago', studentId: '2026-09-002', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 6) },
     { id: 'fee-002-now', studentId: '2026-09-002', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
-    { id: 'fee-014-ago', studentId: '2026-10-014', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-১০' },
+    { id: 'fee-014-ago', studentId: '2026-10-014', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 10) },
     { id: 'fee-014-now', studentId: '2026-10-014', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
-    { id: 'fee-007-ago', studentId: '2026-08-007', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৮-০৪' },
-    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: '২০২৬-০৯-০১' }
+    { id: 'fee-007-ago', studentId: '2026-08-007', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 4) },
+    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: monthDay(0, 1) }
   ],
   payments: [
-    { id: 'pay-1', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, date: '২০২৬-০৮-০৫', receivedBy: 'সিস্টেম' }
+    { id: 'pay-1', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, date: monthDay(0, 1), receivedBy: 'সিস্টেম' }
   ],
   suggestions: [
     {
@@ -114,8 +152,8 @@ const SEED = {
   exams: [
     {
       id: 'exam-1', title: 'গণিত MCQ মডেল টেস্ট-১', className: 'নবম', subject: 'গণিত',
-      author: 'কামরুল ইসলাম', date: '২০২৬-০৯-০২', time: '১৭:০০',
-      duration: 30, startDate: '২০২৬-০৯-০১', endDate: '২০২৬-০৯-৩০',
+      author: 'কামরুল ইসলাম', date: daysFromNow(0), time: '১৭:০০',
+      duration: 30, startDate: daysFromNow(-2), endDate: daysFromNow(5),
       questions: [
         { q: '৫ + ৩ × ২ = ?', options: ['১০', '১১', '১৬', ''], answer: 1 },
         { q: 'একটি ত্রিভুজের তিন কোণের সমষ্টি কত?', options: ['৯০°', '১৮০°', '২৭০°', '৩৬০°'], answer: 1 },
@@ -139,10 +177,10 @@ const SEED = {
     { id: 'mat-1', title: 'গণিত নোট — অধ্যায় ১', subject: 'গণিত', className: 'নবম', type: 'নোট', chapter: '১', description: 'স্বাভাবিক সংখ্যা ও ভগ্নাংশ', date: '২০২৬-০৯-০১', by: 'কামরুল ইসলাম', published: true }
   ],
   assignments: [
-    { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: '২০২৬-০৯-১০', marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
+    { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: daysFromNow(5), marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
   ],
   submissions: [
-    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: '২০২৬-০৯-০৩', feedback: '' }
+    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: daysFromNow(-2), feedback: '' }
   ],
   notifications: [
     { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০২৬-০৯-০১', createdAt: new Date().toISOString(), read: false }
@@ -163,12 +201,54 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+/* One parsed copy of the store per page load: re-parsing 350 KB of JSON on
+   every collection access made inserts quadratic (5 ms/record at 1 500 rows).
+   Invalidated by our own remote snapshots and by writes from another tab. */
+let storeCache = null;
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (event) => {
+    if (!event || !event.key || event.key === DATA_KEY) storeCache = null;
+  });
+}
+
+// The storage layer being reset (tests, or a host clearing the memory fallback)
+// must drop our parsed copy with it.
+onStoreReset(() => { storeCache = null; });
+
 function load() {
+  if (storeCache) return storeCache;
   const existing = readJSON(DATA_KEY, null);
-  if (existing && existing.version === DATA_VERSION && existing.collections) return existing;
+  if (existing && existing.collections) {
+    // A version bump must never cost the centre its data: carry it forward.
+    storeCache = Number(existing.version) === DATA_VERSION ? existing : migrateStore(existing);
+    if (storeCache !== existing) writeJSON(DATA_KEY, storeCache);
+    return storeCache;
+  }
   const fresh = { version: DATA_VERSION, seededAt: new Date().toISOString(), collections: clone(SEED) };
   writeJSON(DATA_KEY, fresh);
+  storeCache = fresh;
   return fresh;
+}
+
+/**
+ * Moves data from an older DATA_VERSION into the current shape instead of
+ * wiping it: every stored collection is kept as-is, and only collections the
+ * old version did not have are filled in from the seed.
+ */
+function migrateStore(old) {
+  const collections = clone(SEED);
+  for (const [key, value] of Object.entries(old.collections || {})) {
+    if (value === null || value === undefined) continue;
+    if (key === 'settings') collections.settings = { ...collections.settings, ...clone(value) };
+    else collections[key] = clone(value);
+  }
+  return {
+    version: DATA_VERSION,
+    seededAt: old.seededAt || new Date().toISOString(),
+    migratedFrom: old.version ?? null,
+    collections
+  };
 }
 
 let applyingRemote = false;
@@ -195,7 +275,8 @@ export function getDbStatus() {
     mode: configured ? 'firebase' : 'local',
     lastSync: syncState.lastSync,
     pending: syncState.pending,
-    error: syncState.error ? 'sync-failed' : null
+    error: syncState.error ? 'sync-failed' : null,
+    persisted: lastPersistOk // false = writes are memory-only for this page load
   };
 }
 
@@ -203,7 +284,9 @@ export function getDbStatus() {
 function pushRemote(store) {
   if (applyingRemote) return;
   const transport = remoteTransport || (isFirebaseConfigured()
-    ? (payload) => { const r = fbRef('activeplus/data'); return r?.set ? r.set(payload).catch(() => null) : null; }
+    // No .catch(() => null) here: a rejected write must stay rejected so the
+    // caller reports "sync failed" instead of claiming the mirror was updated.
+    ? (payload) => { const r = fbRef('activeplus/data'); return r?.set ? r.set(payload) : null; }
     : null);
   if (!transport) return;
   syncState.pending += 1;
@@ -219,9 +302,24 @@ function pushRemote(store) {
   }
 }
 
+let lastPersistOk = true;
+let persistWarningShown = false;
+
+/** Spec 51: a save that never reached storage must not look like a success. */
+function notifyPersistFailure() {
+  if (persistWarningShown) return;
+  persistWarningShown = true;
+  try {
+    showToast('সংরক্ষণ ব্যর্থ: ব্রাউজারের স্টোরেজ বন্ধ বা জায়গা শেষ। এই পেজ বন্ধ করলে নতুন তথ্য হারিয়ে যাবে — এখনই ব্যাকআপ নামান।', 'error', 9000);
+  } catch (e) { /* no DOM (tests): getDbStatus().persisted still tells the truth */ }
+}
+
 function save(store) {
-  writeJSON(DATA_KEY, store);
+  storeCache = store;
+  lastPersistOk = writeJSON(DATA_KEY, store);
+  if (!lastPersistOk) notifyPersistFailure();
   pushRemote(store);
+  return lastPersistOk;
 }
 
 /**
@@ -237,6 +335,7 @@ export function subscribeRemote(onSnapshot) {
     if (!value || !value.collections) return;
     applyingRemote = true;
     writeJSON(DATA_KEY, value);
+    storeCache = value && value.collections ? value : null;
     applyingRemote = false;
     if (onSnapshot) onSnapshot(value);
   };
@@ -327,6 +426,7 @@ export const db = {
 
   reset() {
     const fresh = { version: DATA_VERSION, seededAt: new Date().toISOString(), collections: clone(SEED) };
+    storeCache = fresh;
     save(fresh);
     return fresh;
   },
@@ -335,12 +435,105 @@ export const db = {
 };
 
 /* ------------------------------------------------------------------ */
+/* Institution profile                                                 */
+/* ------------------------------------------------------------------ */
+/* The name, address, mobile and email an admin writes in Settings are  */
+/* the identity printed on every receipt, report, admission form, ID    */
+/* card and shown in the student/teacher portals — so they are read,    */
+/* validated and normalised in one place instead of per document.       */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+
+/** Digits only — Bengali numerals are accepted wherever the app asks for one. */
+export function mobileDigits(value) {
+  return bnDigitsToAscii(String(value ?? '')).replace(/\D/g, '');
+}
+
+/** Bangladeshi mobile: 11 digits from 01, with or without the 880 country code. */
+export function isValidMobile(value) {
+  const digits = mobileDigits(value);
+  if (!digits) return false;
+  // +8801711000000 and 01711000000 are the same number — compare the local form.
+  const local = digits.startsWith('880') ? `0${digits.slice(3)}` : digits;
+  return local.length === 11 && local.startsWith('01');
+}
+
+export function isValidEmail(value) {
+  return EMAIL_RE.test(String(value ?? '').trim());
+}
+
+/**
+ * The institution identity used by every letterhead, document and portal.
+ * Always complete: the seed fills anything the admin has not written yet.
+ */
+export function orgInfo() {
+  const s = db.settings.get();
+  const trim = (v) => String(v ?? '').trim();
+  const mobile = trim(s.mobile);
+  const email = trim(s.email);
+  return {
+    name: trim(s.orgName) || 'Active Plus',
+    address: trim(s.address),
+    mobile,
+    email,
+    website: trim(s.website),
+    academicYear: trim(s.academicYear),
+    /** One-line "mobile · email" for letterheads and document headers. */
+    contactLine: [mobile, email].filter(Boolean).join(' · ')
+  };
+}
+
+/**
+ * Validate and store the institution profile written in admin Settings.
+ *
+ * Nothing is saved unless every field is usable, so a document can never be
+ * exported with a half-filled letterhead. Returns `{ ok, errors, org }` where
+ * each error is `{ field, message }` in Bengali — the data layer never touches
+ * the DOM, the caller decides where to show them.
+ */
+export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}) {
+  const name = String(input.orgName ?? '').trim();
+  const address = String(input.address ?? '').trim();
+  const mobile = String(input.mobile ?? '').trim();
+  const email = String(input.email ?? '').trim();
+
+  const errors = [];
+  const fail = (field, message) => errors.push({ field, message });
+
+  if (!name) fail('orgName', 'প্রতিষ্ঠানের নাম লিখুন।');
+  if (!address) fail('address', 'প্রতিষ্ঠানের ঠিকানা লিখুন।');
+  if (!mobile) fail('mobile', 'মোবাইল নম্বর লিখুন।');
+  else if (!isValidMobile(mobile)) fail('mobile', 'সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যা, ০১ দিয়ে শুরু (যেমন ০১৭০০-০০০০০০)।');
+  if (!email) fail('email', 'ইমেইল ঠিকানা লিখুন।');
+  else if (!isValidEmail(email)) fail('email', 'সঠিক ইমেইল ঠিকানা দিন (যেমন info@example.com)।');
+
+  if (errors.length) return { ok: false, errors, org: orgInfo() };
+
+  db.settings.update({ orgName: name, address, mobile, email });
+  logActivity({ user, role, action: 'updated institute profile', target: name });
+  return { ok: true, errors: [], org: orgInfo() };
+}
+
+/* ------------------------------------------------------------------ */
 /* Domain helpers                                                      */
 /* ------------------------------------------------------------------ */
 
 export function todayBn() {
   const iso = new Date().toISOString().slice(0, 10);
   return iso.replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+}
+
+/** True when a Bengali ISO date ('২০২৬-০৯-১২') falls in the current month. */
+export function isThisMonth(bnDate) {
+  const value = String(bnDate || '');
+  return value.length >= 7 && value.slice(0, 7) === todayBn().slice(0, 7);
+}
+
+/** Exam percentage, guarded: a zero-question paper must not produce NaN/Infinity. */
+export function resultPercent(result) {
+  const total = Number(result?.total) || 0;
+  if (total <= 0) return 0;
+  return (Number(result?.score) || 0) / total * 100;
 }
 
 export function newId(prefix) {
@@ -411,44 +604,87 @@ export function studentsOfClass(className) {
 }
 
 /** Due (বকেয়া) fee rows joined with their student, optionally by class. */
+/** What is still owed on a fee row: the amount minus anything already paid. */
+export function dueRemaining(fee) {
+  if (!fee) return 0;
+  return Math.max(0, (Number(fee.amount) || 0) - (Number(fee.paid) || 0));
+}
+
 export function dueFees(className = ALL_CLASSES) {
   const students = studentsOfClass(className);
   const ids = new Set(students.map((s) => s.id));
   return db.fees.list()
-    .filter((fee) => fee.status === 'বকেয়া' && ids.has(fee.studentId))
-    .map((fee) => ({ ...fee, student: students.find((s) => s.id === fee.studentId) || null }));
+    .filter((fee) => fee.status === 'বকেয়া' && dueRemaining(fee) > 0 && ids.has(fee.studentId))
+    .map((fee) => ({
+      ...fee,
+      remaining: dueRemaining(fee),
+      student: students.find((s) => s.id === fee.studentId) || null
+    }));
 }
 
 /**
- * Marks a fee as paid, records the payment, clears the student's বকেয়া status
- * when nothing is due anymore, and sends a personal notice to the student.
+ * Collects money against a due fee and writes exactly one payment row.
+ *
+ * The amount is always checked against what is really owed: a smaller payment
+ * is kept as a partial payment (the fee stays বকেয়া with a reduced balance),
+ * a larger one is refused, and only money that clears the balance marks the fee
+ * পরিশোধিত. Callers therefore cannot close a ৳1200 due by taking ৳50.
+ * Returns null when there is nothing to collect or the amount is not acceptable.
  */
-export function receivePayment(feeId, receivedBy) {
+export function receivePayment(feeId, receivedBy, details = {}) {
   const fee = db.fees.find(feeId);
-  if (!fee || fee.status !== 'বকেয়া') return null;
-  const student = db.students.find(fee.studentId);
-  const date = todayBn();
+  if (!fee || fee.status === 'পরিশোধিত') return null;
+  const remaining = dueRemaining(fee);
+  if (remaining <= 0) return null;
 
-  db.fees.update(feeId, { status: 'পরিশোধিত', date });
+  const given = details?.amount;
+  const amount = given === undefined || given === null || given === ''
+    ? remaining                                  // nothing specified → settle the due
+    : Number(given);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > remaining + 1e-9) return null;
+
+  const student = db.students.find(fee.studentId);
+  const date = String(details?.date || '').trim() || todayBn();
+  const paidTotal = (Number(fee.paid) || 0) + amount;
+  const settled = paidTotal + 1e-9 >= (Number(fee.amount) || 0);
+
   const payment = {
     id: newId('pay'), studentId: fee.studentId, month: fee.month,
-    amount: fee.amount, date, receivedBy: receivedBy || 'অ্যাডমিন'
+    amount, date, receivedBy: receivedBy || 'অ্যাডমিন'
   };
+  if (details?.method) payment.method = String(details.method);
+  if (details?.reference) payment.reference = String(details.reference);
+  if (details?.remarks) payment.remarks = String(details.remarks);
+  if (details?.receiptNo) payment.receiptNo = String(details.receiptNo);
   db.payments.add(payment);
 
+  db.fees.update(feeId, settled
+    ? { status: 'পরিশোধিত', date, paid: paidTotal }
+    : { paid: paidTotal });
+
   if (student) {
-    const stillDue = db.fees.list().some((f) => f.studentId === student.id && f.status === 'বকেয়া');
-    if (!stillDue) db.students.update(student.id, { status: 'সক্রিয়' });
+    const stillDue = db.fees.list()
+      .some((f) => f.studentId === student.id && f.status === 'বকেয়া' && dueRemaining(f) > 0);
+    if (!stillDue && student.status !== 'সক্রিয়') db.students.update(student.id, { status: 'সক্রিয়' });
     db.notices.add({
       id: newId('n'),
-      title: `পেমেন্ট গৃহীত: ${fee.month} — ৳${fee.amount}`,
+      title: `পেমেন্ট গৃহীত: ${fee.month} — ৳${amount}${settled ? '' : ` (বাকি ৳${dueRemaining(db.fees.find(feeId))})`}`,
       audience: 'শিক্ষার্থী',
       className: student.className,
-      forStudent: student.id,
+      forStudent: student.id, // personal: noticesFor() keeps it off shared boards
       date
     });
   }
-  return { fee, student, payment };
+  return { fee: db.fees.find(feeId), student, payment, settled, remaining: dueRemaining(db.fees.find(feeId)) };
+}
+
+/**
+ * Notices for a shared board (teacher/admin lists, "latest notice" cards).
+ * A payment receipt is personal to one student (`forStudent`) and must never be
+ * broadcast to a class or a teacher.
+ */
+export function sharedNotices() {
+  return db.notices.list().filter((n) => !n.forStudent);
 }
 
 /** Notices visible to one student: global + own class + personal (private). */
@@ -468,7 +704,12 @@ export function scoreExam(exam, answers) {
   const total = exam.questions.length;
   let score = 0;
   exam.questions.forEach((question, index) => {
-    if (Number(answers[index]) === question.answer) score += 1;
+    const given = answers ? answers[index] : undefined;
+    // Unanswered must mean zero marks: Number(null) === 0 used to award a point
+    // whenever the correct option happened to be A.
+    if (given === null || given === undefined || given === '') return;
+    const chosen = Number(given);
+    if (Number.isFinite(chosen) && chosen === Number(question.answer)) score += 1;
   });
   return { score, total };
 }
@@ -506,7 +747,7 @@ export function examSummary(examId) {
   const results = db.examResults.list().filter((r) => r.examId === examId);
   if (!exam || !results.length) return null;
   const passMarkPct = (db.settings.get().passMark || 40);
-  const scores = results.map((r) => r.score / r.total * 100);
+  const scores = results.map((r) => resultPercent(r));
   const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   const pass = scores.filter((p) => p >= passMarkPct).length;
   return {
@@ -524,7 +765,7 @@ export function classPerformance() {
     const student = db.students.find(r.studentId);
     const cls = student?.className || 'অজানা';
     (byClass[cls] = byClass[cls] || (byClass[cls] = { name: cls, total: 0, count: 0 }));
-    byClass[cls].total += r.score / r.total * 100;
+    byClass[cls].total += resultPercent(r);
     byClass[cls].count += 1;
   });
   return Object.values(byClass).map((c) => ({ name: c.name, avg: Math.round(c.total / c.count) }));
@@ -535,7 +776,7 @@ export function leaderboard(examId = null) {
   if (examId) results = results.filter((r) => r.examId === examId);
   const rows = results.map((r) => {
     const student = db.students.find(r.studentId);
-    return { ...r, pct: Math.round(r.score / r.total * 100), className: student?.className || '—' };
+    return { ...r, pct: Math.round(resultPercent(r)), className: student?.className || '—' };
   }).sort((a, b) => b.pct - a.pct);
   return rows.map((r, i) => ({ position: i + 1, ...r }));
 }
@@ -547,7 +788,7 @@ export function analytics() {
   const payments = db.payments.list();
   const due = dueFees();
   const today = todayBn();
-  const dueTotal = due.reduce((s, d) => s + Number(d.amount || 0), 0);
+  const dueTotal = due.reduce((s, d) => s + Number(d.remaining ?? d.amount) || 0, 0);
   return {
     totalStudents: students.length,
     activeStudents: students.filter((s) => s.status === 'সক্রিয়').length,
@@ -556,10 +797,11 @@ export function analytics() {
     activeBatches: db.batches.list().length,
     totalSubjects: db.subjects.list().length,
     upcomingExams: db.exams.list().length,
-    pendingAssignments: db.assignments.list().filter((a) => !a.checked).length,
+    pendingAssignments: db.submissions.list().filter((s) => !submissionChecked(s)).length,
     publishedResults: db.examResults.list().length,
     todayCollection: payments.filter((p) => p.date === today).reduce((s, p) => s + Number(p.amount || 0), 0),
-    monthlyCollection: payments.reduce((s, p) => s + Number(p.amount || 0), 0),
+    // The dashboard labels this "মাসিক সংগ্রহ", so it counts this month only.
+    monthlyCollection: payments.filter((p) => isThisMonth(p.date)).reduce((s, p) => s + Number(p.amount || 0), 0),
     totalDue: dueTotal,
     totalClasses: db.classes.list().filter((c) => c.active).length
   };
@@ -575,9 +817,14 @@ export function importBackup(text) {
   let parsed;
   try { parsed = JSON.parse(text); } catch (e) { return { ok: false, error: 'অবৈধ JSON ফাইল।' }; }
   if (!parsed || parsed.app !== 'active-plus' || !parsed.collections) return { ok: false, error: 'এটি Active Plus ব্যাকআপ নয়।' };
-  const known = ['settings', 'students', 'teachers', 'batches', 'notices', 'routine', 'attendance', 'results', 'fees', 'payments', 'suggestions', 'exams', 'examResults', 'classes', 'subjects', 'materials', 'assignments', 'submissions', 'notifications', 'activityLogs'];
+  // Restore every collection the file actually holds. A hard-coded whitelist
+  // silently dropped tips, banners, materialProgress, studyActivity and
+  // challenge — a "successful" restore that lost five collections.
   const collections = {};
-  for (const key of known) if (Array.isArray(parsed.collections[key]) || (key === 'settings' && parsed.collections[key])) collections[key] = parsed.collections[key];
+  for (const [key, value] of Object.entries(parsed.collections || {})) {
+    if (value === null || value === undefined) continue;
+    if (Array.isArray(value) || (value && typeof value === 'object')) collections[key] = value;
+  }
   const store = load();
   store.collections = { ...store.collections, ...clone(collections) };
   save(store);
@@ -936,11 +1183,18 @@ export function submitAssignment(assignment, student, note = '') {
   return row;
 }
 
+/** A submission counts as reviewed once a teacher has marked it. */
+function submissionChecked(submission) {
+  return !!submission && (submission.checked === true || submission.status === 'চেক হয়েছে');
+}
+
 /** Teacher/admin marks a submission checked, optionally with feedback. */
 export function checkSubmission(submissionId, feedback = '', marks = null) {
   const row = db.submissions.find(submissionId);
   if (!row) return null;
-  const patch = { status: 'চেক হয়েছে', feedback: String(feedback || ''), checkedDate: todayBn() };
+  // `checked` is what the teacher UI reads, `status` is what the student sees —
+  // set both so a marked submission cannot keep offering the marking form.
+  const patch = { status: 'চেক হয়েছে', checked: true, feedback: String(feedback || ''), checkedDate: todayBn() };
   if (marks !== null && marks !== undefined && marks !== '' && Number.isFinite(Number(marks))) {
     patch.marks = Number(marks);
   }
@@ -1099,7 +1353,16 @@ export function teacherDayClasses(name, day = DAY_BN[new Date().getDay()]) {
 /** Assignments set for this teacher's classes that still need checking. */
 export function teacherPendingAssignments(name) {
   const { classNames } = teacherProfile(name);
-  return db.assignments.list().filter((a) => classNames.includes(a.className) && !a.checked);
+  const mine = db.assignments.list().filter((a) => classNames.includes(a.className));
+  if (!mine.length) return [];
+  const ids = new Set(mine.map((a) => a.id));
+  // "Needs checking" = at least one submission the teacher has not marked yet.
+  // (Assignments have no `checked` field of their own — filtering on it made
+  // every assignment look permanently unreviewed.)
+  const waiting = new Set(db.submissions.list()
+    .filter((s) => ids.has(s.assignmentId) && !submissionChecked(s))
+    .map((s) => s.assignmentId));
+  return mine.filter((a) => waiting.has(a.id));
 }
 
 /** Exams for this teacher's classes that are open or upcoming. */

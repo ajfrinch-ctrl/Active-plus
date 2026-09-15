@@ -61,14 +61,16 @@ admin.html          admin panel — app-style Home (institute overview, recent
                     batches, subjects, exams, question bank, materials,
                     assignments, submissions, routine, results, fees &
                     payments, notices, notifications, reports, analytics,
-                    users & permissions, activity log, backup/restore
+                    users & permissions, activity log, institute profile
+                    settings, backup/restore
 css/style.css       single mobile-first stylesheet
 js/firebase.js      Firebase integration + offline fallback + toasts
 js/auth.js          local sign-in, sessions, route guards
 js/app.js           shared shell: header, tabs, tables, modals
 js/data.js          persistent data layer (versioned CRUD collections +
-                    payments/suggestions/exams/material progress + domain
-                    helpers such as todayProgress, performanceFor, feeStatusFor)
+                    payments/suggestions/exams/material progress + the
+                    institute profile orgInfo/saveOrgInfo + domain helpers such
+                    as todayProgress, performanceFor, feeStatusFor)
 js/student-home.js  the student Home: sections, bottom navigation, detail views
 js/teacher-home.js  the teacher Home: today's teaching hero, feature grid,
                     quick actions, today's classes, next class
@@ -105,8 +107,14 @@ student's own records — no hard-coded statistics anywhere:
 | Notices, Teacher's Tip, banners | admin-managed `notices`, `tips`, `banners` |
 
 Every card answers with the student's own rows only; the data layer filters by
-class/batch before anything reaches the UI, and `database.rules.json` enforces
-the same boundaries server-side once Firebase is deployed.
+class/batch before anything reaches the UI.
+
+> **Security status (read before using real data).** Those filters run *in the
+> browser*, and so does the whole database: everything lives in `localStorage` on
+> the device. Anyone with DevTools on that device can read or rewrite it, so
+> client-side scoping is a UX boundary, not a security one.
+> `database.rules.json` is written to enforce the same boundaries server-side but
+> is **not effective yet** — see *Configuring Firebase* below.
 
 ## Teacher Home
 
@@ -177,10 +185,36 @@ settings, backup). Admins hold all of them; teachers get a teaching-only
 subset; students get none.
 
 Rights are enforced at the **data layer** — `can()` and `assertCan()` guard
-every write — not merely by hiding buttons, and `database.rules.json` repeats
-the boundaries server-side once Firebase is deployed. Search is scoped the same
-way: a teacher searching never sees another class's students, and a student
-never sees anyone but themselves.
+every write — not merely by hiding buttons. Search is scoped the same way: a
+teacher searching never sees another class's students, and a student never sees
+anyone but themselves. Both are enforced in browser code, so they protect against
+mistakes rather than a determined user with DevTools (see the security note under
+*Student Home*).
+
+### Institute profile (Settings)
+
+Settings → **প্রতিষ্ঠানের তথ্য** in `admin.html` is where the coaching centre's own
+identity is written and edited:
+
+| Field | Stored as | Validation |
+| ----- | --------- | ---------- |
+| প্রতিষ্ঠানের নাম | `settings.orgName` | required |
+| ঠিকানা | `settings.address` | required |
+| মোবাইল নম্বর | `settings.mobile` | required · 11 digits from `01`, `+880` accepted, Bengali digits accepted |
+| ইমেইল | `settings.email` | required · `name@domain.tld` |
+
+`orgInfo()` / `saveOrgInfo()` in `js/data.js` own these four values: the form
+saves nothing unless every field passes, the failure is reported per field in
+Bengali (message under the form, red outline on the offending input, toast),
+and every accepted edit is written to the activity log. A live letterhead
+preview under the fields mirrors what a document will print as the admin types.
+
+The saved profile is then reused everywhere the institute appears — the print
+letterhead (`ph-org` / `ph-addr` / `ph-contact`), receipts, reports, admission
+forms, ID cards and fee ledgers (`js/docs.js`), the institute card on the admin
+Home (with tap-to-call and tap-to-email links plus an edit shortcut), the login
+screen and the student app's Help card. Nothing outside Settings hard-codes the
+name, address, mobile or email.
 
 ### Admin controls
 
@@ -220,6 +254,18 @@ Database and signs in against it; until then it runs in local mode so nothing
 breaks on GitHub Pages.
 
 ### Deploy the security rules
+
+> **Cloud mode is not production-ready yet.** Two things must be fixed first:
+>
+> 1. Nothing writes `roles/<uid>/role`, which every rule checks — so after
+>    `firebase deploy` *all* clients (including the admin) are denied the
+>    mirrored store. Bootstrap that node from a trusted place (a Cloud Function
+>    or the console) before relying on the rules.
+> 2. The client only reads/writes the single `activeplus/data` mirror, so the
+>    per-collection rules below are not exercised yet, and a whole-store `set()`
+>    means concurrent edits overwrite each other (last write wins).
+>
+> Until then treat the app as single-device local storage.
 
 `database.rules.json` holds the Realtime Database rules. Deploy them with
 `firebase deploy --only database` (or paste them into the console under

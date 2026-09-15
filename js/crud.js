@@ -41,7 +41,8 @@ export function mountCrud(cfg) {
 
   host.innerHTML = `
     <div class="form-group" style="max-width:280px">
-      <input class="form-input" placeholder="${escapeHtml(searchPlaceholder)}" data-crud-search>
+      <input class="form-input" placeholder="${escapeHtml(searchPlaceholder)}"
+             aria-label="${escapeHtml(searchPlaceholder)}" data-crud-search>
     </div>
     <div class="table-wrap"><table class="table"><thead><tr></tr></thead><tbody></tbody></table></div>`;
 
@@ -92,15 +93,31 @@ export function mountCrud(cfg) {
       if (!row) return;
       modal.querySelector('[data-crud-title]').textContent = `${singular} সম্পাদনা`;
       form.querySelector('[data-crud-edit]').value = editKey;
-      fields.forEach((f) => { if (form.elements[f.name]) form.elements[f.name].value = row[f.name] ?? ''; });
+      fields.forEach((f) => {
+        const el = form.elements[f.name];
+        if (!el) return;
+        const value = row[f.name] ?? '';
+        // A stored value that is not among the select's options cannot be
+        // assigned — the field silently fell back to the first option and the
+        // next save overwrote the record with it.
+        if (f.type === 'select' && value !== '' && ![...el.options].some((o) => o.value === String(value))) {
+          el.add(new Option(String(value), String(value), true, true));
+        }
+        el.value = value;
+      });
     } else {
       modal.querySelector('[data-crud-title]').textContent = `নতুন ${singular}`;
     }
     openModal(modalId);
   };
 
+  let searchTimer = null;
   host.addEventListener('input', (e) => {
-    if (e.target.matches('[data-crud-search]')) { searchTerm = e.target.value.trim().toLowerCase(); render(); }
+    if (!e.target.matches('[data-crud-search]')) return;
+    const value = e.target.value.trim().toLowerCase();
+    // Every keystroke re-filters and repaints the table; wait for a pause.
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { searchTerm = value; render(); }, 180);
   });
 
   host.addEventListener('click', (e) => {
@@ -126,12 +143,19 @@ export function mountCrud(cfg) {
     const editKey = form.querySelector('[data-crud-edit]').value;
     const record = {};
     let invalid = null;
+    let badNumber = null;
     fields.forEach((f) => {
       let value = String(data.get(f.name) ?? '').trim();
-      if (f.type === 'number') value = Number(value) || 0;
-      if (f.required && !value) invalid = invalid || f;
+      if (f.type === 'number' && value !== '') {
+        const parsed = Number(value);
+        // "Number(value) || 0" quietly stored 0 for anything unparsable.
+        if (!Number.isFinite(parsed)) badNumber = badNumber || f;
+        else value = parsed;
+      }
+      if (f.required && value === '') invalid = invalid || f;
       record[f.name] = value;
     });
+    if (badNumber) { showToast(`"${badNumber.label}"-এ একটি সঠিক সংখ্যা লিখুন।`, 'error'); return; }
     if (invalid) { showToast(`"${invalid.label}" পূরণ করুন।`, 'error'); return; }
     if (cfg.validate) {
       const err = cfg.validate(record, editKey);

@@ -11,9 +11,9 @@
  * Every figure is computed live through analytics() and the collections
  * themselves — nothing is hard-coded.
  */
-import { escapeHtml, mountConnectionStatus } from './app.js';
+import { escapeHtml, safeUrl, mountConnectionStatus } from './app.js';
 import {
-  db, analytics, dueFees, getDbStatus, DAY_BN
+  db, analytics, dueFees, getDbStatus, DAY_BN, orgInfo, mobileDigits, sharedNotices
 } from './data.js';
 
 const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
@@ -87,6 +87,50 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
 
   const statusChip = () => `<span class="net-chip" id="admin-net-chip" role="status" aria-live="polite">…</span>`;
 
+  /** `tel:` / `mailto:` hrefs — Bangladeshi numbers are normalised to +880. */
+  const telHref = (mobile) => {
+    const digits = mobileDigits(mobile);
+    if (!digits) return null;
+    const intl = digits.startsWith('880') ? digits : (digits.startsWith('0') ? `88${digits}` : `880${digits}`);
+    return `tel:+${intl}`;
+  };
+
+  /**
+   * Institute identity — the name, address, mobile and email written in
+   * Settings, shown on the landing screen with a one-tap way to edit them.
+   * The same four fields feed every receipt, report, admission form and ID
+   * card, so the admin can always see what will be printed.
+   */
+  const instituteCard = () => {
+    const org = orgInfo();
+    const contact = (icon, label, value, href) => `
+      <div class="info-row">
+        <span class="l">${icon} ${label}</span>
+        ${value
+          ? `<span class="v">${href
+            ? `<a href="${escapeHtml(safeUrl(href))}">${escapeHtml(value)}</a>`
+            : escapeHtml(value)}</span>`
+          : '<span class="v empty">যোগ করুন</span>'}
+      </div>`;
+
+    return `
+      <section class="home-section" aria-label="প্রতিষ্ঠানের তথ্য">
+        <h2 class="sec-title">🏛️ প্রতিষ্ঠানের তথ্য</h2>
+        <div class="hcard org-card" id="admin-org-card">
+          <div class="org-top">
+            <img src="assets/logo.png" alt="">
+            <div class="org-id">
+              <strong>${escapeHtml(org.name)}</strong>
+              <small>${escapeHtml(org.address || 'ঠিকানা যোগ করুন')}</small>
+            </div>
+            <button type="button" class="chip" data-goto="settings" title="সেটিংস থেকে সম্পাদনা করুন">✏️ সম্পাদনা</button>
+          </div>
+          ${contact('📱', 'মোবাইল', org.mobile, telHref(org.mobile))}
+          ${contact('✉️', 'ইমেইল', org.email, org.email ? `mailto:${org.email}` : null)}
+        </div>
+      </section>`;
+  };
+
   const analyticsGrid = () => {
     const a = analytics();
     const due = dueFees();
@@ -136,7 +180,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
       taka(a.totalDue), 'মোট বকেয়া', 'dues'),
     announcements: () => navCard(
       '📢', 'ঘোষণা', 'View latest announcements',
-      bn(db.notices.list().length), 'টি নোটিশ', 'notices'),
+      bn(sharedNotices().length), 'টি নোটিশ', 'notices'),
     'recent-activities': () => navCard(
       '📝', 'সাম্প্রতিক কার্যক্রম', 'View recent system activities',
       bn(db.activityLogs.list().length), 'টি কার্যক্রম', 'activity')
@@ -162,7 +206,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
 
   function render() {
     const headerSub = document.getElementById('user-role');
-    if (headerSub) headerSub.textContent = db.settings.get().orgName || 'Active Plus';
+    if (headerSub) headerSub.textContent = orgInfo().name;
     const a = analytics();
     const results = db.examResults.list();
     const pcts = results.map((r) => Math.round((Number(r.score) || 0) / (Number(r.total) || 1) * 100));
@@ -172,6 +216,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     host.innerHTML = `
       <div id="admin-home-content">
         ${statusChip()}
+        ${instituteCard()}
         ${analyticsGrid()}
         ${GROUPS.map((g) => groupSection(g, ctx)).join('')}
         <section class="home-section">

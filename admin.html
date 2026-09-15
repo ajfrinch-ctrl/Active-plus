@@ -22,6 +22,7 @@
       <div>
         <div class="ph-title" id="ph-org">Active Plus</div>
         <div class="ph-sub" id="ph-addr"></div>
+        <div class="ph-sub" id="ph-contact"></div>
       </div>
       <div class="ph-right"><strong id="ph-date"></strong><span id="ph-label">রিপোর্ট</span></div>
     </div>
@@ -149,15 +150,50 @@
         <!-- ======================= Settings ======================= -->
         <section class="tab-panel" id="tab-settings" hidden>
           <h2 class="section-title">প্রতিষ্ঠান সেটিংস</h2>
-          <form id="settings-form" class="card">
+          <!-- novalidate: the institute fields are checked in Bengali by
+               saveOrgInfo() instead of the browser's own English bubbles. -->
+          <form id="settings-form" class="card" novalidate>
+            <h3>প্রতিষ্ঠানের তথ্য</h3>
+            <p class="form-hint">এই নাম, ঠিকানা, মোবাইল নম্বর ও ইমেইল রিপোর্ট, রিসিট, ভর্তি ফরম, আইডি কার্ড, প্রিন্ট হেডার এবং শিক্ষার্থী ও শিক্ষক পোর্টালে ব্যবহার হয়।</p>
             <div class="form-group">
               <label for="set-org">প্রতিষ্ঠানের নাম</label>
-              <input class="form-input" id="set-org" name="orgName" required>
+              <input class="form-input" id="set-org" name="orgName" required
+                     placeholder="যেমন: অ্যাক্টিভ প্লাস কোচিং সেন্টার" autocomplete="organization">
             </div>
             <div class="form-group">
               <label for="set-address">ঠিকানা</label>
-              <input class="form-input" id="set-address" name="address">
+              <textarea class="form-input form-textarea rows-2" id="set-address" name="address" rows="2"
+                        placeholder="যেমন: ২য় তলা, মদিনা প্লাজা, মিরপুর-১০, ঢাকা"></textarea>
             </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="set-mobile">মোবাইল নম্বর</label>
+                <input class="form-input" id="set-mobile" name="mobile" type="tel" inputmode="tel"
+                       placeholder="যেমন: ০১৭০০-০০০০০০" autocomplete="tel">
+                <p class="form-hint">১১ সংখ্যার নম্বর (০১… দিয়ে শুরু)। বাংলা বা ইংরেজি সংখ্যায় লেখা যাবে।</p>
+              </div>
+              <div class="form-group">
+                <label for="set-email">ইমেইল</label>
+                <input class="form-input" id="set-email" name="email" type="email" inputmode="email"
+                       placeholder="যেমন: info@activeplus.edu" autocomplete="email">
+              </div>
+            </div>
+            <p class="form-error" id="org-error" role="alert"></p>
+
+            <!-- Live mirror of the document letterhead, so the admin sees the edit. -->
+            <div class="org-preview" id="org-preview">
+              <div class="op-label">ডকুমেন্টে যেভাবে দেখাবে</div>
+              <div class="op-sheet">
+                <img src="assets/logo.png" alt="">
+                <div>
+                  <div class="op-org" id="op-org">Active Plus</div>
+                  <div class="op-line" id="op-address"></div>
+                  <div class="op-line" id="op-contact"></div>
+                </div>
+              </div>
+            </div>
+
+            <h3>অন্যান্য সেটিংস</h3>
             <div class="form-group">
               <label for="set-fee">মাসিক ফি (৳)</label>
               <input class="form-input" id="set-fee" name="monthlyFee" type="number" min="0">
@@ -233,12 +269,12 @@
           <div class="form-group"><label for="qb-exam">পরীক্ষা নির্বাচন</label><select id="qb-exam" class="form-input form-select"></select></div>
           <div class="card">
             <h3>পেস্ট করে ইমপোর্ট</h3>
-            <div class="form-group"><textarea id="qb-paste" class="form-input form-textarea" placeholder="প্রশ্ন&#10;A. অপশন&#10;B. অপশন&#10;C. অপশন&#10;D. অপশন&#10;সঠিক: B"></textarea></div>
+            <div class="form-group"><textarea id="qb-paste" aria-label="পেস্ট করে প্রশ্ন ইমপোর্ট" class="form-input form-textarea" placeholder="প্রশ্ন&#10;A. অপশন&#10;B. অপশন&#10;C. অপশন&#10;D. অপশন&#10;সঠিক: B"></textarea></div>
             <div class="row-actions"><button type="button" class="btn btn-secondary" id="qb-parse">Parse</button><button type="button" class="btn btn-small" id="qb-template">স্যাম্পল টেমপ্লেট</button></div>
           </div>
           <div class="card">
             <h3>CSV/Excel আপলোড</h3>
-            <div class="form-group"><input type="file" id="qb-file" class="form-input" accept=".csv,text/csv"></div>
+            <div class="form-group"><input type="file" id="qb-file" class="form-input" accept=".csv,text/csv" aria-label="CSV/Excel ফাইল নির্বাচন"></div>
           </div>
           <div id="qb-preview"></div>
           <button type="button" class="btn btn-block" id="qb-import">নিশ্চিত করে ইমপোর্ট করুন</button>
@@ -304,7 +340,7 @@
 
         <section class="tab-panel" id="tab-activity" hidden>
           <h2 class="section-title">অ্যাক্টিভিটি লগ</h2>
-          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…"></div>
+          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…" aria-label="কার্যক্রম ফিল্টার করুন"></div>
           <div class="table-wrap"><table class="table" id="activity-table"><thead><tr></tr></thead><tbody></tbody></table></div>
         </section>
 
@@ -415,7 +451,7 @@
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label for="student-phone">অভিভাবকের মোবাইল</label>
+              <label for="student-phone">শিক্ষার্থীর মোবাইল</label>
               <input class="form-input" id="student-phone" name="phone" inputmode="tel" placeholder="০১XXXXXXXXX">
             </div>
             <div class="form-group">
@@ -424,6 +460,12 @@
                 <option value="সক্রিয়">সক্রিয়</option>
                 <option value="বকেয়া">বকেয়া</option>
               </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="student-guardian-phone">অভিভাবকের মোবাইল</label>
+              <input class="form-input" id="student-guardian-phone" name="guardianPhone" inputmode="tel" placeholder="০১XXXXXXXXX">
             </div>
           </div>
           <p class="form-hint" id="student-id-hint">স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001</p>
@@ -654,7 +696,7 @@
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo } from './js/data.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, sharedNotices, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
       import { receiptSummary, shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from './js/docs.js';
@@ -701,7 +743,7 @@
         return lines.join('\n');
       };
       const openWhatsApp = (st) => {
-        const phone = st.phone || st.guardianPhone;
+        const phone = st.guardianPhone || st.phone; // the message is for the guardian
         if (!waNumber(phone)) { showToast('মোবাইল নম্বর পাওয়া যায়নি।', 'error'); return; }
         const url = waLink(phone, admissionMessage(st));
         window.open(url, '_blank', 'noopener');
@@ -712,21 +754,26 @@
       const onlineFor = (action) => requireOnline(action, getDbStatus);
 
       /* ------------------------------------------------------------ */
-      /* Report letterhead: logo + organisation name for every print.  */
-      /* Hidden on screen; shown when printing/exporting a PDF.       */
+      /* Report letterhead: logo + organisation identity for every      */
+      /* print. Hidden on screen; shown when printing/exporting a PDF.  */
+      /* It always carries the institute profile written in Settings:   */
+      /* name, address and the "mobile · email" contact line.           */
       /* ------------------------------------------------------------ */
-      const ensurePrintHeader = (settings = {}) => {
+      const ensurePrintHeader = () => {
+        const org = orgInfo();
         const orgEl = document.getElementById('ph-org');
         const addrEl = document.getElementById('ph-addr');
-        if (orgEl) orgEl.textContent = settings.orgName || 'Active Plus';
-        if (addrEl) addrEl.textContent = settings.address || '';
+        const contactEl = document.getElementById('ph-contact');
+        if (orgEl) orgEl.textContent = org.name;
+        if (addrEl) addrEl.textContent = org.address;
+        if (contactEl) contactEl.textContent = org.contactLine;
       };
 
       /* ------------------------------------------------------------ */
       /* Dashboard                                                     */
       /* ------------------------------------------------------------ */
       const renderOverview = () => {
-        ensurePrintHeader(db.settings.get());
+        ensurePrintHeader();
         const students = db.students.list();
         const teachers = db.teachers.list();
         const batches = db.batches.list();
@@ -748,7 +795,8 @@
         document.getElementById('income-summary').textContent =
           `সংগৃহীত ৳${bn(collected.toLocaleString('en-US'))} / প্রত্যাশিত ৳${bn(expected.toLocaleString('en-US'))}`;
         document.getElementById('income-bar').style.width = `${expected ? Math.min(100, Math.round((collected / expected) * 100)) : 0}%`;
-        document.getElementById('latest-notice').textContent = db.notices.list()[0]?.title || '—';
+        // Newest shared notice: personal payment receipts never belong here.
+        document.getElementById('latest-notice').textContent = sharedNotices().slice(-1)[0]?.title || '—';
         document.getElementById('student-count').textContent = bn(students.length);
         refreshAdminBell();
       };
@@ -803,6 +851,7 @@
           studentForm.elements.section.value = student.section || '';
           studentForm.elements.batch.value = student.batch || '';
           studentForm.elements.guardian.value = student.guardian || '';
+          studentForm.elements.guardianPhone.value = student.guardianPhone || '';
           studentForm.elements.admissionDate.value = student.admissionDate || '';
           studentForm.elements.photo.value = student.photo || '';
           studentForm.elements.status.value = student.status || 'সক্রিয়';
@@ -829,10 +878,11 @@
           section: String(data.get('section') || '').trim(),
           batch: String(data.get('batch') || '').trim(),
           guardian: String(data.get('guardian') || '').trim(),
+          guardianPhone: String(data.get('guardianPhone') || '').trim(),
           admissionDate: String(data.get('admissionDate') || '').trim(),
           photo: String(data.get('photo') || '').trim(),
           roll: String(data.get('roll')),
-          phone: String(data.get('phone') || '—').trim(),
+          phone: String(data.get('phone') || '').trim(), // never store a dash as a phone number
           status: String(data.get('status'))
         };
         if (!record.name) { showToast('শিক্ষার্থীর নাম আবশ্যক।', 'error'); return; }
@@ -873,7 +923,7 @@
           ${info('শ্রেণি', `${student.className || '—'}${student.section ? ` · ${student.section}` : ''}${student.roll ? ` · রোল ${student.roll}` : ''}`)}
           ${student.school ? info('স্কুল/কলেজ', student.school) : ''}
           ${student.guardian ? info('অভিভাবক', student.guardian) : ''}
-          ${info('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}`;
+          ${info('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}`;
         openModal('admission-modal');
       };
       document.getElementById('admission-wa')?.addEventListener('click', () => {
@@ -910,7 +960,7 @@
               ${field('ব্যাচ', student.batch || '—')}
               ${field('স্কুল / কলেজ', student.school || '—')}
               ${field('অভিভাবকের নাম', student.guardian || '—')}
-              ${field('অভিভাবকের মোবাইল', student.phone || student.guardianPhone || '—')}
+              ${field('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}
               ${field('ভর্তির তারিখ', student.admissionDate || '—')}
             </div>
             <div class="af-sign">
@@ -968,7 +1018,7 @@
         const paid = db.payments.list().filter((p) => p.studentId === id);
         const dues = dueFees().filter((d) => d.studentId === id);
         const paidTotal = paid.reduce((s, p) => s + Number(p.amount || 0), 0);
-        const dueTotal = dues.reduce((s, d) => s + Number(d.amount || 0), 0);
+        const dueTotal = dues.reduce((s, d) => s + Number(d.remaining ?? d.amount) || 0, 0);
         const results = db.examResults.list().filter((r) => r.studentId === id);
         const perf = performanceFor(st);
         const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(String(value ?? '—'))}</span></div>`;
@@ -1252,7 +1302,7 @@
           { key: 'student', label: 'নাম', render: (row) => escapeHtml(row.student?.name || '—') },
           { key: 'className', label: 'শ্রেণি', render: (row) => escapeHtml(row.student?.className || '—') },
           { key: 'month', label: 'মাস' },
-          { key: 'amount', label: 'পরিমাণ' },
+          { key: 'amount', label: 'পরিমাণ', render: (row) => escapeHtml(String(row.remaining ?? row.amount)) },
           { key: '_pay', label: 'অ্যাকশন', render: (row) => `<button type="button" class="btn btn-small btn-success" data-pay="${escapeHtml(row.id)}">পেমেন্ট নিন</button>` }
         ], dues, 'সব বকেয়া পরিশোধিত 🎉');
 
@@ -1289,7 +1339,8 @@
         document.getElementById('pay-fee-id').value = fee.id;
         document.getElementById('pay-student').value = `${student?.name || fee.studentId} (${fee.studentId})`;
         document.getElementById('pay-month').value = fee.month || '';
-        document.getElementById('pay-amount').value = fee.amount || '';
+        document.getElementById('pay-amount').value = dueRemaining(fee) || '';
+        document.getElementById('pay-amount').max = String(dueRemaining(fee));
         document.getElementById('pay-date').value = todayBn();
         document.getElementById('pay-reference').value = '';
         document.getElementById('pay-remarks').value = '';
@@ -1307,17 +1358,28 @@
         if (!Number.isFinite(amount) || amount <= 0) { showToast('সঠিক পরিমাণ লিখুন।', 'error'); return; }
         if (!date) { showToast('তারিখ দিন।', 'error'); return; }
 
-        const result = receivePayment(feeId, session.name);
-        if (!result) { showToast('এই বকেয়া ইতিমধ্যে পরিশোধিত।', 'error'); return; }
-        // enrich the payment with the captured details + a unique receipt number
-        const receiptNo = nextReceiptNo();
-        db.payments.update(result.payment.id, {
+        // Validate against what is really owed *before* anything is written:
+        // the old flow marked the fee পরিশোধিত first and only then copied the
+        // typed amount onto the payment, so ৳50 closed a ৳1200 due.
+        const fee = db.fees.find(feeId);
+        const remaining = dueRemaining(fee);
+        if (!fee || fee.status === 'পরিশোধিত' || remaining <= 0) {
+          showToast('এই বকেয়া ইতিমধ্যে পরিশোধিত।', 'error'); return;
+        }
+        if (amount > remaining) {
+          showToast(`বকেয়ার চেয়ে বেশি নেওয়া যাবে না — বাকি আছে ৳${bn(remaining)}।`, 'error'); return;
+        }
+        const result = receivePayment(feeId, session.name, {
           amount, date,
           method: String(d.get('method') || 'নগদ'),
           reference: String(d.get('reference') || ''),
           remarks: String(d.get('remarks') || ''),
-          receiptNo
+          receiptNo: nextReceiptNo()
         });
+        if (!result) { showToast('পেমেন্ট সংরক্ষণ করা যায়নি — পরিমাণটি বকেয়ার সঙ্গে মেলেনি।', 'error'); return; }
+        if (!result.settled) {
+          showToast(`আংশিক পেমেন্ট সংরক্ষিত হয়েছে — বাকি ৳${bn(result.remaining)}।`, 'warning');
+        }
         logActivity({ user: session.name, role: session.role, action: 'recorded payment', target: `${result.payment.studentId} ৳${amount}` });
         closeModal('payment-modal');
         renderDues(); renderStudents(); renderOverview();
@@ -1404,10 +1466,52 @@
       /* ------------------------------------------------------------ */
       /* Settings                                                      */
       /* ------------------------------------------------------------ */
+      /* Institute profile: name, address, mobile and email are written */
+      /* here once and reused by every document and portal.             */
+      const ORG_INPUTS = {
+        orgName: 'set-org', address: 'set-address', mobile: 'set-mobile', email: 'set-email'
+      };
+      const orgInput = (field) => document.getElementById(ORG_INPUTS[field]);
+      const orgValue = (field) => (orgInput(field)?.value || '').trim();
+
+      /** Mirror the four fields into the letterhead preview while typing. */
+      const renderOrgPreview = () => {
+        const orgEl = document.getElementById('op-org');
+        const addrEl = document.getElementById('op-address');
+        const contactEl = document.getElementById('op-contact');
+        if (orgEl) orgEl.textContent = orgValue('orgName') || 'প্রতিষ্ঠানের নাম';
+        if (addrEl) addrEl.textContent = orgValue('address');
+        if (contactEl) {
+          contactEl.textContent = [orgValue('mobile'), orgValue('email')].filter(Boolean).join(' · ');
+        }
+      };
+
+      /** Field-level Bengali errors under the form (and a red outline). */
+      const showOrgErrors = (errors = []) => {
+        const box = document.getElementById('org-error');
+        if (box) {
+          box.textContent = errors.map((e) => e.message).join(' ');
+          box.classList.toggle('visible', errors.length > 0);
+        }
+        Object.keys(ORG_INPUTS).forEach((field) => {
+          orgInput(field)?.classList.toggle('input-invalid', errors.some((e) => e.field === field));
+        });
+        if (errors.length) orgInput(errors[0].field)?.focus();
+      };
+
+      Object.values(ORG_INPUTS).forEach((id) => {
+        const el = document.getElementById(id);
+        el?.addEventListener('input', () => { renderOrgPreview(); showOrgErrors([]); });
+      });
+
       const renderSettings = () => {
         const settings = db.settings.get();
-        document.getElementById('set-org').value = settings.orgName || '';
-        document.getElementById('set-address').value = settings.address || '';
+        orgInput('orgName').value = settings.orgName || '';
+        orgInput('address').value = settings.address || '';
+        orgInput('mobile').value = settings.mobile || '';
+        orgInput('email').value = settings.email || '';
+        showOrgErrors([]);
+        renderOrgPreview();
         document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
         document.getElementById('set-challenge').value = settings.dailyChallengeTarget ?? 10;
         const editableFields = settings.studentEditableFields || [];
@@ -1435,10 +1539,26 @@
       document.getElementById('settings-form').addEventListener('submit', (event) => {
         event.preventDefault();
         if (!onlineFor('সেটিংস সংরক্ষণ')) return;
+        try { assertCan(session, 'manageSettings', 'সেটিংস সংরক্ষণ'); }
+        catch (err) { showToast(err.message, 'error'); return; }
         const data = new FormData(event.target);
+
+        // The institute profile is validated first: a bad mobile/email must not
+        // silently reach a printed receipt, so nothing is saved until it passes.
+        const org = saveOrgInfo({
+          orgName: data.get('orgName'),
+          address: data.get('address'),
+          mobile: data.get('mobile'),
+          email: data.get('email')
+        }, { user: session.name, role: session.role });
+        if (!org.ok) {
+          showOrgErrors(org.errors);
+          showToast(org.errors[0].message, 'error');
+          return;
+        }
+        showOrgErrors([]);
+
         db.settings.update({
-          orgName: String(data.get('orgName') || '').trim(),
-          address: String(data.get('address') || '').trim(),
           monthlyFee: Number(data.get('monthlyFee')) || 0
         });
         db.settings.update({
@@ -1451,8 +1571,14 @@
           [...event.target.querySelectorAll('input[name^="home_"]')]
             .map((input) => [input.name.slice(5), input.checked])
         ));
-        showToast('সেটিংস সংরক্ষিত হয়েছে।', 'success');
+
+        // Everything that prints or shows the institute identity picks it up now.
+        renderSettings();
+        ensurePrintHeader();
         renderOverview();
+        adminHome?.render?.();
+        refreshAdminBell();
+        showToast('প্রতিষ্ঠানের তথ্যসহ সেটিংস সংরক্ষিত হয়েছে।', 'success');
       });
 
       document.getElementById('reset-data').addEventListener('click', () => {
