@@ -1,19 +1,24 @@
 /**
  * Clean, standalone document builders (payment receipt + report pages).
  *
- * Two outputs share the same field logic:
- *   - HTML builders (buildReceiptHtml / buildReportHtml) render a clean
- *     standalone sheet for on-screen preview/tests.
- *   - Canvas renderers (renderReceiptCanvas / renderReportCanvases) draw the
- *     same document straight onto a canvas with the Canvas 2D API, so it can
- *     be shared as a PNG or embedded in a PDF on every browser — no SVG
- *     <foreignObject> (which taints the canvas and blocks export).
+ * Institution Pad/Logo Standard (mandatory):
+ * - Every generated PDF must automatically use the configured:
+ *   Institution Logo + Institution Name + Official Pad/Header + Footer
+ * - The same Institution Profile controls both WhatsApp Image and PDF
+ * - No institutional PDF may be generated without branding
+ * - Header: [Logo] INSTITUTION NAME, Address, Mobile | Email | Website, Document Title
+ * - Footer: institution info, generated date, page number, institution name, authorized/by
+ * - Layout: professional, print-ready, margins, logo proportional, no clipping,
+ *   auto-paginate long tables, repeat header/footer on every page, Bengali+English Unicode
  *
+ * Two outputs share the same field logic:
+ *   - HTML builders (buildReceiptHtml / buildReportHtml) for preview/tests
+ *   - Canvas renderers (renderReceiptCanvas / renderReportCanvases) for PDF/PNG
  * Neither output contains any application UI.
  */
 
 import { db, CLASS_TO_NUMBER, ALL_CLASSES } from './data.js';
-import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, assetDataUrl, loadImage, makeCanvas, wrapText } from './pdf.js';
+import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, assetDataUrl, loadImage, makeCanvas, wrapText, clearLogoCache } from './pdf.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -30,13 +35,59 @@ const BORDER = '#e6e9ee';
 const ACCENT = '#2563eb';
 
 /* ------------------------------------------------------------------ */
+/* Institution Pad helpers                                             */
+/* ------------------------------------------------------------------ */
+
+function resolveOrg(settingsOrOpts) {
+  const s = settingsOrOpts?.settings || settingsOrOpts || {};
+  // db fallback when no settings passed
+  let fallback = {};
+  try { fallback = db.settings.get(); } catch (e) {}
+  const orgName = (s.orgName || fallback.orgName || 'Active Plus').trim() || 'Active Plus';
+  const address = (s.address || fallback.address || '').trim();
+  const mobile = (s.mobile || fallback.mobile || '').trim();
+  const email = (s.email || fallback.email || '').trim();
+  const website = (s.website || fallback.website || '').trim();
+  const footerText = (s.footerText || fallback.footerText || '').trim();
+  const orgLogo = s.orgLogo || fallback.orgLogo || null;
+  const contactParts = [mobile, email, website].filter(Boolean);
+  return {
+    orgName,
+    name: orgName,
+    address,
+    mobile,
+    email,
+    website,
+    footerText,
+    orgLogo,
+    logo: orgLogo,
+    contactLine: contactParts.join(' | '),
+    contactLinePipe: contactParts.join(' | '),
+    contactLineDot: contactParts.join(' · '),
+    academicYear: (s.academicYear || fallback.academicYear || '').trim()
+  };
+}
+
+function formatGenDate() {
+  try {
+    return new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch (e) {
+    return new Date().toLocaleDateString();
+  }
+}
+
+function formatGenDateTime() {
+  try {
+    return `${new Date().toLocaleDateString('bn-BD')} ${new Date().toLocaleTimeString('bn-BD')}`;
+  } catch (e) {
+    return new Date().toLocaleString();
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Payment receipt                                                     */
 /* ------------------------------------------------------------------ */
 
-/**
- * Money breakdown for a receipt: what was still due, what was paid now and
- * what remains. Computed live from the store so it never goes stale.
- */
 export function receiptSummary(pay) {
   const fees = db.fees.list().filter((f) => f.studentId === pay.studentId);
   const remainingDue = fees
@@ -47,7 +98,6 @@ export function receiptSummary(pay) {
   return { remainingDue, paidAmount, previousDue };
 }
 
-/** Receipt rows in display order — shared by the HTML and canvas renderers. */
 function receiptRows(pay, { student }) {
   const { previousDue, paidAmount, remainingDue } = receiptSummary(pay);
   const rows = [
@@ -68,10 +118,10 @@ function receiptRows(pay, { student }) {
   return rows;
 }
 
-/** Clean, professional, print/PDF-ready payment receipt (no app UI). */
 export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
-  const org = settings || {};
-  const logoSrc = logo || absUrl('assets/logo.png');
+  const org = resolveOrg(settings);
+  const logoSrc = logo || org.orgLogo || absUrl('assets/logo.png');
+  const contact = org.contactLine;
 
   const row = (label, value) => `
     <div style="display:flex;justify-content:space-between;gap:12px;padding:8px 2px;border-bottom:1px solid #eef0f3;font-size:14px;line-height:1.5">
@@ -83,10 +133,11 @@ export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
   <div data-receipt-sheet style="background:#ffffff;color:#111827;font-family:'Hind Siliguri','Noto Sans Bengali',sans-serif;border-radius:14px;padding:24px 22px;max-width:560px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,.06)">
     <div style="text-align:center;border-bottom:3px solid #2563eb;padding-bottom:14px">
       <img src="${logoSrc}" alt="" style="width:60px;height:60px;object-fit:contain;margin-bottom:6px">
-      <div style="font-size:19px;font-weight:800">${esc(org.orgName || 'Active Plus')}</div>
-      <div style="font-size:12px;color:#6b7280">${esc(org.address || '')}</div>
-      <div style="font-size:12px;color:#6b7280">${esc(org.mobile || '')}${org.email ? ` · ${esc(org.email)}` : ''}</div>
-      <div style="font-size:16px;font-weight:800;margin-top:10px;letter-spacing:.02em">পেমেন্ট রিসিট</div>
+      <div style="font-size:19px;font-weight:800">${esc(org.orgName)}</div>
+      <div style="font-size:12px;color:#6b7280">${esc(org.address)}</div>
+      ${contact ? `<div style="font-size:12px;color:#6b7280">${esc(contact)}</div>` : ''}
+      <div style="font-size:16px;font-weight:800;margin-top:10px;letter-spacing:.02em">PAYMENT RECEIPT</div>
+      <div style="font-size:13px;color:#374151">পেমেন্ট রিসিট</div>
     </div>
 
     <div style="margin-top:6px">
@@ -101,7 +152,10 @@ export function buildReceiptHtml(pay, { student, settings, logo } = {}) {
         <div style="border-top:1px solid #111827;padding-top:6px;font-size:12px;color:#374151">শিক্ষার্থী / অভিভাবকের স্বাক্ষর</div>
       </div>
     </div>
-    <div style="text-align:center;margin-top:18px;font-size:11px;color:#9ca3af">ধন্যবাদ — ${esc(org.orgName || 'Active Plus')}</div>
+    <div style="text-align:center;margin-top:18px;font-size:11px;color:#9ca3af">
+      ${esc(org.footerText || `ধন্যবাদ — ${org.orgName}`)}<br>
+      Generated: ${esc(formatGenDateTime())} · ${esc(org.orgName)}
+    </div>
   </div>`;
 }
 
@@ -124,11 +178,14 @@ async function warmFonts() {
   } catch (e) { /* proceed */ }
 }
 
-async function loadLogo() {
+async function loadLogo(customDataUrl = null) {
   try {
+    if (customDataUrl && typeof customDataUrl === 'string' && customDataUrl.startsWith('data:image/')) {
+      return await loadImage(customDataUrl);
+    }
     return await loadImage(await logoDataUrl());
   } catch (e) {
-    return null; // drawing without a logo is always better than failing
+    return null;
   }
 }
 
@@ -145,20 +202,77 @@ function drawLogo(ctx, img, centerX, top, size) {
   ctx.drawImage(img, centerX - (iw * scale) / 2, top, iw * scale, ih * scale);
 }
 
+/* Professional footer for every PDF page */
+function paintPageFooter(ctx, width, height, pad, org, pageNum, totalPages, generatedBy = null, paint = true) {
+  if (!paint) return;
+  const footerTop = height - pad - 56;
+  const lineY = footerTop - 12;
+
+  ctx.strokeStyle = BORDER;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, lineY);
+  ctx.lineTo(width - pad, lineY);
+  ctx.stroke();
+
+  ctx.textBaseline = 'top';
+  const dateStr = formatGenDate();
+  const pageStr = `Page ${pageNum} / ${totalPages}`;
+
+  // Line 1: Institution Name | Page | Date
+  setFont(ctx, 14, 400);
+  ctx.fillStyle = MUTED;
+
+  ctx.textAlign = 'left';
+  ctx.fillText(org.orgName || 'Active Plus', pad, footerTop);
+
+  ctx.textAlign = 'center';
+  ctx.fillText(pageStr, width / 2, footerTop);
+
+  ctx.textAlign = 'right';
+  ctx.fillText(dateStr, width - pad, footerTop);
+
+  // Line 2: footerText + contact + generatedBy
+  let secondLineY = footerTop + 18;
+  const extras = [];
+  if (org.footerText) extras.push(org.footerText);
+  if (generatedBy) extras.push(`Generated by: ${generatedBy}`);
+
+  if (extras.length) {
+    setFont(ctx, 12, 400);
+    ctx.fillStyle = FAINT;
+    ctx.textAlign = 'center';
+    const txt = extras.join(' | ');
+    const lines = wrapText(ctx, txt, width - pad * 2);
+    lines.forEach((ln, i) => {
+      ctx.fillText(ln, width / 2, secondLineY + i * 16);
+    });
+  } else if (org.contactLine) {
+    setFont(ctx, 11, 400);
+    ctx.fillStyle = FAINT;
+    ctx.textAlign = 'center';
+    const lines = wrapText(ctx, org.contactLine, width - pad * 2);
+    lines.forEach((ln, i) => ctx.fillText(ln, width / 2, secondLineY + i * 14));
+  }
+}
+
 /**
  * Receipt layout pass. Runs twice: once to measure the height (paint=false)
  * and once to actually paint (paint=true). Both passes advance the cursor
  * identically so the measured height is exact.
+ * Uses Institution Pad: Logo + Name + Address + Mobile | Email | Website + Title + Footer
  */
 function receiptPass(ctx, width, pay, opts, paint) {
   const pad = 44;
   const inner = width - pad * 2;
   let y = pad;
-  const org = opts.settings || {};
+  const org = resolveOrg(opts.settings || opts);
+  const genBy = opts.generatedBy || pay.receivedBy || null;
 
   ctx.textBaseline = 'top';
 
   const center = (text, px, weight, color, lhMul = 1.4) => {
+    if (!text) return;
     setFont(ctx, px, weight);
     ctx.textAlign = 'center';
     const lines = wrapText(ctx, text, inner);
@@ -175,13 +289,13 @@ function receiptPass(ctx, width, pay, opts, paint) {
     y += 96 + 10;
   }
 
-  center(org.orgName || 'Active Plus', 32, 700, INK);
+  center(org.orgName, 32, 700, INK);
   if (org.address) center(org.address, 16, 400, MUTED, 1.4);
-  const contact = [org.mobile, org.email].filter(Boolean).join(' · ');
-  if (contact) center(contact, 16, 400, MUTED, 1.4);
+  if (org.contactLine) center(org.contactLine, 16, 400, MUTED, 1.4);
 
-  y += 16;
-  center('পেমেন্ট রিসিট', 28, 700, INK);
+  y += 12;
+  center('PAYMENT RECEIPT', 26, 700, INK);
+  center('পেমেন্ট রিসিট', 20, 400, MUTED, 1.4);
   y += 10;
   if (paint) {
     ctx.fillStyle = ACCENT;
@@ -232,13 +346,38 @@ function receiptPass(ctx, width, pay, opts, paint) {
   }
   y += 48;
 
+  // Footer area inside receipt
   if (paint) {
-    setFont(ctx, 15, 400);
+    // separator
+    ctx.strokeStyle = BORDER;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(pad + inner, y);
+    ctx.stroke();
+    y += 12;
+
+    setFont(ctx, 14, 400);
     ctx.textAlign = 'center';
     ctx.fillStyle = FAINT;
-    ctx.fillText(`ধন্যবাদ — ${org.orgName || 'Active Plus'}`, width / 2, y);
+    const footerMain = org.footerText || `ধন্যবাদ — ${org.orgName}`;
+    const lines = wrapText(ctx, footerMain, inner);
+    lines.forEach((ln, i) => ctx.fillText(ln, width / 2, y + i * 18));
+    y += lines.length * 18 + 6;
+
+    setFont(ctx, 12, 400);
+    ctx.fillStyle = FAINT;
+    const genLine = `Generated: ${formatGenDateTime()}${genBy ? ` | By: ${genBy}` : ''} | ${org.orgName}`;
+    const genLines = wrapText(ctx, genLine, inner);
+    genLines.forEach((ln, i) => ctx.fillText(ln, width / 2, y + i * 16));
+    y += genLines.length * 16 + 6;
+
+    setFont(ctx, 11, 400);
+    ctx.fillText(`Page 1 / 1`, width / 2, y);
+    y += 16;
+  } else {
+    y += 80;
   }
-  y += 26;
 
   return y + pad;
 }
@@ -247,7 +386,9 @@ function receiptPass(ctx, width, pay, opts, paint) {
 export async function renderReceiptCanvas(pay, opts = {}) {
   await warmFonts();
   const width = 760;
-  const fullOpts = { ...opts, logoImg: await loadLogo() };
+  const org = resolveOrg(opts.settings || opts);
+  const logoImg = await loadLogo(org.orgLogo || opts.settings?.orgLogo || null);
+  const fullOpts = { ...opts, settings: org, logoImg, generatedBy: opts.generatedBy || pay.receivedBy || null };
 
   const probe = makeCanvas(width, 4);
   const pctx = probe.getContext('2d');
@@ -261,24 +402,18 @@ export async function renderReceiptCanvas(pay, opts = {}) {
   return canvas;
 }
 
-/**
- * Share the receipt as an IMAGE via the Web Share API (native share sheet →
- * user picks WhatsApp). Falls back to downloading the PNG when file sharing
- * is unsupported. Never sends the receipt as a text-only message.
- */
 export async function shareReceiptAsImage(pay, opts) {
   const canvas = await renderReceiptCanvas(pay, opts);
   const blob = await canvasToPngBlob(canvas);
   const file = new File([blob], receiptFileName(pay), { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    await navigator.share({ files: [file], title: 'পেমেন্ট রিসিট' });
+    await navigator.share({ files: [file], title: 'PAYMENT RECEIPT' });
     return { shared: true };
   }
   downloadBlob(blob, receiptFileName(pay));
   return { shared: false, downloaded: true };
 }
 
-/** Download the receipt as a PNG image. */
 export async function downloadReceiptPng(pay, opts) {
   const canvas = await renderReceiptCanvas(pay, opts);
   const blob = await canvasToPngBlob(canvas);
@@ -289,24 +424,18 @@ export async function downloadReceiptPng(pay, opts) {
 /* Reports                                                             */
 /* ------------------------------------------------------------------ */
 
-/** Filename-safe class label, e.g. "Class-9" for নবম, "All-Classes" for সব. */
 export function classFileLabel(className) {
   if (!className || className === ALL_CLASSES) return 'All-Classes';
   const num = CLASS_TO_NUMBER[className];
   if (num) return `Class-${num}`;
-  const cleaned = String(className).replace(/[^\w-]/g, '');
+  const cleaned = String(className).replace(/[^\\w-]/g, '');
   return cleaned || 'Class';
 }
 
-/**
- * Clean standalone report page (HTML form — used for preview/tests). `columns`
- * are `{ key, label }`, rows are plain objects. Values are escaped.
- */
 export function buildReportHtml({ settings, title, subtitle, columns, rows, logo }) {
-  const org = settings || {};
-  const logoSrc = logo || absUrl('assets/logo.png');
-  // The institute contact line the admin wrote in Settings (mobile · email).
-  const contact = [org.mobile, org.email].filter(Boolean).map(esc).join(' · ');
+  const org = resolveOrg(settings);
+  const logoSrc = logo || org.orgLogo || absUrl('assets/logo.png');
+  const contact = org.contactLine;
   const head = columns.map((c) =>
     `<th style="padding:9px 8px;border:1px solid #d3d9e0;background:#eef2f7;text-align:left;font-size:12px;font-weight:700;color:#111827">${esc(c.label)}</th>`).join('');
   const body = rows.map((r) =>
@@ -318,10 +447,10 @@ export function buildReportHtml({ settings, title, subtitle, columns, rows, logo
   <div style="width:100%;height:100%;box-sizing:border-box;background:#ffffff;color:#111827;font-family:'Hind Siliguri','Noto Sans Bengali',sans-serif;padding:46px 50px;display:flex;flex-direction:column">
     <div style="text-align:center;border-bottom:3px solid #2563eb;padding-bottom:14px">
       <img src="${logoSrc}" alt="" style="width:58px;height:58px;object-fit:contain;margin-bottom:6px">
-      <div style="font-size:20px;font-weight:800">${esc(org.orgName || 'Active Plus')}</div>
-      <div style="font-size:12px;color:#6b7280">${esc(org.address || '')}</div>
-      ${contact ? `<div style="font-size:12px;color:#6b7280">${contact}</div>` : ''}
-      <div style="font-size:16px;font-weight:800;margin-top:10px">${esc(title)}</div>
+      <div style="font-size:20px;font-weight:800">${esc(org.orgName)}</div>
+      <div style="font-size:12px;color:#6b7280">${esc(org.address)}</div>
+      ${contact ? `<div style="font-size:12px;color:#6b7280">${esc(contact)}</div>` : ''}
+      <div style="font-size:16px;font-weight:800;margin-top:10px;letter-spacing:.04em">${esc(title)}</div>
       ${subtitle ? `<div style="font-size:13px;color:#374151">${esc(subtitle)}</div>` : ''}
     </div>
     <table style="width:100%;border-collapse:collapse;margin-top:16px">
@@ -329,7 +458,8 @@ export function buildReportHtml({ settings, title, subtitle, columns, rows, logo
       <tbody>${body || empty}</tbody>
     </table>
     <div style="margin-top:auto;padding-top:20px;text-align:center;font-size:11px;color:#9ca3af">
-      ${esc(org.orgName || 'Active Plus')} · ${new Date().toLocaleDateString('bn-BD')}
+      ${esc(org.footerText || org.orgName)} · ${esc(formatGenDate())} · Page 1<br>
+      ${esc(org.orgName)} · ${esc(contact)}
     </div>
   </div>`;
 }
@@ -345,10 +475,49 @@ export const CLASS_REPORT_COLUMNS = [
   { key: 'status', label: 'অবস্থা' }
 ];
 
-/**
- * Map students to report rows, flagging records missing a Name or Unique ID
- * as "অসম্পূর্ণ রেকর্ড" (spec: these two fields are mandatory in every report).
- */
+/* Additional standard columns for various reports as per task */
+export const STUDENT_STATEMENT_COLUMNS = [
+  { key: 'field', label: 'বিবরণ' },
+  { key: 'value', label: 'তথ্য' }
+];
+
+export const DUE_STATEMENT_COLUMNS = [
+  { key: 'month', label: 'মাস' },
+  { key: 'amount', label: 'পরিমাণ' },
+  { key: 'status', label: 'অবস্থা' },
+  { key: 'due', label: 'বকেয়া' }
+];
+
+export const FINANCE_REPORT_COLUMNS = [
+  { key: 'date', label: 'তারিখ' },
+  { key: 'student', label: 'শিক্ষার্থী' },
+  { key: 'type', label: 'ধরন' },
+  { key: 'amount', label: 'পরিমাণ' },
+  { key: 'method', label: 'মাধ্যম' }
+];
+
+export const TEACHER_REPORT_COLUMNS = [
+  { key: 'name', label: 'নাম' },
+  { key: 'subject', label: 'বিষয়' },
+  { key: 'phone', label: 'মোবাইল' },
+  { key: 'classes', label: 'ক্লাস' }
+];
+
+export const ROUTINE_REPORT_COLUMNS = [
+  { key: 'day', label: 'দিন' },
+  { key: 'time', label: 'সময়' },
+  { key: 'subject', label: 'বিষয়' },
+  { key: 'teacher', label: 'শিক্ষক' },
+  { key: 'room', label: 'কক্ষ' }
+];
+
+export const NOTICE_REPORT_COLUMNS = [
+  { key: 'title', label: 'শিরোনাম' },
+  { key: 'className', label: 'ক্লাস' },
+  { key: 'audience', label: 'কাদের জন্য' },
+  { key: 'date', label: 'তারিখ' }
+];
+
 export function classReportRows(students) {
   let incomplete = 0;
   const rows = (students || []).map((s, i) => {
@@ -379,12 +548,13 @@ const BODY = 21;
 const LH = 30;
 
 function reportHeaderPass(ctx, width, pad, opts, paint) {
-  const org = opts.settings || {};
+  const org = resolveOrg(opts.settings || {});
   let y = pad;
   const inner = width - pad * 2;
 
   ctx.textBaseline = 'top';
   const center = (text, px, weight, color, lhMul = 1.4) => {
+    if (!text) return;
     setFont(ctx, px, weight);
     ctx.textAlign = 'center';
     const lines = wrapText(ctx, text, inner);
@@ -400,20 +570,20 @@ function reportHeaderPass(ctx, width, pad, opts, paint) {
     if (paint) drawLogo(ctx, opts.logoImg, width / 2, y, 80);
     y += 80 + 10;
   }
-  center(org.orgName || 'Active Plus', 36, 700, INK);
+  center(org.orgName, 36, 700, INK);
   if (org.address) center(org.address, 18, 400, MUTED, 1.4);
-  const contact = [org.mobile, org.email].filter(Boolean).join(' · ');
-  if (contact) center(contact, 18, 400, MUTED, 1.4);
-  y += 16;
-  center(opts.title || 'রিপোর্ট', 32, 700, INK);
-  if (opts.subtitle) center(opts.subtitle, 22, 400, MUTED, 1.4);
-  y += 14;
+  if (org.contactLine) center(org.contactLine, 18, 400, MUTED, 1.4);
+  y += 12;
+  // Document title — professional, consistent header as per spec
+  center((opts.title || 'REPORT').toUpperCase(), 30, 700, INK);
+  if (opts.subtitle) center(opts.subtitle, 20, 400, MUTED, 1.4);
+  y += 12;
   if (paint) {
     ctx.fillStyle = ACCENT;
     ctx.fillRect(pad, y, inner, 3);
   }
   y += 3 + 18;
-  return y; // top of the table
+  return y;
 }
 
 function columnWidths(ctx, columns, rows, usable) {
@@ -432,8 +602,6 @@ function columnWidths(ctx, columns, rows, usable) {
     const scale = usable / total;
     return req.map((w) => Math.max(48, w * scale));
   }
-  // Spread any leftover space across the columns so the table always spans the
-  // full page width — a short report must not sit squeezed onto one side.
   const extra = (usable - total) / columns.length;
   return req.map((w) => w + extra);
 }
@@ -463,12 +631,11 @@ function tableHeaderHeight(ctx, columns, widths) {
   return h + CELL_PAD;
 }
 
-function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
+function paintTable(ctx, width, pad, top, columns, widths, rows) {
   let y = top;
   const totalW = widths.reduce((a, b) => a + b, 0);
   const headerH = tableHeaderHeight(ctx, columns, widths);
 
-  // header row
   ctx.fillStyle = '#eef2f7';
   ctx.fillRect(pad, y, totalW, headerH);
   let x = pad;
@@ -485,7 +652,6 @@ function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
   ctx.strokeRect(pad, y, totalW, headerH);
   y += headerH;
 
-  // data rows (or an honest empty state)
   if (!rows.length) {
     setFont(ctx, BODY, 400);
     ctx.textAlign = 'center';
@@ -513,13 +679,7 @@ function paintTable(ctx, width, pad, top, columns, widths, rows, pageHeight) {
     y += rh;
   }
 
-  // footer
-  setFont(ctx, 16, 400);
-  ctx.textAlign = 'center';
-  ctx.fillStyle = FAINT;
-  ctx.fillText(`Active Plus · ${new Date().toLocaleDateString('bn-BD')}`, width / 2, pageHeight - pad - 14);
-
-  return y; // bottom of the table, so callers can append a summary
+  return y;
 }
 
 function summaryHeight(summary) {
@@ -554,15 +714,11 @@ function paintSummary(ctx, width, pad, top, summary, paint) {
   return y;
 }
 
-/**
- * Render a report into one or more A4 canvases (a new page is started when a
- * row would overflow). `summary` is an optional `[{ label, value }]` totals
- * block drawn after the final table row. Returns an array of canvases ready
- * for canvasesToPdf.
- */
-export async function renderReportCanvases({ settings, title, subtitle, columns, rows, summary = [] }) {
+export async function renderReportCanvases({ settings, title, subtitle, columns, rows, summary = [], generatedBy = null }) {
   await warmFonts();
-  const opts = { settings, title, subtitle, logoImg: await loadLogo() };
+  const org = resolveOrg(settings);
+  const logoImg = await loadLogo(org.orgLogo || settings?.orgLogo || null);
+  const opts = { settings: org, title: title || 'REPORT', subtitle, logoImg, generatedBy };
   const { width, height } = PAGE;
   const usable = width - PAD * 2;
 
@@ -571,10 +727,9 @@ export async function renderReportCanvases({ settings, title, subtitle, columns,
   const tableTop = reportHeaderPass(pctx, width, PAD, opts, false);
   const widths = columnWidths(pctx, columns, rows, usable);
   const headerH = tableHeaderHeight(pctx, columns, widths);
-  const footerReserve = PAD + 60;
+  const footerReserve = PAD + 80;
   const pageLimit = height - footerReserve;
 
-  // paginate, tracking how far down each page is filled so the summary has room
   const pages = [];
   const usedYs = [];
   let current = [];
@@ -594,11 +749,12 @@ export async function renderReportCanvases({ settings, title, subtitle, columns,
   pages.push(current);
   usedYs.push(y);
 
-  // if the summary will not fit on the final page, give it a page of its own
   if (usedYs[usedYs.length - 1] + summaryHeight(summary) > pageLimit) {
     pages.push([]);
     usedYs.push(tableTop + headerH);
   }
+
+  const totalPages = pages.length;
 
   return pages.map((chunk, idx) => {
     const canvas = makeCanvas(width, height);
@@ -606,8 +762,10 @@ export async function renderReportCanvases({ settings, title, subtitle, columns,
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
     const top = reportHeaderPass(ctx, width, PAD, opts, true);
-    const bottom = paintTable(ctx, width, PAD, top, columns, widths, chunk, height);
-    if (idx === pages.length - 1) paintSummary(ctx, width, PAD, bottom, summary, true);
+    const bottom = paintTable(ctx, width, PAD, top, columns, widths, chunk);
+    let afterSummary = bottom;
+    if (idx === pages.length - 1) afterSummary = paintSummary(ctx, width, PAD, bottom, summary, true);
+    paintPageFooter(ctx, width, height, PAD, org, idx + 1, totalPages, generatedBy, true);
     return canvas;
   });
 }
@@ -626,26 +784,23 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/**
- * Student ID card — a clean standalone card (logo, institution, photo/initial,
- * name, ID, class, roll, session, signature). Nothing else renders.
- */
 export async function renderIdCardCanvas(student, opts = {}) {
   await warmFonts();
   const width = 760;
-  const settings = opts.settings || {};
+  const org = resolveOrg(opts.settings || opts);
   const photo = student?.photo ? await assetDataUrl(student.photo) : null;
   const photoImg = photo ? await loadImage(photo).catch(() => null) : null;
-  const fullOpts = { ...opts, student, settings, logoImg: await loadLogo(), photoImg };
+  const logoImg = await loadLogo(org.orgLogo || opts.settings?.orgLogo || null);
+  const fullOpts = { ...opts, student, settings: org, logoImg, photoImg, generatedBy: opts.generatedBy || null };
 
   const pass = (ctx, paint) => {
     const pad = 40;
     const inner = width - pad * 2;
     let y = pad;
-    const org = settings || {};
     ctx.textBaseline = 'top';
 
     const center = (text, px, weight, color, lhMul = 1.4) => {
+      if (!text) return;
       setFont(ctx, px, weight);
       ctx.textAlign = 'center';
       const lines = wrapText(ctx, text, inner);
@@ -661,12 +816,14 @@ export async function renderIdCardCanvas(student, opts = {}) {
       if (paint) drawLogo(ctx, fullOpts.logoImg, width / 2, y, 96);
       y += 96 + 8;
     }
-    center(org.orgName || 'Active Plus', 32, 700, INK);
+    center(org.orgName, 32, 700, INK);
+    if (org.address) center(org.address, 16, 400, MUTED, 1.4);
+    if (org.contactLine) center(org.contactLine, 14, 400, MUTED, 1.4);
     y += 8;
-    center('স্টুডেন্ট আইডি কার্ড', 22, 700, ACCENT);
+    center('STUDENT ID CARD', 20, 700, ACCENT);
+    center('স্টুডেন্ট আইডি কার্ড', 18, 400, MUTED);
     y += 16;
 
-    // photo box
     const boxW = 150;
     const boxH = 176;
     const boxX = (width - boxW) / 2;
@@ -699,13 +856,12 @@ export async function renderIdCardCanvas(student, opts = {}) {
     }
     y += boxH + 20;
 
-    // fields
     const fields = [
       ['নাম', student?.name],
       ['আইডি', student?.id],
       ['শ্রেণি', student?.className],
       ['রোল', student?.roll],
-      ['সেশন', student?.admissionDate || settings?.academicYear || '—']
+      ['সেশন', student?.admissionDate || org?.academicYear || '—']
     ];
     const labelW = Math.round(inner * 0.38);
     const valueW = inner - labelW - 26;
@@ -746,6 +902,14 @@ export async function renderIdCardCanvas(student, opts = {}) {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#374151';
       ctx.fillText('প্রতিষ্ঠানের স্বাক্ষর', width / 2, y + 10);
+      y += 28;
+      // footer
+      setFont(ctx, 12, 400);
+      ctx.fillStyle = FAINT;
+      const footer = org.footerText || org.orgName;
+      ctx.fillText(footer, width / 2, y);
+      y += 16;
+      ctx.fillText(`${formatGenDate()} | Page 1 / 1 | ${org.orgName}`, width / 2, y);
     }
     y += 42;
     return y + pad;
@@ -767,7 +931,6 @@ export async function renderIdCardCanvas(student, opts = {}) {
   return canvas;
 }
 
-/** Student fee ledger — charges + payments with a running balance and totals. */
 export async function renderLedgerCanvases(student, opts = {}) {
   const fees = db.fees.list().filter((f) => f.studentId === student.id);
   const payments = db.payments.list().filter((p) => p.studentId === student.id);
@@ -782,10 +945,11 @@ export async function renderLedgerCanvases(student, opts = {}) {
     credit += Number(p.amount || 0);
     rows.push({ date: p.date || '—', desc: `পেমেন্ট (${p.month})`, debit: '', credit: taka(p.amount), balance: taka(debit - credit) });
   }
+  const org = resolveOrg(opts.settings || opts);
   return renderReportCanvases({
-    settings: opts.settings || {},
-    title: 'ফি লেজার',
-    subtitle: `${student.name || student.id} · ${student.id}`,
+    settings: org,
+    title: 'STUDENT LEDGER',
+    subtitle: `${student.name || student.id} · ${student.id} — ফি লেজার`,
     columns: [
       { key: 'date', label: 'তারিখ' },
       { key: 'desc', label: 'বিবরণ' },
@@ -798,12 +962,13 @@ export async function renderLedgerCanvases(student, opts = {}) {
       { label: 'মোট চার্জ', value: taka(debit) },
       { label: 'মোট পরিশোধিত', value: taka(credit) },
       { label: 'বর্তমান ব্যালেন্স', value: taka(debit - credit) }
-    ]
+    ],
+    generatedBy: opts.generatedBy || null
   });
 }
 
-/** Admission form — the student's details as a clean two-column document. */
 export async function renderAdmissionFormCanvases(student, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
   const fields = [
     ['শিক্ষার্থীর নাম', student.name],
     ['স্টুডেন্ট আইডি', student.id],
@@ -817,24 +982,296 @@ export async function renderAdmissionFormCanvases(student, opts = {}) {
     ['ভর্তির তারিখ', student.admissionDate]
   ];
   return renderReportCanvases({
-    settings: opts.settings || {},
-    title: 'ভর্তি ফরম',
-    subtitle: 'Admission Form',
+    settings: org,
+    title: 'ADMISSION FORM',
+    subtitle: `ভর্তি ফরম — ${student.name || student.id}`,
     columns: [{ key: 'label', label: 'বিবরণ' }, { key: 'value', label: 'তথ্য' }],
-    rows: fields.map(([label, value]) => ({ label, value: value || '—' }))
+    rows: fields.map(([label, value]) => ({ label, value: value || '—' })),
+    generatedBy: opts.generatedBy || null
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* Additional standard documents as per task                           */
+/* ------------------------------------------------------------------ */
+
+export async function renderStudentStatementCanvases(student, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const fees = db.fees.list().filter((f) => f.studentId === student.id);
+  const payments = db.payments.list().filter((p) => p.studentId === student.id);
+  const total = fees.reduce((s, f) => s + Number(f.amount || 0), 0);
+  const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const due = total - paid;
+
+  const infoRows = [
+    { field: 'শিক্ষার্থীর নাম', value: student.name || '—' },
+    { field: 'ইউনিক আইডি', value: student.id || '—' },
+    { field: 'শ্রেণি', value: student.className || '—' },
+    { field: 'রোল', value: student.roll || '—' },
+    { field: 'শাখা', value: student.section || '—' },
+    { field: 'ব্যাচ', value: student.batch || '—' },
+    { field: 'মোবাইল', value: student.phone || '—' },
+    { field: 'অভিভাবক', value: student.guardian || '—' },
+    { field: 'মোট ফি', value: taka(total) },
+    { field: 'পরিশোধিত', value: taka(paid) },
+    { field: 'বকেয়া', value: taka(due) },
+    { field: 'অবস্থা', value: student.status || '—' }
+  ];
+
+  return renderReportCanvases({
+    settings: org,
+    title: 'STUDENT STATEMENT',
+    subtitle: `${student.name || ''} · ${student.id} — শিক্ষার্থী বিবরণী`,
+    columns: [
+      { key: 'field', label: 'বিবরণ' },
+      { key: 'value', label: 'তথ্য' }
+    ],
+    rows: infoRows,
+    summary: [
+      { label: 'মোট ফি', value: taka(total) },
+      { label: 'পরিশোধিত', value: taka(paid) },
+      { label: 'বকেয়া', value: taka(due) }
+    ],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderDueStatementCanvases(student, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const dues = db.fees.list().filter((f) => f.studentId === student.id && f.status === 'বকেয়া');
+  const rows = dues.map((d) => ({
+    month: d.month || '—',
+    amount: taka(d.amount),
+    status: d.status || 'বকেয়া',
+    due: taka(d.amount)
+  }));
+  const totalDue = dues.reduce((s, d) => s + Number(d.amount || 0), 0);
+
+  return renderReportCanvases({
+    settings: org,
+    title: 'STUDENT DUE STATEMENT',
+    subtitle: `${student.name || ''} · ${student.id} — বকেয়া বিবরণী`,
+    columns: DUE_STATEMENT_COLUMNS,
+    rows,
+    summary: [
+      { label: 'মোট বকেয়া', value: taka(totalDue) }
+    ],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderFinanceReportCanvases({ from, to, payments, summary } = {}, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const pays = payments || db.payments.list();
+  const rows = pays.map((p) => {
+    const st = db.students.find(p.studentId);
+    return {
+      date: p.date || '—',
+      student: st?.name || p.studentId,
+      type: p.month || '—',
+      amount: taka(p.amount),
+      method: p.method || '—'
+    };
+  });
+  const total = pays.reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  return renderReportCanvases({
+    settings: org,
+    title: 'FINANCE REPORT',
+    subtitle: `${from || ''}${from && to ? ' - ' : ''}${to || ''} — অর্থ বিবরণী`.trim() || 'অর্থ বিবরণী',
+    columns: FINANCE_REPORT_COLUMNS,
+    rows,
+    summary: summary || [
+      { label: 'মোট আদায়', value: taka(total) },
+      { label: 'মোট লেনদেন', value: `${rows.length} টি` }
+    ],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderStudentListCanvases(students, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const { rows } = classReportRows(students || db.students.list());
+  return renderReportCanvases({
+    settings: org,
+    title: 'STUDENT LIST',
+    subtitle: opts.subtitle || 'শিক্ষার্থী তালিকা',
+    columns: CLASS_REPORT_COLUMNS,
+    rows,
+    summary: [{ label: 'মোট শিক্ষার্থী', value: bn(rows.length) }],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderTeacherReportCanvases(teachers, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const list = teachers || db.teachers.list();
+  return renderReportCanvases({
+    settings: org,
+    title: 'TEACHER REPORT',
+    subtitle: opts.subtitle || 'শিক্ষক তালিকা',
+    columns: TEACHER_REPORT_COLUMNS,
+    rows: list,
+    summary: [{ label: 'মোট শিক্ষক', value: bn(list.length) }],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderBatchReportCanvases(batches, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const list = batches || db.batches.list();
+  return renderReportCanvases({
+    settings: org,
+    title: 'CLASS/BATCH REPORT',
+    subtitle: opts.subtitle || 'ক্লাস/ব্যাচ রিপোর্ট',
+    columns: [
+      { key: 'name', label: 'ব্যাচ' },
+      { key: 'className', label: 'ক্লাস' },
+      { key: 'teacher', label: 'শিক্ষক' },
+      { key: 'students', label: 'শিক্ষার্থী' }
+    ],
+    rows: list,
+    summary: [{ label: 'মোট ব্যাচ', value: bn(list.length) }],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderNoticeCanvases(notices, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const list = notices || db.notices.list();
+  return renderReportCanvases({
+    settings: org,
+    title: 'NOTICE',
+    subtitle: opts.subtitle || 'নোটিশ',
+    columns: NOTICE_REPORT_COLUMNS,
+    rows: list.map((n) => ({
+      title: n.title || '—',
+      className: n.className || 'সব',
+      audience: n.audience || 'সবাই',
+      date: n.date || '—'
+    })),
+    summary: [{ label: 'মোট নোটিশ', value: bn(list.length) }],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+export async function renderRoutineCanvases(routineRows, opts = {}) {
+  const org = resolveOrg(opts.settings || opts);
+  const list = routineRows || db.routine.list();
+  return renderReportCanvases({
+    settings: org,
+    title: 'CLASS ROUTINE',
+    subtitle: opts.subtitle || 'ক্লাস রুটিন',
+    columns: ROUTINE_REPORT_COLUMNS,
+    rows: list,
+    summary: [{ label: 'মোট ক্লাস', value: bn(list.length) }],
+    generatedBy: opts.generatedBy || null
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Generic WhatsApp-shareable image with Institution Pad               */
+/* ------------------------------------------------------------------ */
+
+export async function renderBrandedImageCanvas({ title, subtitle, lines = [], orgSettings, generatedBy } = {}) {
+  await warmFonts();
+  const width = 760;
+  const org = resolveOrg(orgSettings || {});
+  const logoImg = await loadLogo(org.orgLogo || orgSettings?.orgLogo || null);
+
+  const pass = (ctx, paint) => {
+    const pad = 44;
+    const inner = width - pad * 2;
+    let y = pad;
+    ctx.textBaseline = 'top';
+
+    const center = (text, px, weight, color, lhMul = 1.4) => {
+      if (!text) return;
+      setFont(ctx, px, weight);
+      ctx.textAlign = 'center';
+      const wrapped = wrapText(ctx, text, inner);
+      const lh = Math.round(px * lhMul);
+      if (paint) {
+        ctx.fillStyle = color;
+        wrapped.forEach((ln, i) => ctx.fillText(ln, width / 2, y + i * lh));
+      }
+      y += wrapped.length * lh;
+    };
+
+    if (logoImg) {
+      if (paint) drawLogo(ctx, logoImg, width / 2, y, 96);
+      y += 96 + 10;
+    }
+    center(org.orgName, 32, 700, INK);
+    if (org.address) center(org.address, 16, 400, MUTED);
+    if (org.contactLine) center(org.contactLine, 16, 400, MUTED);
+    y += 12;
+    center((title || 'NOTICE').toUpperCase(), 28, 700, INK);
+    if (subtitle) center(subtitle, 18, 400, MUTED);
+    y += 12;
+    if (paint) {
+      ctx.fillStyle = ACCENT;
+      ctx.fillRect(pad, y, inner, 3);
+    }
+    y += 21;
+
+    for (const line of lines) {
+      setFont(ctx, 20, 400);
+      const wrapped = wrapText(ctx, String(line), inner);
+      const lh = 28;
+      if (paint) {
+        ctx.textAlign = 'left';
+        ctx.fillStyle = INK;
+        wrapped.forEach((ln, i) => ctx.fillText(ln, pad, y + i * lh));
+      }
+      y += wrapped.length * lh + 10;
+    }
+
+    y += 20;
+    if (paint) {
+      ctx.strokeStyle = BORDER;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(pad + inner, y);
+      ctx.stroke();
+      y += 12;
+      setFont(ctx, 12, 400);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = FAINT;
+      ctx.fillText(org.footerText || org.orgName, width / 2, y);
+      y += 16;
+      ctx.fillText(`${formatGenDate()} | ${org.orgName}`, width / 2, y);
+      y += 16;
+    } else {
+      y += 50;
+    }
+
+    return y + pad;
+  };
+
+  const probe = makeCanvas(width, 4);
+  const pctx = probe.getContext('2d');
+  const height = pass(pctx, false);
+
+  const canvas = makeCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  pass(ctx, true);
+  return canvas;
 }
 
 export function receiptPdfFileName(pay) {
   return `receipt-${pay.receiptNo || pay.id}.pdf`;
 }
 
-/** A receipt document ready for the shared preview → download/share flow. */
 export async function receiptPreviewDoc(pay, opts = {}) {
-  const canvas = await renderReceiptCanvas(pay, opts);
+  const org = resolveOrg(opts.settings || opts);
+  const canvas = await renderReceiptCanvas(pay, { ...opts, settings: org });
   return {
-    title: 'পেমেন্ট রিসিট',
-    meta: `${pay.receiptNo || pay.id} · ${opts.student?.name || pay.studentId}`,
+    title: 'PAYMENT RECEIPT',
+    meta: `${pay.receiptNo || pay.id} · ${opts.student?.name || pay.studentId} — ${org.orgName}`,
     filename: receiptPdfFileName(pay),
     canvases: [canvas],
     shareable: true

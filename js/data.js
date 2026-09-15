@@ -14,7 +14,7 @@ import { readJSON, writeJSON, onStoreReset } from './store.js';
 import { isFirebaseConfigured, ref as fbRef, showToast } from './firebase.js';
 
 const DATA_KEY = 'activeplus_data';
-export const DATA_VERSION = 7; // student home: tips, banners, study activity, daily challenge
+export const DATA_VERSION = 8; // institution pad: logo, website, footerText + consistent branding
 
 export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'একাদশ', 'দ্বাদশ'];
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };
@@ -64,10 +64,12 @@ const MONTH_NOW = monthLabel(0);
 const SEED = {
   settings: {
     orgName: 'Active Plus Coaching',
+    orgLogo: null,
     address: '২য় তলা, মদিনা প্লাজা, মিরপুর-১০, ঢাকা',
     mobile: '০১৭০০-০০০০০০',
     email: 'info@activeplus.edu',
     website: 'activeplus.edu',
+    footerText: 'শিক্ষাই শক্তি — Active Plus Coaching',
     academicYear: '২০২৬',
     monthlyFee: 1200,
     admissionFee: 500,
@@ -435,14 +437,22 @@ export const db = {
 };
 
 /* ------------------------------------------------------------------ */
-/* Institution profile                                                 */
+/* Institution profile / Pad Settings                                  */
 /* ------------------------------------------------------------------ */
-/* The name, address, mobile and email an admin writes in Settings are  */
-/* the identity printed on every receipt, report, admission form, ID    */
-/* card and shown in the student/teacher portals — so they are read,    */
-/* validated and normalised in one place instead of per document.       */
+/* Central Institution Profile — the single source of truth for every   */
+/* official document and WhatsApp-shareable image. Admin configures     */
+/* once in Settings → Institution Profile / Pad Settings:               */
+/*   - Institution Name (required)                                      */
+/*   - Institution Logo (stored locally as data URL, reused everywhere)  */
+/*   - Address (required)                                               */
+/*   - Mobile Number (required, BD)                                     */
+/*   - Email (optional)                                                 */
+/*   - Website (optional)                                               */
+/*   - Footer Text (optional)                                           */
+/* Every PDF and WhatsApp image automatically uses this pad.            */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+const WEBSITE_RE = /^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i;
 
 /** Digits only — Bengali numerals are accepted wherever the app asks for one. */
 export function mobileDigits(value) {
@@ -453,49 +463,74 @@ export function mobileDigits(value) {
 export function isValidMobile(value) {
   const digits = mobileDigits(value);
   if (!digits) return false;
-  // +8801711000000 and 01711000000 are the same number — compare the local form.
   const local = digits.startsWith('880') ? `0${digits.slice(3)}` : digits;
   return local.length === 11 && local.startsWith('01');
 }
 
 export function isValidEmail(value) {
-  return EMAIL_RE.test(String(value ?? '').trim());
+  const v = String(value ?? '').trim();
+  if (!v) return true;
+  return EMAIL_RE.test(v);
+}
+
+export function isValidWebsite(value) {
+  const v = String(value ?? '').trim();
+  if (!v) return true;
+  if (/\s/.test(v)) return false;
+  return WEBSITE_RE.test(v) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(v);
+}
+
+export function isValidLogoDataUrl(value) {
+  if (!value) return true;
+  const s = String(value).trim();
+  if (!s) return true;
+  return s.startsWith('data:image/') && s.includes('base64,');
 }
 
 /**
  * The institution identity used by every letterhead, document and portal.
  * Always complete: the seed fills anything the admin has not written yet.
+ * This is the single source of truth for Institution Pad/Letterhead.
  */
 export function orgInfo() {
   const s = db.settings.get();
   const trim = (v) => String(v ?? '').trim();
   const mobile = trim(s.mobile);
   const email = trim(s.email);
+  const website = trim(s.website);
+  const footerText = trim(s.footerText);
+  const orgLogo = s.orgLogo || null;
+  const parts = [mobile, email, website].filter(Boolean);
   return {
     name: trim(s.orgName) || 'Active Plus',
+    orgName: trim(s.orgName) || 'Active Plus',
     address: trim(s.address),
     mobile,
     email,
-    website: trim(s.website),
+    website,
+    footerText,
+    orgLogo,
+    logo: orgLogo,
     academicYear: trim(s.academicYear),
-    /** One-line "mobile · email" for letterheads and document headers. */
-    contactLine: [mobile, email].filter(Boolean).join(' · ')
+    contactLine: parts.join(' | '),
+    contactLinePipe: parts.join(' | '),
+    contactLineDot: parts.join(' · ')
   };
 }
 
 /**
  * Validate and store the institution profile written in admin Settings.
- *
- * Nothing is saved unless every field is usable, so a document can never be
- * exported with a half-filled letterhead. Returns `{ ok, errors, org }` where
- * each error is `{ field, message }` in Bengali — the data layer never touches
- * the DOM, the caller decides where to show them.
+ * Required: orgName, address, mobile
+ * Optional: email, website, footerText, orgLogo
  */
 export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}) {
   const name = String(input.orgName ?? '').trim();
   const address = String(input.address ?? '').trim();
   const mobile = String(input.mobile ?? '').trim();
   const email = String(input.email ?? '').trim();
+  const website = String(input.website ?? '').trim();
+  const footerText = String(input.footerText ?? '').trim();
+  const orgLogo = input.orgLogo !== undefined ? input.orgLogo : undefined;
 
   const errors = [];
   const fail = (field, message) => errors.push({ field, message });
@@ -504,16 +539,44 @@ export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}
   if (!address) fail('address', 'প্রতিষ্ঠানের ঠিকানা লিখুন।');
   if (!mobile) fail('mobile', 'মোবাইল নম্বর লিখুন।');
   else if (!isValidMobile(mobile)) fail('mobile', 'সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যা, ০১ দিয়ে শুরু (যেমন ০১৭০০-০০০০০০)।');
-  if (!email) fail('email', 'ইমেইল ঠিকানা লিখুন।');
-  else if (!isValidEmail(email)) fail('email', 'সঠিক ইমেইল ঠিকানা দিন (যেমন info@example.com)।');
+  if (email && !EMAIL_RE.test(email)) fail('email', 'সঠিক ইমেইল ঠিকানা দিন (যেমন info@example.com)।');
+  if (website && !isValidWebsite(website)) fail('website', 'সঠিক ওয়েবসাইট দিন (যেমন www.example.com)।');
+  if (orgLogo !== undefined && orgLogo !== null && String(orgLogo).trim() !== '' && !isValidLogoDataUrl(orgLogo)) {
+    fail('orgLogo', 'লোগো ছবিটি সঠিক ফরম্যাটে নয়। PNG/JPG আপলোড করুন।');
+  }
 
   if (errors.length) return { ok: false, errors, org: orgInfo() };
 
-  db.settings.update({ orgName: name, address, mobile, email });
+  const patch = { orgName: name, address, mobile };
+  if (input.email !== undefined) patch.email = email;
+  if (input.website !== undefined) patch.website = website;
+  if (input.footerText !== undefined) patch.footerText = footerText;
+  if (orgLogo !== undefined) patch.orgLogo = orgLogo ? String(orgLogo).trim() : null;
+
+  db.settings.update(patch);
   logActivity({ user, role, action: 'updated institute profile', target: name });
   return { ok: true, errors: [], org: orgInfo() };
 }
 
+export function saveOrgLogo(dataUrl, { user = 'system', role = 'admin' } = {}) {
+  if (!dataUrl) {
+    db.settings.update({ orgLogo: null });
+    logActivity({ user, role, action: 'removed institute logo' });
+    return { ok: true, errors: [], org: orgInfo() };
+  }
+  if (!isValidLogoDataUrl(dataUrl)) {
+    return { ok: false, errors: [{ field: 'orgLogo', message: 'লোগো ছবিটি সঠিক ফরম্যাটে নয়।' }], org: orgInfo() };
+  }
+  if (String(dataUrl).length > 4_000_000) {
+    return { ok: false, errors: [{ field: 'orgLogo', message: 'লোগো ফাইলটি খুব বড় — ২MB এর কম ছবি ব্যবহার করুন।' }], org: orgInfo() };
+  }
+  db.settings.update({ orgLogo: String(dataUrl) });
+  logActivity({ user, role, action: 'updated institute logo' });
+  return { ok: true, errors: [], org: orgInfo() };
+}
+
+/* ------------------------------------------------------------------ */
+/* Domain helpers                                                      */
 /* ------------------------------------------------------------------ */
 /* Domain helpers                                                      */
 /* ------------------------------------------------------------------ */
