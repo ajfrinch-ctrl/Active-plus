@@ -1,0 +1,146 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "roles": {
+      "$uid": {
+        ".read": "auth !== null && (auth.uid === $uid || root.child('roles/' + auth.uid + '/role').val() === 'admin')",
+        ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
+        ".validate": "newData.hasChildren(['role'])"
+      }
+    },
+    "activeplus": {
+      "data": {
+        ".comment": "Full store mirror written by the app — administrators only.",
+        ".read": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
+        ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+      }
+    },
+    "students": {
+      ".read": "auth !== null",
+      "$studentId": {
+        ".comment": "A student may only ever read or edit their own record.",
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() === 'admin' || (root.child('roles/' + auth.uid + '/role').val() === 'teacher' && root.child('teacherClasses/' + auth.uid + '/' + data.child('className').val()).val() === true))",
+        ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
+        "phone": {
+          ".write": "auth !== null && auth.uid === data.parent().child('uid').val()"
+        }
+      },
+      ".comment": "teacherClasses/<uid>/<className> (admin-written) scopes what a teacher may read."
+    },
+    "fees": {
+      "$studentId": {
+        ".comment": "Fee data is strictly private to that student; teachers/admins for management.",
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() === 'admin')",
+        ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+      }
+    },
+    "payments": {
+      "$studentId": {
+        ".read": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
+        ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+      }
+    },
+    "results": {
+      "$studentId": {
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() === 'admin' || (root.child('roles/' + auth.uid + '/role').val() === 'teacher' && root.child('teacherClasses/' + auth.uid + '/' + data.child('className').val()).val() === true))",
+        ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+      }
+    },
+    "examResults": {
+      "$resultId": {
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() === 'admin' || (root.child('roles/' + auth.uid + '/role').val() === 'teacher' && root.child('teacherClasses/' + auth.uid + '/' + data.child('className').val()).val() === true))",
+        ".write": "auth !== null"
+      }
+    },
+    "submissions": {
+      "$submissionId": {
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() === 'admin' || (root.child('roles/' + auth.uid + '/role').val() === 'teacher' && root.child('teacherClasses/' + auth.uid + '/' + data.child('className').val()).val() === true))",
+        ".write": "auth !== null"
+      }
+    },
+    "notifications": {
+      "$notificationId": {
+        ".comment": "Students read their own notifications; nobody edits another person's.",
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() !== 'student')",
+        ".write": "auth !== null"
+      }
+    },
+    "classes": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "subjects": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "batches": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "routine": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "materials": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "assignments": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "suggestions": {
+      ".read": "auth !== null",
+      ".write": "auth !== null"
+    },
+    "exams": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "tips": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "banners": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "notices": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "attendance": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() !== 'student'"
+    },
+    "teachers": {
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
+    },
+    "activityLogs": {
+      ".read": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
+      ".write": "auth !== null",
+      "$logId": {
+        ".comment": "Ordinary users may add or edit their own entry but never delete logs.",
+        ".write": "auth !== null && (root.child('roles/' + auth.uid + '/role').val() === 'admin' || newData.exists())"
+      }
+    },
+    "studyActivity": {
+      "$studentId": {
+        ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() !== 'student')",
+        ".write": "auth !== null && auth.uid === data.child('uid').val()"
+      }
+    },
+    "teacherClasses": {
+      ".comment": "Admin-maintained map of which teacher may read which class.",
+      ".read": "auth !== null",
+      ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
+      "$uid": {
+        "$className": {
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    }
+  }
+}

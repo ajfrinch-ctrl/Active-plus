@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Local tooling / caches
+.cache/
+*.log
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
