@@ -9,7 +9,7 @@
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v15';
+const CACHE_NAME = 'active-plus-v16';
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -19,6 +19,7 @@ const PRECACHE_URLS = [
   'css/style.css',
   'css/home.css',
   'css/admin-shell.css',
+  'css/modern.css',
   'js/firebase.js',
   'js/store.js',
   'js/data.js',
