@@ -57,13 +57,19 @@ test('student home renders every priority section from live data', async () => {
   const p = data.todayProgress(student);
   assert.ok(html.includes(`width:${p.pct}%`), `progress bar shows ${p.pct}%`);
 
-  // Feature grid: 8 destinations, each wired to an action.
-  const tiles = doc.querySelectorAll('#home-content .feature-grid:not(.more-grid) .tile');
-  assert.equal(tiles.length, 8, 'eight main features');
+  // Minimal admin-style layout: an overview card, a row of quick shortcuts,
+  // then every information card folded into collapsible sections (tap to open).
+  assert.ok(doc.getElementById('student-overview'), 'আজকের অবস্থা overview present');
+  const chips = doc.querySelectorAll('#student-quick .chip');
+  assert.ok(chips.length >= 3, 'quick shortcuts rendered');
+  for (const c of chips) assert.ok(c.dataset.act, 'shortcut has an action');
+  const folds = doc.querySelectorAll('#home-content details.mini-details:not(.in-card)');
+  assert.ok(folds.length >= 4, 'information cards live in folds');
+  for (const f of folds) assert.equal(f.open, false, 'folds open minimized');
+  assert.equal(doc.querySelector('#home-content .see-more'), null, 'no see-more swap button');
   const moreTiles = doc.querySelectorAll('#more-features .tile');
-  assert.ok(moreTiles.length >= 6, 'See More reveals the secondary features');
-  assert.equal(doc.getElementById('more-features').hidden, true, 'collapsed by default');
-  for (const t of tiles) assert.ok(t.dataset.act, 'tile has an action');
+  assert.ok(moreTiles.length >= 6, 'the আরও ফিচার fold carries the secondary features');
+  assert.equal(doc.getElementById('student-more-sec').open, false, 'আরও ফিচার minimized by default');
 
   // Next class / upcoming exam come from the routine + exam collections.
   const next = data.nextClass();
@@ -88,13 +94,14 @@ test('bottom nav switches views and exactly one stays highlighted', async () => 
   assert.equal(doc.getElementById('view-home').hidden, false);
 });
 
-test('feature tiles route to the right view / panel', async () => {
+test('home shortcuts route to the right view / panel', async () => {
   const { doc } = await bootHome();
-  click(doc, '#home-content [data-act="exam"]');
-  assert.equal(doc.getElementById('view-exam').hidden, false, 'exam tile opens the exam view');
+  // The seed exam window is open, so its card offers the Start action.
+  click(doc, '#home-content [data-act="startexam"]');
+  assert.equal(doc.getElementById('view-exam').hidden, false, 'exam shortcut opens the exam view');
   click(doc, '.bottom-nav button[data-view="home"]');
   click(doc, '#home-content [data-act="routine"]');
-  assert.equal(doc.getElementById('view-more').hidden, false, 'routine tile opens More');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'routine shortcut opens More');
   assert.ok(doc.getElementById('more-routine'), 'routine panel exists');
 });
 
@@ -154,7 +161,7 @@ test('offline shows the indicator and blocks starting an exam', async () => {
   Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: false, configurable: true });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('offline'));
   assert.equal(doc.getElementById('net-chip').classList.contains('off'), true, 'chip marked offline');
-  click(doc, '#home-content [data-act="exam"]');
+  click(doc, '#home-content [data-act="startexam"]');
   assert.equal(doc.getElementById('view-exam').hidden, true, 'exam view not opened while offline');
 });
 
@@ -237,7 +244,7 @@ test('teacher query reaches the teacher notification list', async () => {
   assert.ok(doc.getElementById('more-query').innerHTML.includes('অধ্যায় ২'), 'student sees their own query listed');
 });
 
-test('notification preview, carousel and See More all work on the home screen', async () => {
+test('notification preview, carousel and the আরও ফিচার fold all work on the home screen', async () => {
   const { doc, data } = await bootHome();
   const html = doc.getElementById('home-content').innerHTML;
   assert.ok(doc.querySelector('#home-content [data-act="notif"]'), 'notification preview offers View All');
@@ -251,13 +258,13 @@ test('notification preview, carousel and See More all work on the home screen', 
   assert.equal(doc.getElementById('detail-title').textContent, firstBanner.title, 'banner CTA opens its details');
   doc.getElementById('detail-modal').classList.remove('active');
 
-  const box = doc.getElementById('more-features');
-  assert.equal(box.hidden, true);
-  click(doc, '#home-content [data-act="seemore"]');
-  assert.equal(box.hidden, false, 'See More expands');
-  assert.equal(doc.querySelector('#home-content [data-act="seemore"]').getAttribute('aria-expanded'), 'true');
-  click(doc, '#home-content [data-act="seemore"]');
-  assert.equal(box.hidden, true, 'and collapses again');
+  // No more "See More" swap: secondary features sit in a fold — minimized by
+  // default, everything inside once tapped open.
+  const moreSec = doc.getElementById('student-more-sec');
+  assert.ok(moreSec, 'আরও ফিচার fold exists');
+  assert.equal(moreSec.open, false, 'folded by default');
+  moreSec.open = true; // tapping the summary toggles <details> natively
+  assert.ok(moreSec.querySelectorAll('#more-features .tile').length >= 6, 'secondary features inside');
 });
 
 test('More menu carries every secondary destination without dead links', async () => {
@@ -351,13 +358,13 @@ test('More includes a Settings panel with real app state', async () => {
   assert.equal(doc.getElementById('view-more').hidden, false, 'settings tile routes to More');
 });
 
-test('today summary rows open their own section', async () => {
+test('clickable rows inside the folded cards stay actionable', async () => {
   const { doc } = await bootHome();
-  const rows = [...doc.querySelectorAll('#home-content [role="button"][data-act]')]
-    .filter((r) => ['routine', 'assignments', 'exam'].includes(r.dataset.act));
-  assert.ok(rows.length >= 3, 'today rows are actionable');
-  click(doc, '#home-content .info-row[data-act="exam"]');
-  assert.equal(doc.getElementById('view-exam').hidden, false, 'exam row opens exams');
+  // Folded sections keep their role="button" rows in the DOM, ready to tap.
+  const rows = [...doc.querySelectorAll('#home-content [role="button"][data-act]')];
+  assert.ok(rows.length >= 2, 'folded rows stay actionable');
+  click(doc, '#home-content [data-act="routine"]');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'routine shortcut opens the More section');
 });
 
 test('latest result card shows the class position when leaderboard is on', async () => {
@@ -392,37 +399,28 @@ test('every tile in the More quick row actually navigates (no dead buttons)', as
   }
 });
 
-test('home follows the priority order: progress first, announcement after result', async () => {
-  const { doc, data } = await bootHome();
-  const student = data.db.students.find('2026-09-001');
-  const exam = data.examsFor(student.className)[0];
-  const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
-  data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+test('home follows the admin-style order: overview, shortcuts, then folded details', async () => {
+  const { doc } = await bootHome();
 
   const html = doc.getElementById('home-content').innerHTML;
   const at = (needle) => html.indexOf(needle);
-  const progress = at('আজকের প্রগ্রেস');
-  const grid = at('feature-grid');
-  const nextCls = at('পরবর্তী ক্লাস');
-  const nextExam = at('আসন্ন পরীক্ষা');
-  const challenge = at('ডেইলি চ্যালেঞ্জ');
-  const result = at('সাম্প্রতিক ফলাফল');
-  const announce = at('carousel');
-  const fee = at('ফি স্ট্যাটাস');
-  const quick = at('কুইক ফিচার');
+  const overview = at('আজকের অবস্থা');
+  const quick = at('কুইক শর্টকাট');
+  const studyFold = at('📚 পড়াশোনা');
+  const examFold = at('📝 পরীক্ষা ও ফলাফল');
+  const workFold = at('📋 অ্যাসাইনমেন্ট ও ফি');
+  const noticeFold = at('📢 নোটিশ ও টিপ');
+  const moreFold = at('✨ আরও ফিচার');
 
-  for (const [name, pos] of Object.entries({ progress, grid, nextCls, nextExam, challenge, result, announce, fee, quick })) {
+  for (const [name, pos] of Object.entries({ overview, quick, studyFold, examFold, workFold, noticeFold, moreFold })) {
     assert.ok(pos >= 0, `${name} rendered`);
   }
-  assert.ok(progress < grid, 'progress before the feature grid');
-  assert.ok(grid < nextCls, 'grid before next class');
-  assert.ok(nextCls < nextExam, 'next class before upcoming exam');
-  assert.ok(nextExam < challenge, 'exam before daily challenge');
-  assert.ok(challenge < result, 'challenge before latest result');
-  assert.ok(result < announce, 'announcement sits after the result card');
-  assert.ok(announce < fee, 'announcement before fee status');
-  assert.ok(fee < quick, 'fee before quick features');
+  assert.ok(overview < quick, 'overview first, then the shortcuts');
+  assert.ok(quick < studyFold, 'shortcuts before the folded sections');
+  assert.ok(studyFold < examFold, 'study before exams');
+  assert.ok(examFold < workFold, 'exams before assignments & fees');
+  assert.ok(workFold < noticeFold, 'assignments & fees before notices');
+  assert.ok(noticeFold < moreFold, 'extra features come last');
 });
 
 test('the student home registers the service worker (PWA install/offline)', async () => {
@@ -553,18 +551,18 @@ test('admin controls which secondary features students see', async () => {
   const acts = tiles.map((t) => t.dataset.act).sort();
   assert.deepEqual(acts, ['help', 'profile']);
 
-  // with nothing enabled the See More button itself disappears (no empty panel)
+  // with nothing enabled the secondary-features grid itself disappears (no
+  // empty panel hiding behind the fold)
   data.setHomeFeatures([]);
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.equal(doc.querySelector('#home-content [data-act="seemore"]'), null, 'See More hidden');
+  assert.equal(doc.getElementById('more-features'), null, 'feature grid removed when nothing is enabled');
   data.setHomeFeatures(['questionbank', 'progress', 'achievements', 'certificates', 'downloads', 'query', 'streak', 'profile', 'settings', 'help']);
 });
 
 test('question bank opens real practice from the own class pool', async () => {
   const { doc, data } = await bootHome();
   const before = data.db.studyActivity.list().reduce((s, a) => s + a.mcqs, 0);
-  click(doc, '#home-content [data-act="seemore"]');
-  click(doc, '#more-features [data-act="questionbank"]');
+  click(doc, '#student-quick [data-act="questionbank"]'); // shortcut chip, no fold to open first
   const body = doc.getElementById('detail-body');
   assert.equal(doc.getElementById('detail-title').textContent.includes('প্রশ্ন ব্যাংক'), true, 'practice sheet opened');
   assert.ok(body.querySelector('[data-opt="0"]'), 'a real question with options');
@@ -578,8 +576,7 @@ test('question bank opens real practice from the own class pool', async () => {
 test('question bank shows an empty state for a class with no questions', async () => {
   const { doc, data } = await bootHome();
   [...data.db.exams.list()].forEach((e) => data.db.exams.remove(e.id));
-  click(doc, '#home-content [data-act="seemore"]');
-  click(doc, '#more-features [data-act="questionbank"]');
+  click(doc, '#student-quick [data-act="questionbank"]');
   assert.ok(doc.getElementById('detail-body').textContent.includes('কোনো প্রশ্ন যোগ করা হয়নি'), 'honest empty state');
 });
 
@@ -616,7 +613,8 @@ test('announcement banners can carry an admin-supplied image', async () => {
 
 test('no home action is a dead button', async () => {
   const { doc } = await bootHome();
-  click(doc, '#home-content [data-act="seemore"]');
+  // Every action lives in the DOM from the start — shortcuts on top, the rest
+  // inside the folded sections — so there is nothing to reveal first.
   const acts = [...new Set([...doc.querySelectorAll('#home-content [data-act]')].map((el) => el.dataset.act))];
   assert.ok(acts.length >= 12, 'home exposes many actions');
   for (const act of acts) {

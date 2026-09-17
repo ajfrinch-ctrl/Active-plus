@@ -185,28 +185,31 @@ test('tapping হোম after আরও folds the admin home back to minimal', a
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
-test('tapping হোম after আরও restores the teacher dashboard', async () => {
+test('tapping হোম after আরও folds the teacher home back to minimal', async () => {
   const out = await bootPage('teacher.html', {
     username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'morehome'
   });
   const doc = out.dom.window.document;
   const win = out.dom.window;
 
-  const content = doc.getElementById('teacher-home-content');
-  const more = doc.getElementById('teacher-more');
-  assert.ok(content && more, 'dashboard content and আরও grid exist');
+  const folds = doc.querySelectorAll('#teacher-home details.mini-details');
+  assert.ok(folds.length >= 3, 'the teacher home keeps its sections folded');
+  for (const f of folds) assert.equal(f.open, false, 'minimized by default');
 
+  // "আরও" unfolds every section; the overview stays where it is.
   doc.querySelector('.bottom-nav button[data-tab="more"]')
     .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  assert.equal(more.hidden, false, 'the আরও grid is shown');
-  assert.equal(content.hidden, true, 'the dashboard is hidden while আরও is open');
+  for (const f of doc.querySelectorAll('#teacher-home details.mini-details')) {
+    assert.equal(f.open, true, 'every section unfolded');
+  }
+  assert.ok(doc.getElementById('teaching-hero'), 'the overview stays on screen');
 
+  // Tapping "হোম" folds everything back to minimal.
   doc.querySelector('.bottom-nav button[data-tab="home"]')
     .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  assert.equal(content.hidden, false, 'the dashboard is visible again after হোম');
-  assert.equal(more.hidden, true, 'the আরও grid is hidden after হোম');
-  assert.equal(doc.getElementById('teacher-see-more').textContent.trim(), 'আরও দেখুন ↓',
-    'the See More label is reset');
+  for (const f of doc.querySelectorAll('#teacher-home details.mini-details')) {
+    assert.equal(f.open, false, 'folded again after হোম');
+  }
 
   const fatal = out.errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
@@ -224,9 +227,12 @@ test('teacher portal boots and shows the student query inbox', async () => {
   const teacherHome = doc.getElementById('teacher-home');
   assert.ok(teacherHome && teacherHome.innerHTML.length > 200, 'teacher home rendered');
   assert.ok(doc.getElementById('teaching-hero'), "Today's Teaching hero present");
-  assert.ok(doc.querySelectorAll('#teacher-features .tile').length >= 8, 'feature grid rendered');
-  assert.ok(doc.querySelectorAll('#teacher-quick .chip').length >= 6, 'quick actions rendered');
-  assert.ok(doc.getElementById('teacher-see-more'), 'See More control present');
+  assert.ok(doc.getElementById('teaching-hero'), 'আজকের সামগ্রিক অবস্থা overview present');
+  assert.ok(doc.querySelectorAll('#teacher-quick .chip').length >= 6, 'quick shortcuts rendered');
+  const tFolds = doc.querySelectorAll('#teacher-home details.mini-details');
+  assert.ok(tFolds.length >= 3, 'info sections folded like the admin home');
+  for (const f of tFolds) assert.equal(f.open, false, 'folds open minimized');
+  assert.equal(doc.getElementById('teacher-see-more'), null, 'no view-swapping See More button');
   const tChip = doc.getElementById('teacher-net-chip');
   assert.ok(tChip, 'teacher connection chip rendered');
   assert.match(tChip.textContent, /অনলাইন|অফলাইন|সিংক/, `live status shown: "${tChip.textContent}"`);
