@@ -1,0 +1,421 @@
+/* ==========================================================================
+   ACTIVE PLUS — Modern gradient interface (v1)
+   A pure design layer over style.css + home.css + admin-shell.css. It only
+   re-skins the UI: no markup, class, id or behaviour changes, so every
+   feature, role and test keeps working exactly as before.
+   Everything lives inside `@media screen` so printed reports, receipts and
+   ID cards keep their exact ink-on-paper look.
+   ========================================================================== */
+
+@media screen {
+
+  /* ---------- Design tokens: vivid gradients on a deep-navy night base --- */
+  :root {
+    --bg: #070b16;
+    --primary: #070b16;
+    --primary-dark: #0d1326;
+    --surface-solid: #0d1326;
+    --sheet: #141a2e;
+
+    --accent: #a78bfa;
+    --brand: #8b5cf6;
+    --accent-fill: #7c3aed;
+    --accent-fill-hover: #6d28d9;
+    --success: #34d399;
+    --success-fill: #059669;
+    --warning: #fbbf24;
+    --danger: #fb7185;
+    --error-fill: #e11d48;
+    --text: #eef1ff;
+    --text-light: #c9d0ea;
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+
+    --grad-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 52%, #d946ef 100%);
+    --grad-warm: linear-gradient(135deg, #f43f5e 0%, #f97316 100%);
+    --grad-cool: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+    --grad-fresh: linear-gradient(135deg, #10b981 0%, #22d3ee 100%);
+    --grad-amber: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    --grad-rose: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+    --glow-primary: 0 8px 24px rgba(139, 92, 246, 0.38);
+  }
+
+  /* ---------- Ambient background: soft aurora glows ---------------------- */
+  body {
+    background:
+      radial-gradient(640px 340px at 12% -6%, rgba(99, 102, 241, 0.22), transparent 62%),
+      radial-gradient(560px 320px at 88% 4%, rgba(236, 72, 153, 0.14), transparent 60%),
+      radial-gradient(700px 480px at 50% 115%, rgba(6, 182, 214, 0.1), transparent 62%),
+      var(--primary);
+    background-attachment: fixed;
+  }
+
+  body.home-body {
+    background:
+      radial-gradient(640px 340px at 12% -6%, rgba(99, 102, 241, 0.24), transparent 62%),
+      radial-gradient(560px 320px at 88% 4%, rgba(236, 72, 153, 0.16), transparent 60%),
+      var(--primary);
+    background-attachment: fixed;
+  }
+
+  ::selection { background: rgba(139, 92, 246, 0.55); color: #fff; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #6366f1, #a855f7); }
+
+  :focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; }
+
+  /* Panels glide in when they appear. */
+  .tab-panel:not([hidden]) { animation: ap-rise 0.28s ease both; }
+  @keyframes ap-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- App header: signature gradient ---------------------------- */
+  .app-header {
+    background: linear-gradient(120deg, #312e81 0%, #6d28d9 48%, #a21caf 100%);
+    border-bottom: none;
+    box-shadow: 0 10px 32px rgba(109, 40, 217, 0.4);
+  }
+
+  .brand-mark.brand-logo {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45), 0 6px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .brand-text strong { color: #fff; }
+  .brand-text span { color: rgba(255, 255, 255, 0.78); }
+
+  .app-header .icon-btn,
+  .admin-topbar .topbar-btn {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #fff;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  .app-header .icon-btn:hover,
+  .admin-topbar .topbar-btn:hover {
+    background: rgba(255, 255, 255, 0.24);
+    color: #fff;
+  }
+
+  .notif-badge {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.75), 0 4px 10px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ---------- Buttons: gradient, glow, lift ------------------------------ */
+  .btn, .btn-login {
+    background: var(--grad-primary);
+    border-radius: 14px;
+    box-shadow: var(--glow-primary);
+    border: none;
+  }
+  .btn:hover, .btn-login:hover { background: var(--grad-primary); filter: brightness(1.1); transform: translateY(-1px); }
+  .btn:active, .btn-login:active { transform: translateY(0) scale(0.99); }
+  .btn-small { border-radius: 10px; }
+  .btn-success { background: var(--grad-fresh); box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35); }
+  .btn-success:hover { background: var(--grad-fresh); }
+  .btn-error { background: var(--grad-rose); box-shadow: 0 8px 20px rgba(244, 63, 94, 0.35); }
+  .btn-error:hover { background: var(--grad-rose); }
+  .btn-warning { background: var(--grad-amber); box-shadow: 0 8px 20px rgba(245, 158, 11, 0.32); }
+  .btn-warning:hover { background: var(--grad-amber); }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-strong);
+    box-shadow: none;
+  }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.14); }
+
+  /* ---------- Forms ------------------------------------------------------- */
+  .form-group input, .form-input, .form-select, .form-textarea {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+  }
+  .form-group input:focus, .form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: #a78bfa;
+    background: rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+  }
+
+  /* ---------- Section titles with gradient accent bars -------------------- */
+  .sec-title::before, .section-title::before {
+    content: "";
+    flex: none;
+    width: 4px;
+    align-self: stretch;
+    border-radius: 999px;
+    background: var(--grad-primary);
+  }
+  .section-title { gap: 0.625rem; }
+
+  /* ---------- Cards, stats, lists: frosted glass -------------------------- */
+  .card, .stat, .list-item, .hcard, .analytics-cell {
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(2, 4, 12, 0.45);
+  }
+  .card:hover { border-color: rgba(167, 139, 250, 0.55); box-shadow: 0 12px 32px rgba(109, 40, 217, 0.28); }
+  .list-item:hover { border-color: rgba(167, 139, 250, 0.4); }
+  .list-item .li-title { color: #fff; }
+
+  /* Stat cards get a gradient top bar, rotating through vivid hues. */
+  .stat { position: relative; overflow: hidden; }
+  .stat::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--stat-grad, var(--grad-primary));
+  }
+  .stat:nth-child(4n+1) { --stat-grad: linear-gradient(90deg, #6366f1, #8b5cf6); }
+  .stat:nth-child(4n+2) { --stat-grad: linear-gradient(90deg, #ec4899, #f43f5e); }
+  .stat:nth-child(4n+3) { --stat-grad: linear-gradient(90deg, #06b6d4, #3b82f6); }
+  .stat:nth-child(4n+4) { --stat-grad: linear-gradient(90deg, #f59e0b, #f97316); }
+  .stat .stat-value { color: #fff; }
+
+  /* ---------- Gradient icon chips (tiles, nav cards, analytics) ----------- */
+  .tile .ico, .nav-card .ico, .analytics-cell .ico, .quickadd-option .qo-ico {
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    color: #fff;
+    background: var(--chip-grad, var(--grad-primary));
+    box-shadow: 0 6px 16px rgba(2, 4, 12, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .tile .ico { width: 46px; height: 46px; font-size: 1.35rem; }
+  .nav-card .ico { width: 48px; height: 48px; font-size: 1.4rem; border-radius: 15px; }
+  .analytics-cell .ico { width: 42px; height: 42px; font-size: 1.2rem; }
+  .quickadd-option .qo-ico { width: 58px; height: 58px; font-size: 1.7rem; border-radius: 18px; }
+
+  /* Rotate chip hues across each grid so every icon feels distinct. */
+  .feature-grid > :nth-child(6n+1) .ico, .analytics-grid > :nth-child(6n+1) .ico,
+  .quickadd-grid > :nth-child(6n+1) .qo-ico { --chip-grad: linear-gradient(135deg, #6366f1, #8b5cf6); }
+  .feature-grid > :nth-child(6n+2) .ico, .analytics-grid > :nth-child(6n+2) .ico,
+  .quickadd-grid > :nth-child(6n+2) .qo-ico { --chip-grad: linear-gradient(135deg, #ec4899, #f43f5e); }
+  .feature-grid > :nth-child(6n+3) .ico, .analytics-grid > :nth-child(6n+3) .ico,
+  .quickadd-grid > :nth-child(6n+3) .qo-ico { --chip-grad: linear-gradient(135deg, #06b6d4, #3b82f6); }
+  .feature-grid > :nth-child(6n+4) .ico, .analytics-grid > :nth-child(6n+4) .ico { --chip-grad: var(--grad-amber); }
+  .feature-grid > :nth-child(6n+5) .ico, .analytics-grid > :nth-child(6n+5) .ico { --chip-grad: var(--grad-fresh); }
+  .feature-grid > :nth-child(6n) .ico, .analytics-grid > :nth-child(6n) .ico { --chip-grad: linear-gradient(135deg, #8b5cf6, #d946ef); }
+
+  .tile {
+    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 22px rgba(2, 4, 12, 0.4);
+    min-height: 92px;
+    gap: 0.5rem;
+  }
+  .tile:hover { border-color: rgba(167, 139, 250, 0.55); transform: translateY(-2px); }
+  .tile:active { transform: scale(0.97); }
+
+  .nav-card { border-radius: 18px; }
+  .nav-card:hover { border-color: rgba(167, 139, 250, 0.55); transform: translateY(-1px); }
+  .nav-card .nc-count { color: #c4b5fd; }
+  .nav-card .nc-view { color: #c4b5fd; font-weight: 700; }
+
+  /* Quick-action pills: bigger, touch-friendly, glassy. */
+  #admin-quick .chip, #teacher-quick .chip {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.45rem 0.95rem;
+    font-size: 0.8125rem;
+    color: var(--text-light);
+    background: rgba(139, 92, 246, 0.14);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  #admin-quick .chip:hover, #teacher-quick .chip:hover {
+    background: rgba(139, 92, 246, 0.26);
+    color: #fff;
+  }
+
+  .see-more { color: #c4b5fd; font-weight: 700; }
+  .see-more:hover { color: #fff; text-shadow: 0 0 18px rgba(167, 139, 250, 0.8); }
+
+  /* ---------- Tables ------------------------------------------------------- */
+  .table-wrap { border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 28px rgba(2, 4, 12, 0.4); }
+  .table th {
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.32), rgba(99, 102, 241, 0.1));
+    color: #c7d2fe;
+  }
+  .table tbody tr:hover td { background: rgba(139, 92, 246, 0.1); }
+
+  /* ---------- Floating bottom navigation ----------------------------------- */
+  .bottom-nav {
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + var(--safe-bottom));
+    border-radius: 26px;
+    background: rgba(13, 17, 32, 0.88);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 24px rgba(139, 92, 246, 0.12);
+    padding: 6px 6px calc(6px + var(--safe-bottom));
+  }
+  .bottom-nav button[data-tab], .bottom-nav button[data-view] {
+    border-radius: 19px;
+    color: #9aa3c0;
+  }
+  .bottom-nav button[data-tab][aria-current="true"],
+  .bottom-nav button[data-view][aria-current="true"] {
+    color: #fff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.5));
+    box-shadow: 0 6px 18px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+
+  .quickadd-fab {
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    border-color: #12172a;
+    box-shadow: 0 12px 28px rgba(236, 72, 153, 0.45), 0 0 0 4px rgba(139, 92, 246, 0.18);
+  }
+  .quickadd-option { border-radius: 20px; }
+  .quickadd-option:hover { transform: translateY(-2px); }
+
+  /* ---------- Sheets, dialogs, toasts -------------------------------------- */
+  .modal-content {
+    border-radius: 26px 26px 0 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.55);
+  }
+  .modal-content::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .modal-content h2 { padding-top: 0.5rem; }
+
+  .toast-container { bottom: calc(96px + var(--safe-bottom)); }
+  .toast { border-radius: 14px; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5); }
+  .toast.success { background: linear-gradient(135deg, #059669, #10b981); }
+  .toast.error { background: linear-gradient(135deg, #be123c, #f43f5e); }
+  .toast.warning { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+
+  /* ---------- Login --------------------------------------------------------- */
+  .auth-body {
+    background:
+      radial-gradient(700px 380px at 50% -8%, rgba(139, 92, 246, 0.32), transparent 62%),
+      radial-gradient(500px 300px at 8% 20%, rgba(6, 182, 214, 0.16), transparent 60%),
+      radial-gradient(500px 300px at 92% 30%, rgba(236, 72, 153, 0.16), transparent 60%),
+      var(--primary);
+  }
+  .logo {
+    background: linear-gradient(135deg, #ffffff, #e9e4ff);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.45), 0 16px 40px rgba(139, 92, 246, 0.4);
+  }
+  .auth-head h1 {
+    background: linear-gradient(92deg, #fff 20%, #c4b5fd 55%, #f9a8d4 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .login-card {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 24px;
+    box-shadow: 0 24px 60px rgba(2, 4, 12, 0.55), 0 0 32px rgba(139, 92, 246, 0.14);
+  }
+  .demo-box { border-radius: 16px; }
+  .demo-box button { border-radius: 10px; }
+
+  /* ---------- Student home --------------------------------------------------- */
+  .avatar {
+    background: linear-gradient(135deg, #6366f1, #a855f7 55%, #ec4899);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), 0 8px 20px rgba(139, 92, 246, 0.45);
+  }
+  .home-header .name { color: #fff; }
+  .bell {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 16px;
+  }
+  .hero {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.22) 55%, rgba(236, 72, 153, 0.2));
+    border: 1px solid rgba(167, 139, 250, 0.4);
+  }
+  .hero .pct {
+    background: linear-gradient(92deg, #fff, #c4b5fd);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+  .banner { border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 14px 34px rgba(2, 4, 12, 0.5); }
+  .banner:nth-of-type(3n+1) { background: linear-gradient(135deg, #4c1d95, #7c3aed 60%, #a855f7); }
+  .banner:nth-of-type(3n+2) { background: linear-gradient(135deg, #9d174d, #db2777 60%, #f472b6); }
+  .banner:nth-of-type(3n) { background: linear-gradient(135deg, #0c4a6e, #0284c7 60%, #22d3ee); }
+  .streak-chip {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(249, 115, 22, 0.18));
+    border-color: rgba(251, 191, 36, 0.5);
+  }
+  .week .d.on .dot { background: var(--grad-fresh); }
+  .carousel-dots i.on { background: linear-gradient(90deg, #8b5cf6, #ec4899); }
+
+  /* ---------- Teacher top tabs, roles, misc --------------------------------- */
+  .top-tab-bar { background: rgba(13, 19, 38, 0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .top-tab-bar button[aria-selected="true"] { background: linear-gradient(135deg, rgba(99, 102, 241, 0.55), rgba(168, 85, 247, 0.55)); color: #fff; }
+  .role-option[data-checked="true"], .role-option:has(input:checked) {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.4), rgba(168, 85, 247, 0.35));
+    border-color: #a78bfa;
+  }
+  .progress-fill { background: linear-gradient(90deg, #22d3ee, #8b5cf6, #ec4899); }
+  .badge.success { background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(34, 211, 238, 0.14)); }
+  .badge.warning { background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(249, 115, 22, 0.14)); }
+  .badge.error { background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(236, 72, 153, 0.14)); }
+  .badge.accent { background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.18)); }
+  .alert { border-left-width: 4px; border-radius: 14px; }
+  .alert-success { border-left-color: #34d399; }
+  .alert-error { border-left-color: #fb7185; }
+  .alert-warning { border-left-color: #fbbf24; }
+  .alert-info { border-left-color: #22d3ee; }
+
+  /* ---------- Admin shell extras -------------------------------------------- */
+  .profile-menu {
+    background: rgba(20, 26, 46, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(167, 139, 250, 0.35);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 28px rgba(139, 92, 246, 0.18);
+    border-radius: 20px;
+  }
+  .pm-avatar { background: var(--grad-primary); }
+  .pm-item:hover { background: rgba(139, 92, 246, 0.2); }
+  .org-card .chip { border-radius: 999px; }
+  .mini-chart .bar { background: linear-gradient(180deg, #a78bfa, #6d28d9); }
+  .info-row.me { background: rgba(139, 92, 246, 0.18); box-shadow: inset 3px 0 0 #a78bfa; }
+
+} /* end @media screen — print keeps the exact ink-on-paper look */
+
+/* ---------- Gentle motion (never on print, never for reduced-motion users) */
+@media screen and (prefers-reduced-motion: no-preference) {
+  .quickadd-fab { animation: ap-fab-breathe 3.2s ease-in-out infinite; }
+  @keyframes ap-fab-breathe {
+    0%, 100% { box-shadow: 0 12px 28px rgba(236, 72, 153, 0.45), 0 0 0 4px rgba(139, 92, 246, 0.18); }
+    50% { box-shadow: 0 12px 32px rgba(236, 72, 153, 0.6), 0 0 0 9px rgba(139, 92, 246, 0.08); }
+  }
+  .auth-head .logo { animation: ap-logo-float 5s ease-in-out infinite; }
+  @keyframes ap-logo-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+}
+
+@media screen and (min-width: 640px) {
+  /* Centred dialogs keep fully rounded corners (no sheet handle). */
+  .modal-content { border-radius: 24px; }
+  .modal-content::before { content: none; }
+  .modal-content h2 { padding-top: 0; }
+}

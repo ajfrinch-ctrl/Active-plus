@@ -9,7 +9,7 @@
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v13';
+const CACHE_NAME = 'active-plus-v16';
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -18,6 +18,8 @@ const PRECACHE_URLS = [
   'admin.html',
   'css/style.css',
   'css/home.css',
+  'css/admin-shell.css',
+  'css/modern.css',
   'js/firebase.js',
   'js/store.js',
   'js/data.js',
@@ -32,6 +34,7 @@ const PRECACHE_URLS = [
   'js/pdf.js',
   'js/docs.js',
   'js/preview.js',
+  'js/install.js',
   'manifest.json',
   'assets/logo.png', // byte-identical to logo-transparent.png: precaching both wasted ~1 MB per install
   'assets/icon-192.png',
