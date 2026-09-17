@@ -7,7 +7,18 @@
  * resulting canvases are either shared as a PNG (receipt) or embedded into a
  * minimal, hand-written PDF (reports). Every generated file is free of the
  * application UI and works on mobile + desktop browsers alike.
+ *
+ * Institution Pad/Logo standard:
+ * - The institution logo configured in Admin → Institution Profile / Pad Settings
+ *   is stored locally (data URL) and reused automatically for ALL PDFs and
+ *   WhatsApp-shareable images.
+ * - Every PDF header must show: [Logo] INSTITUTION NAME, Address, Mobile | Email | Website
+ * - Every PDF footer must show institution info, generated date, page number, etc.
+ * - No institutional PDF may be generated without branding — this module always
+ *   tries the custom logo first, then falls back to the default asset.
  */
+
+import { readJSON } from './store.js';
 
 /**
  * Absolute same-origin URL for an asset.
@@ -47,6 +58,43 @@ export function loadImage(src) {
 }
 
 let logoDataUrlCache = null;
+let customLogoChecked = false;
+
+/**
+ * Try to read the institution's custom logo stored locally.
+ * The logo is saved as a data URL in settings.orgLogo (see data.js).
+ * We read directly from the layered store so it works even when localStorage
+ * is blocked (memory fallback) and in Node tests.
+ */
+function getCustomLogoDataUrl() {
+  try {
+    const rawStore = readJSON('activeplus_data', null);
+    const custom = rawStore?.collections?.settings?.orgLogo;
+    if (custom && typeof custom === 'string' && custom.startsWith('data:image/')) {
+      return custom;
+    }
+  } catch (e) { /* ignore */ }
+  // Fallback: direct localStorage parse for older stores
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem('activeplus_data');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const custom = parsed?.collections?.settings?.orgLogo;
+        if (custom && typeof custom === 'string' && custom.startsWith('data:image/')) {
+          return custom;
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+/** Clear the cached logo — call after admin updates the institution logo. */
+export function clearLogoCache() {
+  logoDataUrlCache = null;
+  customLogoChecked = false;
+}
 
 /**
  * Fetch an asset (same-origin, or cross-origin if the server allows CORS) and
@@ -71,12 +119,29 @@ export async function assetDataUrl(path) {
 }
 
 /**
- * The centre logo as a data URL. A data URL can always be drawn to canvas
- * without tainting it. Fetched once, then cached for the page lifetime.
+ * The institution logo as a data URL.
+ * - First tries the custom logo uploaded by admin (stored locally, reused automatically)
+ * - Then falls back to the default asset logo
+ * A data URL can always be drawn to canvas without tainting it. Cached for page lifetime
+ * but automatically picks up a new custom logo when clearLogoCache() is called.
  */
 export async function logoDataUrl() {
-  if (logoDataUrlCache) return logoDataUrlCache;
-  logoDataUrlCache = await assetDataUrl('assets/logo.png') || absUrl('assets/logo.png');
+  // Always prefer the custom logo if present — even if we have a cached default,
+  // a newly uploaded logo must be used immediately for all PDFs and WhatsApp images.
+  const custom = getCustomLogoDataUrl();
+  if (custom) {
+    logoDataUrlCache = custom;
+    customLogoChecked = true;
+    return custom;
+  }
+  // If we already checked and cached the default, reuse it
+  if (logoDataUrlCache && customLogoChecked) return logoDataUrlCache;
+  if (logoDataUrlCache && !custom) return logoDataUrlCache;
+
+  // No custom logo — load the bundled asset
+  const asset = await assetDataUrl('assets/logo.png');
+  logoDataUrlCache = asset || absUrl('assets/logo.png');
+  customLogoChecked = true;
   return logoDataUrlCache;
 }
 

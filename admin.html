@@ -148,47 +148,82 @@
         </section>
 
         <!-- ======================= Settings ======================= -->
+        <!-- Institution Profile / Pad Settings: central place where Admin configures
+             Institution Name, Logo, Address, Mobile, Email (optional), Website (optional),
+             Footer Text (optional). The uploaded logo is stored locally and reused
+             automatically for ALL PDFs and WhatsApp-shareable images. -->
         <section class="tab-panel" id="tab-settings" hidden>
-          <h2 class="section-title">প্রতিষ্ঠান সেটিংস</h2>
+          <h2 class="section-title">প্রতিষ্ঠান সেটিংস — Institution Profile / Pad</h2>
           <!-- novalidate: the institute fields are checked in Bengali by
                saveOrgInfo() instead of the browser's own English bubbles. -->
           <form id="settings-form" class="card" novalidate>
-            <h3>প্রতিষ্ঠানের তথ্য</h3>
-            <p class="form-hint">এই নাম, ঠিকানা, মোবাইল নম্বর ও ইমেইল রিপোর্ট, রিসিট, ভর্তি ফরম, আইডি কার্ড, প্রিন্ট হেডার এবং শিক্ষার্থী ও শিক্ষক পোর্টালে ব্যবহার হয়।</p>
+            <h3>প্রতিষ্ঠানের তথ্য — Institution Pad / Letterhead with Logo</h3>
+            <p class="form-hint">এই নাম, লোগো, ঠিকানা, মোবাইল, ইমেইল, ওয়েবসাইট ও ফুটার টেক্সট সব PDF (Payment Receipt, Student Statement, Due Statement, Finance Report, Student List, Admission Form, Notice, Class/Batch, Teacher, Routine) এবং WhatsApp শেয়ার ইমেজে স্বয়ংক্রিয়ভাবে ব্যবহার হয়। একবার কনফিগার করলেই সব ডকুমেন্টে একই Pad দেখাবে।</p>
             <div class="form-group">
-              <label for="set-org">প্রতিষ্ঠানের নাম</label>
+              <label for="set-org">প্রতিষ্ঠানের নাম *</label>
               <input class="form-input" id="set-org" name="orgName" required
                      placeholder="যেমন: অ্যাক্টিভ প্লাস কোচিং সেন্টার" autocomplete="organization">
             </div>
             <div class="form-group">
-              <label for="set-address">ঠিকানা</label>
-              <textarea class="form-input form-textarea rows-2" id="set-address" name="address" rows="2"
+              <label for="set-logo">প্রতিষ্ঠানের লোগো * — Institution Logo</label>
+              <input class="form-input" id="set-logo" name="orgLogoFile" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml">
+              <p class="form-hint">PNG/JPG/WebP/SVG, ২MB এর কম। স্বচ্ছ ব্যাকগ্রাউন্ড হলে PDF-এ সুন্দর দেখাবে। লোগো স্থানীয়ভাবে সংরক্ষিত হবে এবং সব PDF ও WhatsApp ইমেজে স্বয়ংক্রিয়ভাবে ব্যবহার হবে।</p>
+              <div id="logo-preview" class="org-preview" style="margin-top:.5rem">
+                <div class="op-label">লোগো প্রিভিউ</div>
+                <div class="op-sheet">
+                  <img id="logo-preview-img" src="assets/logo.png" alt="logo" style="width:64px;height:64px;object-fit:contain">
+                  <div>
+                    <div class="op-org">লোগো</div>
+                    <div class="op-line" id="logo-preview-name">কোনো কাস্টম লোগো নেই — ডিফল্ট লোগো ব্যবহার হবে</div>
+                    <div class="row-actions" style="margin-top:.5rem">
+                      <button type="button" class="btn btn-small btn-error" id="logo-remove">লোগো মুছুন</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="set-address">ঠিকানা *</label>
+              <textarea class="form-input form-textarea rows-2" id="set-address" name="address" rows="2" required
                         placeholder="যেমন: ২য় তলা, মদিনা প্লাজা, মিরপুর-১০, ঢাকা"></textarea>
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label for="set-mobile">মোবাইল নম্বর</label>
-                <input class="form-input" id="set-mobile" name="mobile" type="tel" inputmode="tel"
+                <label for="set-mobile">মোবাইল নম্বর *</label>
+                <input class="form-input" id="set-mobile" name="mobile" type="tel" inputmode="tel" required
                        placeholder="যেমন: ০১৭০০-০০০০০০" autocomplete="tel">
                 <p class="form-hint">১১ সংখ্যার নম্বর (০১… দিয়ে শুরু)। বাংলা বা ইংরেজি সংখ্যায় লেখা যাবে।</p>
               </div>
               <div class="form-group">
-                <label for="set-email">ইমেইল</label>
+                <label for="set-email">ইমেইল — ঐচ্ছিক</label>
                 <input class="form-input" id="set-email" name="email" type="email" inputmode="email"
-                       placeholder="যেমন: info@activeplus.edu" autocomplete="email">
+                       placeholder="যেমন: info@activeplus.edu (ঐচ্ছিক)" autocomplete="email">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="set-website">ওয়েবসাইট — ঐচ্ছিক</label>
+                <input class="form-input" id="set-website" name="website" type="text" inputmode="url"
+                       placeholder="যেমন: www.activeplus.edu">
+              </div>
+              <div class="form-group">
+                <label for="set-footer">ফুটার টেক্সট — ঐচ্ছিক</label>
+                <input class="form-input" id="set-footer" name="footerText" type="text"
+                       placeholder="যেমন: শিক্ষাই শক্তি — Active Plus">
               </div>
             </div>
             <p class="form-error" id="org-error" role="alert"></p>
 
             <!-- Live mirror of the document letterhead, so the admin sees the edit. -->
             <div class="org-preview" id="org-preview">
-              <div class="op-label">ডকুমেন্টে যেভাবে দেখাবে</div>
+              <div class="op-label">PDF হেডার/ফুটার — Institution Pad প্রিভিউ (সব PDF ও WhatsApp ইমেজে একইভাবে দেখাবে)</div>
               <div class="op-sheet">
-                <img src="assets/logo.png" alt="">
+                <img id="op-logo" src="assets/logo.png" alt="">
                 <div>
                   <div class="op-org" id="op-org">Active Plus</div>
                   <div class="op-line" id="op-address"></div>
                   <div class="op-line" id="op-contact"></div>
+                  <div class="op-line" id="op-footer" style="font-style:italic"></div>
                 </div>
               </div>
             </div>
@@ -764,9 +799,11 @@
         const orgEl = document.getElementById('ph-org');
         const addrEl = document.getElementById('ph-addr');
         const contactEl = document.getElementById('ph-contact');
+        const logoEl = document.querySelector('.print-header img');
         if (orgEl) orgEl.textContent = org.name;
         if (addrEl) addrEl.textContent = org.address;
         if (contactEl) contactEl.textContent = org.contactLine;
+        if (logoEl) logoEl.src = org.orgLogo || 'assets/logo.png';
       };
 
       /* ------------------------------------------------------------ */
@@ -935,6 +972,8 @@
       /* -------- Printable Admission Form: institution logo + name -------- */
       const fillAdmissionForm = (student) => {
         const s = db.settings.get();
+        const logoSrc = s.orgLogo || 'assets/logo.png';
+        const contactLine = [s.mobile, s.email, s.website].filter(Boolean).join(' | ');
         const field = (label, value) => `
           <div class="admission-field">
             <div class="af-label">${escapeHtml(label)}</div>
@@ -943,11 +982,12 @@
         document.getElementById('admission-form-body').innerHTML = `
           <div class="admission-sheet">
             <div class="af-head">
-              <img src="assets/logo.png" alt="">
+              <img src="${logoSrc}" alt="" style="width:64px;height:64px;object-fit:contain">
               <div>
                 <div class="af-org">${escapeHtml(s.orgName || 'Active Plus')}</div>
                 <div class="af-addr">${escapeHtml(s.address || '')}</div>
-                <div class="af-addr">${escapeHtml(s.mobile || '')}${s.email ? ' · ' + escapeHtml(s.email) : ''}</div>
+                <div class="af-addr">${escapeHtml(contactLine)}</div>
+                ${s.footerText ? `<div class="af-addr" style="font-style:italic">${escapeHtml(s.footerText)}</div>` : ''}
               </div>
             </div>
             <div class="af-title">ভর্তি ফরম / Admission Form</div>
@@ -1025,7 +1065,7 @@
 
         document.getElementById('student-detail-body').innerHTML = `
           <div class="card" data-idcard style="border:2px solid var(--accent);text-align:center">
-            <img src="assets/logo.png" alt="" class="doc-logo" style="width:56px;height:56px;margin-bottom:.25rem">
+            <img src="${settings.orgLogo || 'assets/logo.png'}" alt="" class="doc-logo" style="width:56px;height:56px;margin-bottom:.25rem;object-fit:contain">
             <div style="font-size:.75rem;letter-spacing:.06em">${escapeHtml(settings.orgName || 'Active Plus')}</div>
             <div style="font-weight:700;font-size:1.125rem;margin-top:.25rem">${escapeHtml(st.name)}</div>
             <div class="meta">${escapeHtml(st.id)}</div>
@@ -1469,20 +1509,47 @@
       /* Institute profile: name, address, mobile and email are written */
       /* here once and reused by every document and portal.             */
       const ORG_INPUTS = {
-        orgName: 'set-org', address: 'set-address', mobile: 'set-mobile', email: 'set-email'
+        orgName: 'set-org', address: 'set-address', mobile: 'set-mobile', email: 'set-email',
+        website: 'set-website', footerText: 'set-footer', orgLogo: 'set-logo'
       };
+      let pendingLogoDataUrl = null; // holds newly selected logo until save
+      const LOGO_PREVIEW_IMG = () => document.getElementById('logo-preview-img');
+      const LOGO_PREVIEW_NAME = () => document.getElementById('logo-preview-name');
+      const OP_LOGO = () => document.getElementById('op-logo');
       const orgInput = (field) => document.getElementById(ORG_INPUTS[field]);
       const orgValue = (field) => (orgInput(field)?.value || '').trim();
 
-      /** Mirror the four fields into the letterhead preview while typing. */
+      /** Mirror the institution fields into the letterhead preview while typing. */
       const renderOrgPreview = () => {
         const orgEl = document.getElementById('op-org');
         const addrEl = document.getElementById('op-address');
         const contactEl = document.getElementById('op-contact');
+        const footerEl = document.getElementById('op-footer');
+        const logoEl = OP_LOGO();
         if (orgEl) orgEl.textContent = orgValue('orgName') || 'প্রতিষ্ঠানের নাম';
         if (addrEl) addrEl.textContent = orgValue('address');
         if (contactEl) {
-          contactEl.textContent = [orgValue('mobile'), orgValue('email')].filter(Boolean).join(' · ');
+          contactEl.textContent = [orgValue('mobile'), orgValue('email'), orgValue('website')].filter(Boolean).join(' | ');
+        }
+        if (footerEl) footerEl.textContent = orgValue('footerText') || '';
+        if (logoEl && pendingLogoDataUrl) {
+          logoEl.src = pendingLogoDataUrl;
+        } else if (logoEl) {
+          const s = db.settings.get();
+          logoEl.src = s.orgLogo || 'assets/logo.png';
+        }
+      };
+
+      const renderLogoPreview = () => {
+        const s = db.settings.get();
+        const img = LOGO_PREVIEW_IMG();
+        const nameEl = LOGO_PREVIEW_NAME();
+        const current = pendingLogoDataUrl || s.orgLogo;
+        if (img) img.src = current || 'assets/logo.png';
+        if (nameEl) {
+          if (pendingLogoDataUrl) nameEl.textContent = 'নতুন লোগো নির্বাচিত — সংরক্ষণ করলে সব PDF ও WhatsApp ইমেজে ব্যবহার হবে';
+          else if (s.orgLogo) nameEl.textContent = 'কাস্টম লোগো সংরক্ষিত — সব PDF ও WhatsApp ইমেজে ব্যবহার হচ্ছে';
+          else nameEl.textContent = 'কোনো কাস্টম লোগো নেই — ডিফল্ট লোগো ব্যবহার হবে';
         }
       };
 
@@ -1493,15 +1560,71 @@
           box.textContent = errors.map((e) => e.message).join(' ');
           box.classList.toggle('visible', errors.length > 0);
         }
-        Object.keys(ORG_INPUTS).forEach((field) => {
+        // Only real inputs get red outline — logo is file input
+        ['orgName','address','mobile','email','website','footerText'].forEach((field) => {
           orgInput(field)?.classList.toggle('input-invalid', errors.some((e) => e.field === field));
         });
-        if (errors.length) orgInput(errors[0].field)?.focus();
+        if (errors.length) {
+          const first = errors[0].field;
+          if (ORG_INPUTS[first] && first !== 'orgLogo') orgInput(first)?.focus();
+        }
       };
 
       Object.values(ORG_INPUTS).forEach((id) => {
         const el = document.getElementById(id);
+        if (!el || id === 'set-logo') return;
         el?.addEventListener('input', () => { renderOrgPreview(); showOrgErrors([]); });
+      });
+
+      // Logo upload: read as data URL, store locally preview
+      const logoInput = document.getElementById('set-logo');
+      logoInput?.addEventListener('change', () => {
+        const file = logoInput.files && logoInput.files[0];
+        if (!file) { pendingLogoDataUrl = null; renderLogoPreview(); renderOrgPreview(); return; }
+        if (file.size > 2 * 1024 * 1024) {
+          showToast('লোগো ফাইলটি খুব বড় — ২MB এর কম ছবি ব্যবহার করুন।', 'error');
+          logoInput.value = '';
+          pendingLogoDataUrl = null;
+          renderLogoPreview();
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          pendingLogoDataUrl = reader.result;
+          renderLogoPreview();
+          renderOrgPreview();
+          showToast('লোগো প্রিভিউ প্রস্তুত — সংরক্ষণ করুন।', 'info');
+        };
+        reader.onerror = () => {
+          showToast('লোগো পড়া যায়নি।', 'error');
+          pendingLogoDataUrl = null;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      document.getElementById('logo-remove')?.addEventListener('click', () => {
+        pendingLogoDataUrl = null;
+        if (logoInput) logoInput.value = '';
+        // Mark for removal on save
+        const s = db.settings.get();
+        if (s.orgLogo) {
+          pendingLogoDataUrl = '__REMOVE__';
+          renderLogoPreview();
+          renderOrgPreview();
+          showToast('লোগো মুছে ফেলার জন্য সংরক্ষণ করুন।', 'warning');
+          // reset the marker after preview so UI shows default, but save will remove
+          // Actually keep marker, render will show default if marker is REMOVE
+          const img = LOGO_PREVIEW_IMG();
+          if (img) img.src = 'assets/logo.png';
+          const nameEl = LOGO_PREVIEW_NAME();
+          if (nameEl) nameEl.textContent = 'লোগো মুছে ফেলা হবে — সংরক্ষণ করুন';
+          const opLogo = OP_LOGO();
+          if (opLogo) opLogo.src = 'assets/logo.png';
+          pendingLogoDataUrl = '__REMOVE__';
+        } else {
+          renderLogoPreview();
+          renderOrgPreview();
+        }
       });
 
       const renderSettings = () => {
@@ -1510,8 +1633,14 @@
         orgInput('address').value = settings.address || '';
         orgInput('mobile').value = settings.mobile || '';
         orgInput('email').value = settings.email || '';
+        orgInput('website').value = settings.website || '';
+        orgInput('footerText').value = settings.footerText || '';
+        pendingLogoDataUrl = null;
+        const logoInp = document.getElementById('set-logo');
+        if (logoInp) logoInp.value = '';
         showOrgErrors([]);
         renderOrgPreview();
+        renderLogoPreview();
         document.getElementById('set-fee').value = settings.monthlyFee ?? 0;
         document.getElementById('set-challenge').value = settings.dailyChallengeTarget ?? 10;
         const editableFields = settings.studentEditableFields || [];
@@ -1536,7 +1665,7 @@
           </div>`).join('');
       };
 
-      document.getElementById('settings-form').addEventListener('submit', (event) => {
+      document.getElementById('settings-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         if (!onlineFor('সেটিংস সংরক্ষণ')) return;
         try { assertCan(session, 'manageSettings', 'সেটিংস সংরক্ষণ'); }
@@ -1545,11 +1674,20 @@
 
         // The institute profile is validated first: a bad mobile/email must not
         // silently reach a printed receipt, so nothing is saved until it passes.
+        // Logo is stored locally and reused automatically for ALL PDFs and WhatsApp images.
+        let logoToSave = undefined;
+        if (pendingLogoDataUrl === '__REMOVE__') logoToSave = null;
+        else if (pendingLogoDataUrl) logoToSave = pendingLogoDataUrl;
+        // If no new logo selected, keep existing (undefined = don't touch)
+
         const org = saveOrgInfo({
           orgName: data.get('orgName'),
           address: data.get('address'),
           mobile: data.get('mobile'),
-          email: data.get('email')
+          email: data.get('email'),
+          website: data.get('website'),
+          footerText: data.get('footerText'),
+          ...(logoToSave !== undefined ? { orgLogo: logoToSave } : {})
         }, { user: session.name, role: session.role });
         if (!org.ok) {
           showOrgErrors(org.errors);
@@ -1557,6 +1695,12 @@
           return;
         }
         showOrgErrors([]);
+        // Clear logo cache so all PDFs and WhatsApp images pick up the new logo immediately
+        try {
+          const { clearLogoCache } = await import('./js/pdf.js');
+          clearLogoCache();
+        } catch (e) {}
+        pendingLogoDataUrl = null;
 
         db.settings.update({
           monthlyFee: Number(data.get('monthlyFee')) || 0

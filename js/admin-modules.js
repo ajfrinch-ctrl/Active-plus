@@ -514,19 +514,51 @@ function mountReports(session) {
   });
 
   const reports = {
+    /* Mandatory branded reports as per Institution Pad spec */
     students: {
-      label: 'শিক্ষার্থী তালিকা', classScoped: true, cols: CLASS_REPORT_COLUMNS,
+      label: 'শিক্ষার্থী তালিকা — Student List', classScoped: true, cols: CLASS_REPORT_COLUMNS,
       rows: () => classReportRows(db.students.list()).rows,
       summary: (rows) => [{ label: 'মোট শিক্ষার্থী', value: bn(rows.length) }]
     },
+    studentStatement: {
+      label: 'শিক্ষার্থী বিবরণী — Student Statement', classScoped: true,
+      cols: [{ key: 'field', label: 'বিবরণ' }, { key: 'value', label: 'তথ্য' }],
+      rows: () => db.students.list().slice(0,1).flatMap((st) => {
+        const fees = db.fees.list().filter((f) => f.studentId === st.id);
+        const payments = db.payments.list().filter((p) => p.studentId === st.id);
+        const total = fees.reduce((s,f)=>s+Number(f.amount||0),0);
+        const paid = payments.reduce((s,p)=>s+Number(p.amount||0),0);
+        return [
+          { field: 'নাম', value: st.name },
+          { field: 'আইডি', value: st.id },
+          { field: 'শ্রেণি', value: st.className },
+          { field: 'মোট ফি', value: taka(total) },
+          { field: 'পরিশোধিত', value: taka(paid) },
+          { field: 'বকেয়া', value: taka(total-paid) }
+        ];
+      }),
+      summary: (rows) => [{ label: 'রেকর্ড', value: bn(rows.length) }]
+    },
+    dueStatement: {
+      label: 'বকেয়া বিবরণী — Due Statement', classScoped: true,
+      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'বকেয়া' }],
+      rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.remaining ?? f.amount), _amount: Number(f.remaining ?? f.amount) || 0 })),
+      summary: (rows) => [{ label: 'মোট বকেয়া', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
+    },
+    finance: {
+      label: 'অর্থ বিবরণী — Finance Report', classScoped: true,
+      cols: [{ key: 'date', label: 'তারিখ' }, { key: 'student', label: 'শিক্ষার্থী' }, { key: 'type', label: 'ধরন' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'method', label: 'মাধ্যম' }],
+      rows: () => payRows(db.payments.list()),
+      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }, { label: 'লেনদেন', value: bn(rows.length) }]
+    },
     teachers: {
-      label: 'শিক্ষক তালিকা', classScoped: false,
-      cols: [{ key: 'name', label: 'নাম' }, { key: 'subject', label: 'বিষয়' }, { key: 'phone', label: 'মোবাইল' }],
+      label: 'শিক্ষক তালিকা — Teacher Report', classScoped: false,
+      cols: [{ key: 'name', label: 'নাম' }, { key: 'subject', label: 'বিষয়' }, { key: 'phone', label: 'মোবাইল' }, { key: 'classes', label: 'ক্লাস/সপ্তাহ' }],
       rows: () => db.teachers.list(),
       summary: (rows) => [{ label: 'মোট শিক্ষক', value: bn(rows.length) }]
     },
     classes: {
-      label: 'ক্লাস রিপোর্ট', classScoped: true,
+      label: 'ক্লাস রিপোর্ট — Class/Batch Report', classScoped: true,
       cols: [{ key: 'className', label: 'ক্লাস' }, { key: 'students', label: 'শিক্ষার্থী' }, { key: 'batches', label: 'ব্যাচ' }],
       rows: () => CLASS_OPTIONS.map((c) => ({
         className: c,
@@ -536,10 +568,22 @@ function mountReports(session) {
       summary: (rows) => [{ label: 'মোট ক্লাস', value: bn(rows.length) }]
     },
     batches: {
-      label: 'ব্যাচ রিপোর্ট', classScoped: false,
+      label: 'ব্যাচ রিপোর্ট — Batch Report', classScoped: false,
       cols: [{ key: 'name', label: 'ব্যাচ' }, { key: 'className', label: 'ক্লাস' }, { key: 'teacher', label: 'শিক্ষক' }, { key: 'students', label: 'শিক্ষার্থী' }],
       rows: () => db.batches.list(),
       summary: (rows) => [{ label: 'মোট ব্যাচ', value: bn(rows.length) }]
+    },
+    notices: {
+      label: 'নোটিশ — Notice', classScoped: true,
+      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'audience', label: 'কাদের জন্য' }, { key: 'date', label: 'তারিখ' }],
+      rows: () => db.notices.list(),
+      summary: (rows) => [{ label: 'মোট নোটিশ', value: bn(rows.length) }]
+    },
+    routine: {
+      label: 'ক্লাস রুটিন — Class Routine', classScoped: true,
+      cols: [{ key: 'day', label: 'দিন' }, { key: 'time', label: 'সময়' }, { key: 'subject', label: 'বিষয়' }, { key: 'teacher', label: 'শিক্ষক' }, { key: 'room', label: 'কক্ষ' }],
+      rows: () => db.routine.list(),
+      summary: (rows) => [{ label: 'মোট ক্লাস', value: bn(rows.length) }]
     },
     exams: {
       label: 'পরীক্ষা রিপোর্ট', classScoped: true,
@@ -611,19 +655,19 @@ function mountReports(session) {
       summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
     },
     due: {
-      label: 'বকেয়া তালিকা', classScoped: true,
+      label: 'বকেয়া তালিকা — Due Statement', classScoped: true,
       cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'পরিমাণ' }],
       rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.remaining ?? f.amount), _amount: Number(f.remaining ?? f.amount) || 0 })),
       summary: (rows) => [{ label: 'মোট বকেয়া', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
     },
     payments: {
-      label: 'পেমেন্ট ইতিহাস', classScoped: true,
+      label: 'পেমেন্ট ইতিহাস — Payment / Finance', classScoped: true,
       cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }, { key: 'method', label: 'মাধ্যম' }, { key: 'reference', label: 'রেফারেন্স' }],
       rows: () => payRows(db.payments.list()),
       summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
     },
     ledger: {
-      label: 'শিক্ষার্থী লেজার', classScoped: true,
+      label: 'শিক্ষার্থী লেজার — Student Ledger / Statement', classScoped: true,
       cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'paid', label: 'পরিশোধিত' }, { key: 'due', label: 'বকেয়া' }],
       rows: () => db.students.list().map((st) => ({
         studentId: st.id, name: st.name, className: st.className,
