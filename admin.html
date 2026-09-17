@@ -6,6 +6,10 @@
     <title>অ্যাডমিন প্যানেল · Active Plus</title>
     <meta name="theme-color" content="#05070a">
     <meta name="color-scheme" content="dark">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Active Plus">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/home.css">
@@ -47,6 +51,7 @@
           </div>
           <button type="button" class="pm-item" id="pm-view-profile"><span aria-hidden="true">👤</span> প্রোফাইল</button>
           <button type="button" class="pm-item" id="pm-settings"><span aria-hidden="true">⚙️</span> সেটিংস</button>
+          <button type="button" class="pm-item" id="pm-install" hidden><span aria-hidden="true">📲</span> অ্যাপ ইনস্টল</button>
           <button type="button" class="pm-item pm-danger" id="logout-btn"><span aria-hidden="true">🚪</span> লগআউট</button>
         </div>
       </header>
@@ -774,6 +779,7 @@
       import { initApp, activeTabs, renderTable, statGrid, escapeHtml, openModal, closeModal, showToast, getAuthMode, requireOnline } from './js/app.js';
       import { mountCrud } from './js/crud.js';
       import { initAdminHome } from './js/admin-home.js';
+      import { mountInstallButton } from './js/install.js';
       import { listUsers, seedUsers } from './js/auth.js';
       import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, sharedNotices, receivePayment, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
@@ -1935,6 +1941,9 @@
         closeProfileMenu();
         tabs?.activate?.('settings');
       });
+      // Installable PWA: the 📲 row appears only while Chrome offers installation.
+      mountInstallButton('#pm-install');
+      document.getElementById('pm-install')?.addEventListener('click', closeProfileMenu);
 
       /* -------- Floating ＋ Quick Add: Admission / Payment / Attendance -------- */
       document.getElementById('quickadd-fab')?.addEventListener('click', () => openModal('quickadd-modal'));

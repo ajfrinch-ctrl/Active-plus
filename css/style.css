@@ -432,6 +432,10 @@ a { color: var(--accent); }
   color: var(--text-light);
   text-align: center;
 }
+/* Installable PWA entry point on the login card. The [hidden] rule must win
+   over .btn's display, so the button stays invisible until Chrome offers it. */
+#install-btn { margin-top: 0.75rem; }
+#install-btn[hidden] { display: none; }
 .btn-small { padding: 0.5rem 0.875rem; font-size: 0.8125rem; min-height: 38px; width: auto; }
 .btn-block { width: 100%; }
 

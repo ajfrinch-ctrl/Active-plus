@@ -111,6 +111,11 @@
   color: #fc8181;
 }
 
+/* Install entry point: [hidden] must win over .pm-item's flex display. */
+#pm-install[hidden] {
+  display: none;
+}
+
 /* ---------- Bottom Bar with floating Quick Add ---------- */
 .admin-bottomnav .inner {
   align-items: flex-start;
