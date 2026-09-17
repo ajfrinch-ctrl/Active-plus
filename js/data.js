@@ -446,7 +446,7 @@ export const db = {
 /*   - Institution Logo (stored locally as data URL, reused everywhere)  */
 /*   - Address (required)                                               */
 /*   - Mobile Number (required, BD)                                     */
-/*   - Email (optional)                                                 */
+/*   - Email (required)                                                 */
 /*   - Website (optional)                                               */
 /*   - Footer Text (optional)                                           */
 /* Every PDF and WhatsApp image automatically uses this pad.            */
@@ -469,7 +469,7 @@ export function isValidMobile(value) {
 
 export function isValidEmail(value) {
   const v = String(value ?? '').trim();
-  if (!v) return true;
+  if (!v) return false; // an email is required; blank is not a valid one
   return EMAIL_RE.test(v);
 }
 
@@ -501,6 +501,7 @@ export function orgInfo() {
   const footerText = trim(s.footerText);
   const orgLogo = s.orgLogo || null;
   const parts = [mobile, email, website].filter(Boolean);
+  const contactParts = [mobile, email].filter(Boolean);
   return {
     name: trim(s.orgName) || 'Active Plus',
     orgName: trim(s.orgName) || 'Active Plus',
@@ -512,7 +513,9 @@ export function orgInfo() {
     orgLogo,
     logo: orgLogo,
     academicYear: trim(s.academicYear),
-    contactLine: parts.join(' | '),
+    /* The letterhead contact line is the number people call plus the
+       address they write to; the website stays a separate setting. */
+    contactLine: contactParts.join(' · '),
     contactLinePipe: parts.join(' | '),
     contactLineDot: parts.join(' · ')
   };
@@ -520,8 +523,8 @@ export function orgInfo() {
 
 /**
  * Validate and store the institution profile written in admin Settings.
- * Required: orgName, address, mobile
- * Optional: email, website, footerText, orgLogo
+ * Required: orgName, address, mobile, email
+ * Optional: website, footerText, orgLogo
  */
 export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}) {
   const name = String(input.orgName ?? '').trim();
@@ -539,7 +542,8 @@ export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}
   if (!address) fail('address', 'প্রতিষ্ঠানের ঠিকানা লিখুন।');
   if (!mobile) fail('mobile', 'মোবাইল নম্বর লিখুন।');
   else if (!isValidMobile(mobile)) fail('mobile', 'সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যা, ০১ দিয়ে শুরু (যেমন ০১৭০০-০০০০০০)।');
-  if (email && !EMAIL_RE.test(email)) fail('email', 'সঠিক ইমেইল ঠিকানা দিন (যেমন info@example.com)।');
+  if (!email) fail('email', 'ইমেইল ঠিকানা লিখুন।');
+  else if (!EMAIL_RE.test(email)) fail('email', 'সঠিক ইমেইল ঠিকানা দিন (যেমন info@example.com)।');
   if (website && !isValidWebsite(website)) fail('website', 'সঠিক ওয়েবসাইট দিন (যেমন www.example.com)।');
   if (orgLogo !== undefined && orgLogo !== null && String(orgLogo).trim() !== '' && !isValidLogoDataUrl(orgLogo)) {
     fail('orgLogo', 'লোগো ছবিটি সঠিক ফরম্যাটে নয়। PNG/JPG আপলোড করুন।');
