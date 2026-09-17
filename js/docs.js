@@ -1270,7 +1270,7 @@ export async function receiptPreviewDoc(pay, opts = {}) {
   const org = resolveOrg(opts.settings || opts);
   const canvas = await renderReceiptCanvas(pay, { ...opts, settings: org });
   return {
-    title: 'PAYMENT RECEIPT',
+    title: 'পেমেন্ট রিসিট',
     meta: `${pay.receiptNo || pay.id} · ${opts.student?.name || pay.studentId} — ${org.orgName}`,
     filename: receiptPdfFileName(pay),
     canvases: [canvas],

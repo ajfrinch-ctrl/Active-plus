@@ -147,62 +147,74 @@ export function initStudentHome() {
     const assignments = cards.assignments
       ? db.assignments.list().filter((a) => a.className === student.className) : [];
 
+    /* Admin-home layout for the student too:
+       1) আজকের অবস্থা — the few figures that matter at a glance,
+       2) quick shortcuts, and
+       3) every information card folded away — minimized until tapped. */
+
+    const cell = (icon, value, label) => `
+      <div class="analytics-cell"><span class="ico">${icon}</span><strong>${value}</strong><span>${label}</span></div>`;
+
+    const fold = (title, body, id = '') => body.trim() ? `
+      <details class="mini-details"${id ? ` id="${id}"` : ''}>
+        <summary>${title}</summary>
+        <div class="mini-body">${body}</div>
+      </details>` : '';
+
     const sections = [];
 
-    const bannerHtml = banners.length ? `
-      <div class="carousel">
-        <div class="carousel-track" id="banner-track">
-          ${banners.map((b) => `
-          <div class="banner">
-            ${b.image ? `<img src="${escapeHtml(b.image)}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:14px;margin-bottom:.5rem">` : ''}
-            <h3>📢 ${escapeHtml(b.title)}</h3>
-            <p>${escapeHtml(b.desc)}</p>
-            <button type="button" class="btn btn-small" data-act="banner" data-id="${escapeHtml(b.id)}">${escapeHtml(b.cta || 'দেখুন')}</button>
-          </div>`).join('')}
-        </div>
-        ${banners.length > 1 ? `<div class="carousel-dots" id="banner-dots">${banners.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
-      </div>` : '';
-
-    if (cards.progress) {
+    /* ---- 1. আজকের অবস্থা (overview) ---- */
+    const cells = [
+      ...(cards.progress ? [
+        cell('📈', `${bn(progress.pct)}%`, 'আজকের প্রগ্রেস'),
+        cell('🔥', bn(streak), 'দিন স্ট্রিক'),
+        cell('📚', bn(progress.classes), 'আজকের ক্লাস'),
+        cell('📋', bn(progress.assignments), 'অ্যাসাইনমেন্ট')
+      ] : []),
+      ...(cards.exam ? [cell('📝', bn(exam ? 1 : 0), 'আসন্ন পরীক্ষা')] : []),
+      ...(cards.fee ? [cell('💰', fee.due > 0 ? `৳${bn(fee.due)}` : '✓', 'ফি স্ট্যাটাস')] : [])
+    ];
+    if (cells.length) {
       sections.push(`
-      <div class="hcard hero">
-        <div class="h-title">আজকের প্রগ্রেস</div>
-        <div class="row">
-          <div><div class="pct">${bn(progress.pct)}%</div><div class="meta">${bn(progress.done)} / ${bn(progress.total)} সম্পন্ন</div></div>
-          <span class="streak-chip">🔥 ${bn(streak)} দিন স্ট্রিক</span>
+      <section class="home-section" aria-label="আজকের অবস্থা">
+        <h2 class="sec-title">📊 আজকের অবস্থা</h2>
+        <div class="hcard overview-card" id="student-overview">
+          <div class="analytics-grid">${cells.join('')}</div>
+          ${cards.progress ? `
+          <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
+          <details class="mini-details in-card">
+            <summary>স্ট্রিক ক্যালেন্ডার</summary>
+            <div class="meta" style="margin:.5rem 0">${bn(progress.done)} / ${bn(progress.total)} সম্পন্ন</div>
+            <div class="week">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
+          </details>` : ''}
         </div>
-        <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
-        <div class="week">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
-      </div>
-
-      <div class="hcard">
-        <div class="h-title">আজ</div>
-        <div class="info-row" role="button" tabindex="0" data-act="routine" style="cursor:pointer"><span class="l">📚 ক্লাস</span><span class="v">${bn(progress.classes)}</span></div>
-        <div class="info-row" role="button" tabindex="0" data-act="assignments" style="cursor:pointer"><span class="l">📋 অ্যাসাইনমেন্ট</span><span class="v">${bn(progress.assignments)}</span></div>
-        <div class="info-row" role="button" tabindex="0" data-act="exam" style="cursor:pointer"><span class="l">📝 পরীক্ষা</span><span class="v">${bn(exam ? 1 : 0)}</span></div>
-      </div>`);
+      </section>`);
     }
 
-    sections.push(`
-      <div class="hcard">
-        <div class="feature-grid">
-          ${tile('classes', '📚', 'ক্লাস')}
-          ${tile('exam', '📝', 'পরীক্ষা', exam ? '১' : '')}
-          ${tile('result', '🏆', 'ফলাফল')}
-          ${tile('study', '📖', 'ম্যাটেরিয়াল')}
-          ${tile('assignments', '📋', 'অ্যাসাইনমেন্ট', assignments.length ? bn(assignments.length) : '')}
-          ${tile('routine', '📅', 'রুটিন')}
-          ${tile('fees', '💰', 'ফি', fee.due ? 'বকেয়া' : '')}
-          ${tile('notices', '📢', 'নোটিশ')}
+    /* ---- 2. কুইক শর্টকাট ---- */
+    const shortcuts = [
+      ...(cards.challenge ? [{ act: 'challenge', ico: '🔥', label: 'চ্যালেঞ্জ' }] : []),
+      ...(enabled.includes('questionbank') ? [{ act: 'questionbank', ico: '🧩', label: 'প্রশ্ন ব্যাংক' }] : []),
+      { act: 'routine', ico: '📅', label: 'রুটিন' },
+      ...(enabled.includes('query') ? [{ act: 'query', ico: '💬', label: 'শিক্ষক প্রশ্ন' }] : [])
+    ];
+    if (shortcuts.length) {
+      sections.push(`
+      <section class="home-section" aria-label="কুইক শর্টকাট">
+        <h2 class="sec-title">⚡ কুইক শর্টকাট</h2>
+        <div class="quick-row" id="student-quick">
+          ${shortcuts.map((q) => `<button type="button" class="chip" data-act="${q.act}">${q.ico} ${escapeHtml(q.label)}</button>`).join('')}
         </div>
-        ${moreFeatures.length ? `<button type="button" class="see-more" data-act="seemore" aria-expanded="false" aria-controls="more-features">আরও দেখুন ↓</button>` : ''}
-        <div class="feature-grid more-grid" id="more-features" hidden style="margin-top:.625rem">
-          ${moreFeatures.map((f) => tile(f.act, f.ico, f.label)).join('')}
-        </div>
-      </div>`);
+      </section>`);
+    }
 
+    /* ---- 3. Folded information cards ---- */
+    const folds = [];
+
+    /* পড়াশোনা */
+    let studyBody = '';
     if (cards.nextClass) {
-      sections.push(next ? `
+      studyBody += next ? `
       <div class="hcard">
         <div class="h-title">পরবর্তী ক্লাস</div>
         <div class="big">${escapeHtml(next.item.subject)}</div>
@@ -214,12 +226,46 @@ export function initStudentHome() {
       <div class="hcard">
         <div class="h-title">পরবর্তী ক্লাস</div>
         <p>আপাতত কোনো ক্লাস নির্ধারিত নেই 🎉</p>
-      </div>`);
+      </div>`;
     }
+    if (resume) {
+      const mp = materialProgressFor(student, student.className);
+      const doneThis = completedMaterialIds(student).includes(resume.id);
+      studyBody += `
+      <div class="hcard">
+        <div class="h-title">পড়া চালিয়ে যান</div>
+        <div class="big">${escapeHtml(resume.title)}</div>
+        <div class="meta">${escapeHtml(resume.subject)} · ${escapeHtml(resume.type || '')}</div>
+        <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${mp.pct}%"></div></div>
+        <div class="meta">${doneThis ? 'এই ম্যাটেরিয়াল সম্পন্ন ✓ · ' : ''}${bn(mp.done)} / ${bn(mp.total)} ম্যাটেরিয়াল সম্পন্ন (${bn(mp.pct)}%)</div>
+        <button type="button" class="btn btn-secondary btn-block" data-act="material" data-id="${escapeHtml(resume.id)}" style="margin-top:.5rem">চালিয়ে যান</button>
+      </div>`;
+    } else if (cards.materials) {
+      studyBody += `
+      <div class="hcard">
+        <div class="h-title">পড়া চালিয়ে যান</div>
+        <p>নতুন কিছু শেখা শুরু করুন 📚</p>
+        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">ম্যাটেরিয়াল দেখুন</button>
+      </div>`;
+    }
+    if (cards.materials && materials.length) {
+      const recent = [...materials].slice(-3).reverse();
+      studyBody += `
+      <div class="hcard">
+        <div class="h-title">স্টাডি ম্যাটেরিয়াল</div>
+        ${recent.map((m) => `<div class="info-row" role="button" tabindex="0" data-act="material" data-id="${escapeHtml(m.id)}" style="cursor:pointer">
+          <span class="l">📖 ${escapeHtml(m.title)}<br><span class="meta">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')}</span></span>
+          <span class="v">${escapeHtml(m.date)}</span></div>`).join('')}
+        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">সব ম্যাটেরিয়াল</button>
+      </div>`;
+    }
+    folds.push(fold('📚 পড়াশোনা', studyBody));
 
+    /* পরীক্ষা ও ফলাফল */
+    let examBody = '';
     if (cards.exam) {
       const win = examWindow(exam);
-      sections.push(exam ? `
+      examBody += exam ? `
       <div class="hcard">
         <div class="h-title">আসন্ন পরীক্ষা</div>
         <div class="big">${escapeHtml(exam.title)}</div>
@@ -235,75 +281,11 @@ export function initStudentHome() {
       <div class="hcard">
         <div class="h-title">আসন্ন পরীক্ষা</div>
         <p>কোনো পরীক্ষা নির্ধারিত নেই।</p>
-      </div>`);
+      </div>`;
     }
-
-    if (cards.challenge) {
-      sections.push(`
-      <div class="hcard">
-        <div class="h-title">🔥 ডেইলি চ্যালেঞ্জ</div>
-        <p>${challenge.done >= challenge.target ? '🎉 চ্যালেঞ্জ সম্পূর্ণ!' : `আজ ${bn(challenge.target)}টি MCQ উত্তর দিন`}</p>
-        <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${Math.round((challenge.done / challenge.target) * 100)}%"></div></div>
-        <div class="meta">${bn(challenge.done)} / ${bn(challenge.target)}</div>
-        ${challenge.done < challenge.target ? `<button type="button" class="btn btn-block" data-act="challenge" style="margin-top:.5rem">চ্যালেঞ্জ শুরু</button>` : ''}
-      </div>`);
-    }
-
-    if (resume) {
-      const mp = materialProgressFor(student, student.className);
-      const doneThis = completedMaterialIds(student).includes(resume.id);
-      sections.push(`
-      <div class="hcard">
-        <div class="h-title">পড়া চালিয়ে যান</div>
-        <div class="big">${escapeHtml(resume.title)}</div>
-        <div class="meta">${escapeHtml(resume.subject)} · ${escapeHtml(resume.type || '')}</div>
-        <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${mp.pct}%"></div></div>
-        <div class="meta">${doneThis ? 'এই ম্যাটেরিয়াল সম্পন্ন ✓ · ' : ''}${bn(mp.done)} / ${bn(mp.total)} ম্যাটেরিয়াল সম্পন্ন (${bn(mp.pct)}%)</div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="material" data-id="${escapeHtml(resume.id)}" style="margin-top:.5rem">চালিয়ে যান</button>
-      </div>`);
-    } else if (cards.materials) {
-      sections.push(`
-      <div class="hcard">
-        <div class="h-title">পড়া চালিয়ে যান</div>
-        <p>নতুন কিছু শেখা শুরু করুন 📚</p>
-        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">ম্যাটেরিয়াল দেখুন</button>
-      </div>`);
-    }
-
-    if (cards.materials && materials.length) {
-      const recent = [...materials].slice(-3).reverse();
-      sections.push(`
-      <div class="hcard">
-        <div class="h-title">স্টাডি ম্যাটেরিয়াল</div>
-        ${recent.map((m) => `<div class="info-row" role="button" tabindex="0" data-act="material" data-id="${escapeHtml(m.id)}" style="cursor:pointer">
-          <span class="l">📖 ${escapeHtml(m.title)}<br><span class="meta">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')}</span></span>
-          <span class="v">${escapeHtml(m.date)}</span></div>`).join('')}
-        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">সব ম্যাটেরিয়াল</button>
-      </div>`);
-    }
-
-    if (cards.assignments) {
-      const asgRows = assignments.map((a) => {
-        const st = assignmentStatus(a, student);
-        return `<div class="info-row" role="button" tabindex="0" data-act="assignment" data-id="${escapeHtml(a.id)}" style="cursor:pointer">
-          <span class="l">📋 ${escapeHtml(a.title)}<br><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
-          <span class="v">${escapeHtml(dueLabel(a, student))}</span>
-        </div>`;
-      }).join('');
-      sections.push(assignments.length ? `
-      <div class="hcard">
-        <div class="h-title">অ্যাসাইনমেন্ট</div>
-        ${asgRows}
-        <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">সব দেখুন</button>
-      </div>` : `
-      <div class="hcard">
-        <div class="h-title">অ্যাসাইনমেন্ট</div>
-        <p>সব শেষ! 🎉</p>
-      </div>`);
-    }
-
+    examBody += lastResultHtml();
     if (perf) {
-      sections.push(`
+      examBody += `
       <div class="hcard">
         <div class="h-title">আমার পারফরম্যান্স</div>
         <div class="feature-grid" style="grid-template-columns:repeat(4,1fr)">
@@ -314,23 +296,33 @@ export function initStudentHome() {
         </div>
         <div class="mini-chart" role="img" aria-label="সাম্প্রতিক পরীক্ষার স্কোর: ${perf.series.map((v) => `${bn(v)}%`).join(', ')}">${perf.series.map((v, i) => `<div class="bar" style="height:${v}%" title="${bn(v)}%"></div>`).join('')}</div>
         <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">পুরো প্রগ্রেস দেখুন</button>
-      </div>`);
+      </div>`;
     }
+    folds.push(fold('📝 পরীক্ষা ও ফলাফল', examBody));
 
-    sections.push(lastResultHtml());
-    if (bannerHtml) sections.push(bannerHtml);
-
-    if (badges.length) {
-      sections.push(`
+    /* অ্যাসাইনমেন্ট ও ফি */
+    let workBody = '';
+    if (cards.assignments) {
+      const asgRows = assignments.map((a) => {
+        const st = assignmentStatus(a, student);
+        return `<div class="info-row" role="button" tabindex="0" data-act="assignment" data-id="${escapeHtml(a.id)}" style="cursor:pointer">
+          <span class="l">📋 ${escapeHtml(a.title)}<br><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
+          <span class="v">${escapeHtml(dueLabel(a, student))}</span>
+        </div>`;
+      }).join('');
+      workBody += assignments.length ? `
       <div class="hcard">
-        <div class="h-title">অর্জন</div>
-        <div class="quick-row">${badges.map((b) => `<div class="tile"><span class="ico">${b.icon}</span>${escapeHtml(b.name)}</div>`).join('')}</div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="achievements" style="margin-top:.5rem">সব অর্জন দেখুন</button>
-      </div>`);
+        <div class="h-title">অ্যাসাইনমেন্ট</div>
+        ${asgRows}
+        <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">সব দেখুন</button>
+      </div>` : `
+      <div class="hcard">
+        <div class="h-title">অ্যাসাইনমেন্ট</div>
+        <p>সব শেষ! 🎉</p>
+      </div>`;
     }
-
     if (cards.fee) {
-      sections.push(`
+      workBody += `
       <div class="hcard">
         <div class="h-title">💰 ফি স্ট্যাটাস</div>
         ${fee.due > 0
@@ -340,11 +332,29 @@ export function initStudentHome() {
              ${fee.nextDue ? `<div class="info-row"><span class="l">পরবর্তী পেমেন্ট</span><span class="v">${escapeHtml(fee.nextDue.month)}</span></div>` : ''}
              <button type="button" class="btn btn-secondary btn-block" data-act="fees" style="margin-top:.5rem">বিস্তারিত</button>`
           : `<p>সব ফি পরিশোধিত ✓</p>`}
-      </div>`);
+      </div>`;
     }
+    folds.push(fold('📋 অ্যাসাইনমেন্ট ও ফি', workBody));
 
+    /* নোটিশ ও টিপ */
+    let noticeBody = '';
+    if (cards.banners && banners.length) {
+      noticeBody += `
+      <div class="carousel">
+        <div class="carousel-track" id="banner-track">
+          ${banners.map((b) => `
+          <div class="banner">
+            ${b.image ? `<img src="${escapeHtml(b.image)}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:14px;margin-bottom:.5rem">` : ''}
+            <h3>📢 ${escapeHtml(b.title)}</h3>
+            <p>${escapeHtml(b.desc)}</p>
+            <button type="button" class="btn btn-small" data-act="banner" data-id="${escapeHtml(b.id)}">${escapeHtml(b.cta || 'দেখুন')}</button>
+          </div>`).join('')}
+        </div>
+        ${banners.length > 1 ? `<div class="carousel-dots" id="banner-dots">${banners.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+      </div>`;
+    }
     if (cards.notices && previewNotes.length) {
-      sections.push(`
+      noticeBody += `
       <div class="hcard">
         <div class="h-title">🔔 নোটিফিকেশন</div>
         ${previewNotes.map((n) => `
@@ -356,24 +366,45 @@ export function initStudentHome() {
           </div>
         </div>`).join('')}
         <button type="button" class="btn btn-secondary btn-block" data-act="notif" style="margin-top:.5rem">সব দেখুন</button>
-      </div>`);
+      </div>`;
     }
-
     if (tip) {
-      sections.push(`<div class="hcard"><div class="h-title">💡 শিক্ষকের টিপ</div><p>"${escapeHtml(tip.text)}"</p></div>`);
+      noticeBody += `<div class="hcard"><div class="h-title">💡 শিক্ষকের টিপ</div><p>"${escapeHtml(tip.text)}"</p></div>`;
     }
+    folds.push(fold('📢 নোটিশ ও টিপ', noticeBody));
 
-    sections.push(`
+    /* আরও ফিচার */
+    let moreBody = '';
+    if (cards.challenge) {
+      moreBody += `
       <div class="hcard">
-        <div class="h-title">কুইক ফিচার</div>
-        <div class="quick-row">
-          ${tile('study', '📚', 'স্টাডি')}
-          ${tile('exam', '📝', 'পরীক্ষা')}
-          ${tile('result', '🏆', 'ফলাফল')}
-          ${tile('routine', '📅', 'রুটিন')}
-          ${tile('assignments', '📋', 'অ্যাসাইনমেন্ট')}
-        </div>
-      </div>`);
+        <div class="h-title">🔥 ডেইলি চ্যালেঞ্জ</div>
+        <p>${challenge.done >= challenge.target ? '🎉 চ্যালেঞ্জ সম্পূর্ণ!' : `আজ ${bn(challenge.target)}টি MCQ উত্তর দিন`}</p>
+        <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${Math.round((challenge.done / challenge.target) * 100)}%"></div></div>
+        <div class="meta">${bn(challenge.done)} / ${bn(challenge.target)}</div>
+        ${challenge.done < challenge.target ? `<button type="button" class="btn btn-block" data-act="challenge" style="margin-top:.5rem">চ্যালেঞ্জ শুরু</button>` : ''}
+      </div>`;
+    }
+    if (badges.length) {
+      moreBody += `
+      <div class="hcard">
+        <div class="h-title">অর্জন</div>
+        <div class="quick-row">${badges.map((b) => `<div class="tile"><span class="ico">${b.icon}</span>${escapeHtml(b.name)}</div>`).join('')}</div>
+        <button type="button" class="btn btn-secondary btn-block" data-act="achievements" style="margin-top:.5rem">সব অর্জন দেখুন</button>
+      </div>`;
+    }
+    if (moreFeatures.length) {
+      moreBody += `<div class="feature-grid more-grid" id="more-features">${moreFeatures.map((f) => tile(f.act, f.ico, f.label)).join('')}</div>`;
+    }
+    folds.push(fold('✨ আরও ফিচার', moreBody, 'student-more-sec'));
+
+    if (folds.some(Boolean)) {
+      sections.push(`
+      <section class="home-section" aria-label="বিস্তারিত তথ্য">
+        <h2 class="sec-title">📂 বিস্তারিত (ট্যাপ করে দেখুন)</h2>
+        ${folds.join('')}
+      </section>`);
+    }
 
     host.innerHTML = sections.join('\n');
   };
@@ -437,13 +468,6 @@ export function initStudentHome() {
     }
     else if (act === 'result' || act === 'progress') switchView('result');
     else if (act === 'study' || act === 'downloads') switchView('study');
-    else if (act === 'seemore') {
-      const box = host.querySelector('#more-features');
-      const open = box && !box.hidden;
-      if (box) box.hidden = open;
-      el.setAttribute('aria-expanded', String(!open));
-      el.textContent = open ? 'আরও দেখুন ↓' : 'কম দেখুন ↑';
-    }
     else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
     else if (act === 'challenge') doChallenge();
     else if (act === 'questionbank') openPractice();
@@ -727,7 +751,7 @@ export function initStudentHome() {
         act === 'study' || act === 'downloads' ? 'study'
           : act === 'result' || act === 'progress' ? 'result' : 'exam');
       else if (act === 'notif') document.getElementById('bell').click();
-      else openMore(act === 'seemore' ? null : act);
+      else openMore(act);
     });
 
     document.getElementById('query-form').addEventListener('submit', (e) => {

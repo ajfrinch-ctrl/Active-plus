@@ -314,6 +314,44 @@ body.home-body {
 .nav-card:hover { border-color: rgba(66, 153, 225, 0.5); }
 .nav-card:active { transform: scale(0.99); }
 
+/* ---------- Collapsible home sections (admin home stays minimized) ---------- */
+/* Everything foldable is a native <details>: one row of title + chevron
+   until tapped open. Keeps the first screen to identity, overview and the
+   quick shortcuts. */
+.mini-details {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); margin-bottom: .625rem; overflow: hidden;
+}
+.mini-details > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  min-height: 44px; padding: .75rem .875rem; cursor: pointer; list-style: none;
+  font-family: inherit; font-weight: 600; font-size: .9375rem; color: var(--white);
+  -webkit-user-select: none; user-select: none;
+}
+.mini-details > summary::-webkit-details-marker { display: none; }
+.mini-details > summary::after {
+  content: '▾'; flex: none; color: var(--text-muted); font-size: .875rem;
+  transition: transform .18s ease;
+}
+.mini-details[open] > summary::after { transform: rotate(180deg); }
+.mini-details > summary:hover, .mini-details > summary:focus-visible {
+  background: var(--surface-hover); outline: none;
+}
+.mini-details .mini-body { padding: 0 .875rem .875rem; }
+.mini-details .mini-body .feature-grid { margin: 0; }
+
+/* The same fold reused inside a card (overview's extra statistics). */
+.mini-details.in-card {
+  border: none; border-top: 1px solid var(--border);
+  border-radius: 0; margin: .75rem 0 0; background: transparent;
+}
+.mini-details.in-card > summary {
+  min-height: 40px; padding: .75rem .125rem 0;
+  font-size: .875rem; font-weight: 600; color: var(--text-muted);
+}
+.mini-details.in-card .analytics-grid { padding: .625rem 0 0; }
+.mini-details.in-card .analytics-grid .analytics-cell { padding: .625rem; }
+
 /* ---------- Notification bell with unread badge ---------- */
 .notif-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .notif-badge {

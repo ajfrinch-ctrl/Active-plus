@@ -31,8 +31,9 @@ Open `http://localhost:8080` and log in.
 | Teacher  | `teacher@activeplus.edu` | `Teacher@123` |
 | Admin    | `admin@activeplus.edu`   | `Admin@123`   |
 
-The login screen lists these with a one-tap "ব্যবহার করুন" fill button, so the
-app can always be signed into even before Firebase is configured.
+These accounts are seeded in local mode, so the app can always be signed into
+even before Firebase is configured — they are deliberately not printed on the
+login screen.
 
 There is **one login form for everyone** — no role picker. `signIn()` detects
 the user type from the account itself and the app routes to the matching

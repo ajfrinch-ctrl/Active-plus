@@ -266,3 +266,42 @@
     max-width: 760px;
   }
 }
+
+/* ---------- Class-wise dues & payment capture ---------- */
+.due-class-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .4rem 0 .75rem; }
+.due-chip {
+  border: 1px solid var(--border-strong);
+  background: var(--sheet);
+  color: var(--text);
+  border-radius: 999px;
+  padding: .38rem .8rem;
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.due-chip.active { background: var(--accent-fill, #1f6fd0); border-color: transparent; color: #fff; }
+.due-month {
+  display: inline-block;
+  background: color-mix(in srgb, var(--warning, #e0a92c) 16%, transparent);
+  border-radius: 999px;
+  padding: .12rem .55rem;
+  font-size: .78rem;
+  white-space: nowrap;
+}
+.due-total { color: var(--danger, #f2555a); }
+.pay-months { display: flex; flex-direction: column; gap: .35rem; }
+.pay-month-row {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: .6rem;
+  padding: .5rem .6rem;
+  cursor: pointer;
+}
+.pay-month-row input { accent-color: var(--accent, #4c9ffe); width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+.pay-month-row .pm-name { flex: 1; }
+.pay-month-row .pm-amt { font-weight: 700; }
+.pay-due-hint, .pay-amount-hint { margin: .3rem 0 0; font-size: .82rem; color: var(--warning, #e0a92c); font-weight: 600; }
+.pay-amount-hint { color: var(--text-muted); font-weight: 400; }

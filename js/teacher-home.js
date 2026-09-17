@@ -1,53 +1,33 @@
 /**
  * Teacher Home — the app-style landing screen of the teacher portal.
  *
- * Same visual language as the student home (rounded cards, hero, feature grid,
- * quick actions, bottom navigation, More menu) but the information architecture
- * answers the teacher's question: "What do I need to teach or manage today?"
+ * Same minimal, tidy interface as the admin home:
+ *   1. "আজকের সামগ্রিক অবস্থা" — the handful of numbers a teacher checks in
+ *      the morning (details folded behind a tap),
+ *   2. one row of quick shortcuts, and
+ *   3. every information section folded into collapsible panels — minimized
+ *      until tapped.
  *
- * Every number is computed from the signed-in teacher's own rows — batches,
- * routine, assignments, exams, results — so nothing is hard-coded and no
- * teacher ever sees a class they are not assigned to.
+ * The feature/more tile grids were removed on purpose: the top tab bar and
+ * bottom navigation already reach every panel, so the tiles only repeated
+ * them. Every number is computed from the signed-in teacher's own rows —
+ * batches, routine, assignments, exams, results.
  */
 import { escapeHtml, safeUrl, mountConnectionStatus } from './app.js';
 import {
-  db, greetingByHour, todayBn, DAY_BN, newId,
-  teacherProfile, teacherStudents, teacherDayClasses, teacherPendingAssignments,
-  teacherExams, teacherPendingResults, teacherMaterials, todayTeaching,
-  teacherNextClass, teacherPerformance, activeBanners, latestNotifications,
-  timeAgo, submissionsFor, logActivity, examWindow, getDbStatus, sharedNotices
+  db, teacherProfile, teacherStudents, teacherDayClasses, teacherPendingAssignments,
+  teacherPendingResults, teacherPerformance, todayTeaching, teacherNextClass,
+  activeBanners, timeAgo, getDbStatus, sharedNotices
 } from './data.js';
 
-const FEATURES = [
-  { key: 'batches', icon: '📚', label: 'আমার ক্লাস' },
-  { key: 'students', icon: '👨‍🎓', label: 'শিক্ষার্থী' },
-  { key: 'exam', icon: '📝', label: 'পরীক্ষা' },
-  { key: 'questions', icon: '❓', label: 'প্রশ্ন ব্যাংক' },
-  { key: 'tasks', icon: '📋', label: 'অ্যাসাইনমেন্ট' },
-  { key: 'materials', icon: '📖', label: 'ম্যাটেরিয়াল' },
-  { key: 'routine', icon: '📅', label: 'রুটিন' },
-  { key: 'results', icon: '🏆', label: 'ফলাফল' }
-];
-
-const QUICK_ACTIONS = [
+/* Actions that open the real authoring flows — shortcuts, not navigation. */
+const QUICK_SHORTCUTS = [
   { act: 'new-exam', icon: '＋', label: 'পরীক্ষা তৈরি' },
   { act: 'add-mcq', icon: '＋', label: 'MCQ যোগ' },
   { act: 'give-assignment', icon: '＋', label: 'অ্যাসাইনমেন্ট' },
   { act: 'upload-material', icon: '＋', label: 'ম্যাটেরিয়াল' },
   { act: 'publish-notice', icon: '＋', label: 'নোটিশ' },
   { act: 'enter-result', icon: '＋', label: 'ফলাফল' }
-];
-
-const MORE_ITEMS = [
-  { key: 'notice', icon: '📢', label: 'নোটিশ' },
-  { key: 'queries', icon: '💬', label: 'শিক্ষার্থী প্রশ্ন' },
-  { key: 'suggestion', icon: '💡', label: 'সাজেশন' },
-  { key: 'attendance', icon: '✅', label: 'উপস্থিতি' },
-  { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
-  { key: 'profile', icon: '👤', label: 'প্রোফাইল' },
-  { key: 'settings', icon: '⚙️', label: 'সেটিংস' },
-  { key: 'help', icon: '❔', label: 'সাহায্য' },
-  { key: 'logout', icon: '🚪', label: 'লগআউট' }
 ];
 
 const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
@@ -64,52 +44,71 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
   };
 
   /* -------------------------------------------------------------- */
-  /* Sections                                                        */
+  /* 1. আজকের সামগ্রিক অবস্থা                                        */
   /* -------------------------------------------------------------- */
-  const hero = () => {
+  const overview = () => {
     const t = todayTeaching(name);
     const cell = (icon, value, label) => `
-      <div class="tile"><span class="ico">${icon}</span><strong>${bn(value)}</strong><span>${label}</span></div>`;
-    return `<div class="hero" id="teaching-hero">
-      <div class="h-title">আজকের শিক্ষণ</div>
-      <div class="feature-grid four">${cell('📚', t.classes, 'ক্লাস')}${cell('👨‍🎓', t.students, 'শিক্ষার্থী')}${cell('📋', t.assignments, 'অ্যাসাইনমেন্ট')}${cell('📝', t.exams, 'পরীক্ষা')}</div>
-      ${t.results ? `<p class="meta">⏳ ${bn(t.results)}টি ফলাফল প্রকাশের অপেক্ষায়</p>` : '<p class="meta">সব ফলাফল প্রকাশিত ✅</p>'}
-    </div>`;
-  };
+      <div class="analytics-cell"><span class="ico">${icon}</span><strong>${bn(value)}</strong><span>${label}</span></div>`;
 
-  const featureGrid = () => `
-    <div class="feature-grid" id="teacher-features">
-      ${FEATURES.map((f) => `<button type="button" class="tile" data-goto="${f.key}"><span class="ico">${f.icon}</span>${escapeHtml(f.label)}</button>`).join('')}
-    </div>
-    <button type="button" class="see-more" id="teacher-see-more">আরও দেখুন ↓</button>`;
-
-  const quickActions = () => `
-    <div class="quick-row" id="teacher-quick">
-      ${QUICK_ACTIONS.map((q) => `<button type="button" class="chip" data-act="${q.act}">${q.icon} ${escapeHtml(q.label)}</button>`).join('')}
-    </div>`;
-
-  const nextClassCard = () => {
+    /* Details (folded): next class + today's class list. */
     const slot = teacherNextClass(name);
-    if (!slot) return `<div class="hcard"><div class="h-title">পরবর্তী ক্লাস</div><p>আজ আর কোনো ক্লাস নেই 🎉</p></div>`;
     const cls = teacherProfile(name).classNames[0] || '';
-    return `<div class="hcard"><div class="h-title">পরবর্তী ক্লাস</div>
-      <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(slot.subject)}</span></div>
-      ${cls ? `<div class="info-row"><span class="l">ক্লাস</span><span class="v">${escapeHtml(cls)}</span></div>` : ''}
-      <div class="info-row"><span class="l">সময়</span><span class="v">${escapeHtml(slot.time)}</span></div>
-      <div class="info-row"><span class="l">কক্ষ</span><span class="v">${escapeHtml(slot.room || '—')}</span></div>
-      <button type="button" class="btn btn-block" data-goto="routine">ক্লাস দেখুন</button></div>`;
-  };
-
-  const todayClasses = () => {
     const slots = teacherDayClasses(name);
     const students = teacherStudents(name).length;
-    return `<div class="hcard"><div class="h-title">আজকের ক্লাস</div>${
-      slots.length ? slots.map((s) => `
+    const details = `
+      ${slot ? `
+        <div class="h-title">পরবর্তী ক্লাস</div>
+        <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(slot.subject)}</span></div>
+        ${cls ? `<div class="info-row"><span class="l">ক্লাস</span><span class="v">${escapeHtml(cls)}</span></div>` : ''}
+        <div class="info-row"><span class="l">সময়</span><span class="v">${escapeHtml(slot.time)}</span></div>
+        <div class="info-row"><span class="l">কক্ষ</span><span class="v">${escapeHtml(slot.room || '—')}</span></div>`
+      : '<p>আজ আর কোনো ক্লাস নেই 🎉</p>'}
+      <div class="h-title" style="margin-top:.625rem">আজকের ক্লাস</div>
+      ${slots.length ? slots.map((s) => `
         <div class="info-row" role="button" tabindex="0" data-goto="routine">
           <span class="l"><strong>${escapeHtml(s.time)}</strong><br><span class="meta">${escapeHtml(s.subject)} · ${escapeHtml(s.room || '')}</span></span>
           <span class="v">${bn(students)} জন</span>
-        </div>`).join('') : '<p>আজ কোনো ক্লাস নেই।</p>'}</div>`;
+        </div>`).join('') : '<p>আজ কোনো ক্লাস নেই।</p>'}`;
+
+    return `
+      <section class="home-section" aria-label="আজকের সামগ্রিক অবস্থা">
+        <h2 class="sec-title">📊 আজকের সামগ্রিক অবস্থা</h2>
+        <div class="hcard overview-card" id="teaching-hero">
+          <div class="analytics-grid">
+            ${cell('📚', t.classes, 'আজকের ক্লাস')}
+            ${cell('👨‍🎓', t.students, 'শিক্ষার্থী')}
+            ${cell('📋', t.assignments, 'অ্যাসাইনমেন্ট বাকি')}
+            ${cell('📝', t.exams, 'আসন্ন পরীক্ষা')}
+            ${cell('🏆', t.results, 'ফলাফল বাকি')}
+          </div>
+          <details class="mini-details in-card">
+            <summary>আজকের বিস্তারিত</summary>
+            ${details}
+          </details>
+        </div>
+      </section>`;
   };
+
+  /* -------------------------------------------------------------- */
+  /* 2. কুইক শর্টকাট                                                 */
+  /* -------------------------------------------------------------- */
+  const quickShortcuts = () => `
+    <section class="home-section" aria-label="কুইক শর্টকাট">
+      <h2 class="sec-title">⚡ কুইক শর্টকাট</h2>
+      <div class="quick-row" id="teacher-quick">
+        ${QUICK_SHORTCUTS.map((q) => `<button type="button" class="chip" data-act="${q.act}">${q.icon} ${escapeHtml(q.label)}</button>`).join('')}
+      </div>
+    </section>`;
+
+  /* -------------------------------------------------------------- */
+  /* 3. Folded information sections — minimized until tapped         */
+  /* -------------------------------------------------------------- */
+  const fold = (title, body) => body.trim() ? `
+    <details class="mini-details">
+      <summary>${title}</summary>
+      <div class="mini-body">${body}</div>
+    </details>` : '';
 
   const pendingTasks = () => {
     const assignments = teacherPendingAssignments(name);
@@ -124,6 +123,15 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
       ${row('💬', 'শিক্ষার্থী প্রশ্নের উত্তর', queries, 'queries')}</div>`;
   };
 
+  const myClasses = () => {
+    const { batches } = teacherProfile(name);
+    return `<div class="hcard"><div class="h-title">আমার ক্লাস</div>${
+      batches.length ? batches.map((b) => `
+        <div class="info-row" role="button" tabindex="0" data-goto="batches">
+          <span class="l">${escapeHtml(b.name)}</span><span class="v">${bn(b.students || 0)} জন</span></div>`).join('')
+        : '<p>কোনো ক্লাস নির্ধারিত নেই।</p>'}</div>`;
+  };
+
   const performance = () => {
     const p = teacherPerformance(name);
     if (!p) return `<div class="hcard"><div class="h-title">শিক্ষার্থীর পারফরম্যান্স</div><p>এখনো কোনো পরীক্ষার ফলাফল নেই।</p></div>`;
@@ -132,15 +140,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
       ${row('গড় স্কোর', p.avg + '%')}${row('সর্বোচ্চ', p.best + '%')}${row('সর্বনিম্ন', p.lowest + '%')}
       ${row('পাসের হার', p.passRate + '%')}${row('অ্যাসাইনমেন্ট জমা', p.assignmentCompletion + '%')}
       ${row('পরীক্ষায় অংশগ্রহণ', p.examParticipation + '%')}</div>`;
-  };
-
-  const myClasses = () => {
-    const { batches } = teacherProfile(name);
-    return `<div class="hcard"><div class="h-title">আমার ক্লাস</div>${
-      batches.length ? batches.map((b) => `
-        <div class="info-row" role="button" tabindex="0" data-goto="batches">
-          <span class="l">${escapeHtml(b.name)}</span><span class="v">${bn(b.students || 0)} জন</span></div>`).join('')
-        : '<p>কোনো ক্লাস নির্ধারিত নেই।</p>'}</div>`;
   };
 
   const noticeCard = () => {
@@ -153,7 +152,7 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
 
   const notificationPreview = () => {
     const rows = db.notifications.list().filter((n) => n.target === 'শিক্ষক').slice(-2).reverse();
-    return `<div class="notif-preview"><div class="h-title">🔔 নোটিফিকেশন</div>${
+    return `<div class="hcard"><div class="h-title">🔔 নোটিফিকেশন</div>${
       rows.length ? rows.map((n) => `<div class="info-row" role="button" tabindex="0" data-goto="queries">
         <span class="l">${escapeHtml(n.title)}</span><span class="v">${escapeHtml(timeAgo(n.createdAt) || n.date || '')}</span></div>`).join('')
         : '<p>কোনো নোটিফিকেশন নেই।</p>'}
@@ -170,11 +169,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
       </div>`).join('')}</div></div>`;
   };
 
-  const morePanel = () => `
-    <div class="feature-grid more-grid" id="teacher-more-grid">
-      ${MORE_ITEMS.map((m) => `<button type="button" class="tile" data-goto="${m.key}"><span class="ico">${m.icon}</span>${escapeHtml(m.label)}</button>`).join('')}
-    </div>`;
-
   /* -------------------------------------------------------------- */
   /* Render + wire                                                   */
   /* -------------------------------------------------------------- */
@@ -184,34 +178,24 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     if (headerSub) {
       headerSub.textContent = [profile.subject, profile.classNames.join(', ')].filter(Boolean).join(' · ') || 'শিক্ষক';
     }
+    const folds = [
+      fold('✅ অপেক্ষমাণ কাজ', pendingTasks()),
+      fold('🧑‍🏫 আমার ক্লাস', myClasses()),
+      fold('📈 শিক্ষার্থীর পারফরম্যান্স', performance()),
+      fold('📢 নোটিশ ও আপডেট', bannerCard() + noticeCard() + notificationPreview())
+    ].join('');
+
     host.innerHTML = `
-      <div id="teacher-home-content">
-        <span class="net-chip" id="teacher-net-chip" role="status" aria-live="polite">…</span>
-        ${hero()}
-        ${featureGrid()}
-        ${quickActions()}
-        ${nextClassCard()}
-        ${todayClasses()}
-        ${pendingTasks()}
-        ${myClasses()}
-        ${performance()}
-        ${bannerCard()}
-        ${noticeCard()}
-        ${notificationPreview()}
-      </div>
-      <div id="teacher-more" hidden>${morePanel()}</div>`;
+      <span class="net-chip" id="teacher-net-chip" role="status" aria-live="polite">…</span>
+      ${overview()}
+      ${quickShortcuts()}
+      <section class="home-section" aria-label="বিস্তারিত তথ্য">
+        <h2 class="sec-title">📂 বিস্তারিত (ট্যাপ করে দেখুন)</h2>
+        ${folds}
+      </section>`;
   }
 
   host.addEventListener('click', (e) => {
-    if (e.target.closest('#teacher-see-more')) {
-      const more = host.querySelector('#teacher-more');
-      const content = host.querySelector('#teacher-home-content');
-      const showing = more.hidden;
-      more.hidden = !showing;
-      content.hidden = showing;
-      e.target.textContent = showing ? '← হোমে ফিরুন' : 'আরও দেখুন ↓';
-      return;
-    }
     const tile = e.target.closest('[data-goto]');
     if (tile) { goto(tile.dataset.goto); return; }
     const action = e.target.closest('[data-act]');
@@ -245,20 +229,16 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     }
   }
 
-  /** Open the "See More" grid (used by the bottom navigation). */
+  /** Bottom navigation "আরও": unfold every section to see everything. */
   function openMore() {
-    const btn = host.querySelector('#teacher-see-more');
-    if (btn && host.querySelector('#teacher-more')?.hidden) btn.click();
+    const folds = host.querySelectorAll('details.mini-details');
+    folds.forEach((d) => { d.open = true; });
+    folds[0]?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }
 
-  /** Reset the home to the main dashboard (used when "হোম" is tapped again). */
+  /** Bottom navigation "হোম": fold everything back to the minimal view. */
   function showHome() {
-    const more = host.querySelector('#teacher-more');
-    const content = host.querySelector('#teacher-home-content');
-    const btn = host.querySelector('#teacher-see-more');
-    if (more) more.hidden = true;
-    if (content) content.hidden = false;
-    if (btn) btn.textContent = 'আরও দেখুন ↓';
+    host.querySelectorAll('details[open]').forEach((d) => { d.open = false; });
   }
 
   renderSafe();
