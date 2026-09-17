@@ -111,12 +111,21 @@ test('admin portal boots and wires the home-content tabs', async () => {
   // the app-style admin home rendered from real data
   const adminHome = doc.getElementById('admin-home');
   assert.ok(adminHome && adminHome.innerHTML.length > 200, 'admin home rendered');
+  assert.ok(doc.getElementById('admin-overview'), 'সামগ্রিক অবস্থা overview card present');
   assert.ok(doc.querySelector('.analytics-grid'), 'academic analytics grid present');
   assert.ok(doc.querySelectorAll('.analytics-cell').length >= 11, 'analytics summary cells rendered');
   assert.ok(doc.querySelectorAll('#admin-home .feature-grid .tile').length >= 8, 'feature grid rendered');
-  assert.ok(doc.querySelectorAll('#admin-quick .chip').length >= 6, 'quick actions rendered');
-  assert.ok(doc.querySelectorAll('#admin-home .nav-card').length >= 4, 'navigation cards rendered');
-  assert.ok(doc.getElementById('admin-see-more'), 'See More control present');
+  assert.ok(doc.querySelectorAll('#admin-quick .chip').length >= 4, 'quick shortcuts rendered');
+
+  // Minimal first screen: no duplicate stat cards, no English filler, and
+  // every feature list stays folded (minimized) until tapped.
+  assert.equal(doc.querySelectorAll('#admin-home .nav-card').length, 0, 'no duplicate navigation cards');
+  assert.ok(!/View [a-z]/i.test(adminHome.innerHTML), 'no English description text on the home');
+  assert.equal(doc.getElementById('admin-see-more'), null, 'no view-swapping See More button');
+  const folds = doc.querySelectorAll('#admin-home details.mini-details');
+  assert.ok(folds.length >= 4, 'feature groups are collapsible');
+  for (const d of folds) assert.equal(d.open, false, 'sections open minimized');
+  assert.ok(doc.getElementById('admin-more-sec'), 'আরও ফিচার collapsible present');
   // the grid is the only navigation now — every tile must land on a real panel
   for (const tile of doc.querySelectorAll('#admin-home [data-goto]')) {
     const key = tile.dataset.goto;
@@ -124,10 +133,10 @@ test('admin portal boots and wires the home-content tabs', async () => {
     assert.ok(doc.getElementById(`tab-${key}`), `admin grid tile "${key}" has a panel`);
   }
   // the summary is computed live from the seeded data (4 students) and shown in
-  // Bengali digits. Finance, Academic Review, Announcements and Recent
-  // Activities are navigation cards (buttons), never raw data dumps.
+  // Bengali digits; each figure appears exactly once — মোট বকেয়া is not repeated.
   const homeText = adminHome.textContent;
   assert.ok(homeText.includes('৪'), 'real counts shown in Bengali digits');
+  assert.equal((homeText.match(/মোট বকেয়া/g) || []).length, 1, 'no duplicated due-total figure');
   for (const key of ['analytics', 'dues', 'notices', 'activity']) {
     assert.ok(doc.querySelector(`#admin-home [data-goto="${key}"]`), `navigation card routes to "${key}"`);
   }
@@ -147,30 +156,30 @@ test('admin portal boots and wires the home-content tabs', async () => {
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
-test('tapping হোম after আরও restores the admin dashboard', async () => {
+test('tapping হোম after আরও folds the admin home back to minimal', async () => {
   const out = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'morehome'
   });
   const doc = out.dom.window.document;
   const win = out.dom.window;
 
-  const content = doc.getElementById('admin-home-content');
-  const more = doc.getElementById('admin-more');
-  assert.ok(content && more, 'dashboard content and আরও grid exist');
+  const moreSec = doc.getElementById('admin-more-sec');
+  assert.ok(moreSec, 'the আরও ফিচার collapsible exists');
+  assert.equal(moreSec.open, false, 'it stays minimized by default');
 
-  // Open the More grid via the bottom navigation ("আরও").
+  // Open the extra features via the bottom navigation ("আরও").
   doc.querySelector('.bottom-nav button[data-tab="more"]')
     .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  assert.equal(more.hidden, false, 'the আরও grid is shown');
-  assert.equal(content.hidden, true, 'the dashboard is hidden while আরও is open');
+  assert.equal(moreSec.open, true, 'the আরও ফিচার list unfolds');
+  assert.equal(doc.getElementById('admin-overview').hidden, false,
+    'the overview stays on screen — nothing is swapped away');
 
-  // Tapping "হোম" must bring the main dashboard back.
+  // Tapping "হোম" must fold every section back to the minimal view.
   doc.querySelector('.bottom-nav button[data-tab="home"]')
     .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  assert.equal(content.hidden, false, 'the dashboard is visible again after হোম');
-  assert.equal(more.hidden, true, 'the আরও grid is hidden after হোম');
-  assert.equal(doc.getElementById('admin-see-more').textContent.trim(), 'আরও দেখুন ↓',
-    'the See More label is reset');
+  assert.equal(moreSec.open, false, 'the আরও ফিচার list is folded again');
+  assert.equal(doc.querySelectorAll('#admin-home details[open]').length, 0,
+    'every section is minimized again');
 
   const fatal = out.errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
@@ -757,10 +766,10 @@ test('the submissions review table paginates instead of painting every row', asy
   const total = data.db.submissions.list().length;
   assert.ok(total > 25, `collection is bigger than one page (has ${total})`);
 
-  // Navigation is the app-style grid now: reveal the More grid, then open
-  // the Submissions tile (the same panel the old top bar used to switch to).
-  doc.getElementById('admin-see-more').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  doc.querySelector('#admin-more [data-goto="submissions"]')
+  // Navigation is the app-style grid now: unfold the আরও ফিচার section, then
+  // open the Submissions tile (the same panel the old top bar used to switch to).
+  doc.getElementById('admin-more-sec').open = true;
+  doc.querySelector('#admin-more-grid [data-goto="submissions"]')
     .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
 
   // Checking one submission re-renders the table; that render must paginate.
