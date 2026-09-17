@@ -186,15 +186,18 @@ test('index.html: login UI nests correctly (button no longer swallows the page)'
 
   const container = document.querySelector('.auth-shell');
   assert.ok(container.contains(btn), 'login button inside .auth-shell');
-  assert.ok(container.contains(document.getElementById('status-bar')), 'status bar inside .auth-shell');
-  const card = document.querySelector('.login-card');
-  assert.ok(card.contains(document.getElementById('status-bar')), 'status bar inside login-card');
 
   // Single login: no role selector of any kind.
   assert.equal(document.querySelector('.role-options'), null, 'no role selector fieldset');
   assert.equal(document.querySelectorAll('input[name="role"]').length, 0, 'no role radios');
-  assert.ok(document.querySelector('.login-note'), 'single-login note present');
   assert.ok(document.querySelector('form#login-form'), 'login form present');
+
+  // Clean login page: only the logo and the form — no brand text above it and
+  // no demo credentials, connection status or helper copy beneath it.
+  assert.equal(document.querySelector('.auth-head h1, .auth-head .subtitle'), null, 'no brand title text next to the logo');
+  assert.equal(document.querySelector('.login-note'), null, 'no single-login helper note');
+  assert.equal(document.getElementById('status-bar'), null, 'no connection status bar');
+  assert.equal(document.getElementById('demo-box'), null, 'no demo account list on screen');
 });
 
 test('student home uses the mobile app shell (header + bottom nav)', () => {
