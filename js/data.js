@@ -741,6 +741,59 @@ export function receivePayment(feeId, receivedBy, details = {}) {
   return { fee: db.fees.find(feeId), student, payment, settled, remaining: dueRemaining(db.fees.find(feeId)) };
 }
 
+/** 'সেপ্টেম্বর ২০২৬' → sortable key (year*12 + month index). Unknown sorts last. */
+export function dueMonthKey(month) {
+  const parts = String(month || '').trim().split(/\s+/);
+  const idx = BN_MONTHS.indexOf(parts[0]);
+  if (idx === -1) return Number.MAX_SAFE_INTEGER;
+  const year = Number(String(parts[1] || '').replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d))));
+  return (Number.isFinite(year) && year > 0 ? year : 9999) * 12 + idx;
+}
+
+/**
+ * Collects money against several of one student's due months at once — the
+ * everyday "দুই মাসের ফি একসাথে দিল" case. The amount is applied oldest month
+ * first through receivePayment(), so every settled month gets its own payment
+ * row, notice and sequential receipt number, and a partial amount simply
+ * leaves the newest months বকেয়া. Refuses (null) anything inconsistent:
+ * another student's fee, an already-paid month, or more than the total owed.
+ */
+export function receiveStudentPayments(studentId, feeIds, amount, receivedBy, details = {}) {
+  const ids = (Array.isArray(feeIds) ? feeIds : []).map(String).filter(Boolean);
+  if (!studentId || !ids.length) return null;
+  const fees = ids.map((id) => db.fees.find(id));
+  if (fees.some((fee) => !fee || fee.studentId !== studentId || fee.status === 'পরিশোধিত' || dueRemaining(fee) <= 0)) {
+    return null;
+  }
+  const ordered = fees.slice().sort((a, b) => dueMonthKey(a.month) - dueMonthKey(b.month));
+  const owed = ordered.reduce((sum, fee) => sum + dueRemaining(fee), 0);
+  const total = (amount === undefined || amount === null || amount === '') ? owed : Number(amount);
+  if (!Number.isFinite(total) || total <= 0 || total > owed + 1e-9) return null;
+
+  const results = [];
+  let left = total;
+  for (const fee of ordered) {
+    if (left <= 1e-9) break;
+    const take = Math.min(left, dueRemaining(fee));
+    const res = receivePayment(fee.id, receivedBy, {
+      ...details,
+      amount: take,
+      receiptNo: ids.length === 1 && details.receiptNo ? String(details.receiptNo) : nextReceiptNo()
+    });
+    if (!res) return null;
+    results.push(res);
+    left = Math.max(0, left - take);
+  }
+  return {
+    student: db.students.find(studentId) || null,
+    results,
+    payments: results.map((r) => r.payment),
+    total,
+    settled: results.filter((r) => r.settled).length,
+    remaining: left
+  };
+}
+
 /**
  * Notices for a shared board (teacher/admin lists, "latest notice" cards).
  * A payment receipt is personal to one student (`forStudent`) and must never be

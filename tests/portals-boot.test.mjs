@@ -358,22 +358,54 @@ test('student profile sheet shows ID card, fee ledger and results', async () => 
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
-test('payment capture records method/reference and prints a receipt', async () => {
+test('payment capture: class-wise dues list, student-wise multi-month collection, receipt', async () => {
   const { doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'payment'
   });
   const data = await import('../js/data.js');
+  const click = (el) => el.dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
 
-  // open the payment modal for a real outstanding fee
-  const fee = data.dueFees()[0];
-  assert.ok(fee, 'there is an outstanding fee to collect');
-  const payBtn = doc.querySelector(`[data-pay="${fee.id}"]`);
-  assert.ok(payBtn, 'pay button rendered for that fee');
-  payBtn.dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+  // class chips: সব + every class, each carrying its due-student count
+  let chips = [...doc.querySelectorAll('#due-class-chips .due-chip')];
+  assert.ok(chips.length >= 2, 'class chips rendered');
+  assert.ok(chips[0].textContent.startsWith('সব'), 'সব chip first');
+  assert.ok(chips[0].classList.contains('active'), 'সব selected by default');
 
-  assert.equal(doc.getElementById('pay-fee-id').value, fee.id, 'modal holds the fee');
-  assert.equal(doc.getElementById('pay-amount').value, String(fee.amount), 'amount prefilled');
-  assert.ok(doc.getElementById('pay-student').value.includes(fee.studentId), 'student shown');
+  // summary strip describes the selected class scope
+  assert.match(doc.getElementById('due-summary').textContent, /মোট বকেয়া/, 'due total summarised');
+  assert.match(doc.getElementById('due-summary').textContent, /আজকের আদায়/, 'today collection summarised');
+
+  // selecting a class scopes the due list to that class only
+  const ninthDues = data.dueFees('নবম');
+  click(chips.find((c) => c.textContent.includes('নবম')));
+  const dueText = doc.getElementById('due-table').textContent;
+  assert.ok(ninthDues.every((d) => dueText.includes(d.student?.name || d.studentId)), 'every নবম due student listed');
+  if (ninthDues.length) {
+    const ninthIds = new Set(ninthDues.map((d) => d.id));
+    const elsewhere = data.dueFees().filter((d) => !ninthIds.has(d.id));
+    assert.ok(elsewhere.every((d) => !dueText.includes(d.student?.name || '!!')), 'other classes filtered out');
+  } else {
+    assert.match(dueText, /বকেয়া নেই/, 'paid-up class shows a clean empty state');
+  }
+
+  // back to সব, then student-wise rows (one row per owing student)
+  chips = [...doc.querySelectorAll('#due-class-chips .due-chip')];
+  click(chips[0]);
+  const sid = data.dueFees()[0].studentId;
+  const payButtons = [...doc.querySelectorAll('#due-table [data-pay-student]')];
+  assert.equal(new Set(payButtons.map((b) => b.dataset.payStudent)).size, payButtons.length,
+    'one pay button per student, not one per due month');
+  const payBtn = doc.querySelector(`[data-pay-student="${sid}"]`);
+  assert.ok(payBtn, 'pay button rendered for that student');
+  click(payBtn);
+
+  // modal: student's due months all ticked, amount prefilled with their total
+  const months = [...doc.querySelectorAll('#pay-months [data-pay-month]')];
+  assert.ok(months.length >= 1, 'due months listed for ticking');
+  assert.ok(months.every((m) => m.checked), 'all months ticked by default');
+  const totalDue = data.dueFees().filter((d) => d.studentId === sid).reduce((s, d) => s + d.remaining, 0);
+  assert.equal(doc.getElementById('pay-amount').value, String(totalDue), 'amount prefilled with the student total due');
+  assert.ok(doc.getElementById('pay-student').value.includes(sid), 'student shown');
 
   // fill the extra details the spec asks for and submit
   doc.getElementById('pay-method').value = 'বিকাশ';
@@ -381,12 +413,16 @@ test('payment capture records method/reference and prints a receipt', async () =
   doc.getElementById('pay-remarks').value = 'অভিভাবকের কাছ থেকে';
   doc.getElementById('payment-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
 
-  const saved = data.db.payments.list().find((p) => p.reference === 'TRX-9911');
-  assert.ok(saved, 'payment persisted with its reference');
+  const savedPayments = data.db.payments.list().filter((p) => p.reference === 'TRX-9911');
+  assert.equal(savedPayments.length, months.length, 'one payment row per collected month');
+  const saved = savedPayments[savedPayments.length - 1];
   assert.equal(saved.method, 'বিকাশ');
   assert.equal(saved.remarks, 'অভিভাবকের কাছ থেকে');
-  assert.match(saved.receiptNo || '', /^\d{11}$/, 'a unique YYYYMMDDXXX receipt number was generated');
-  assert.equal(data.db.fees.find(fee.id).status, 'পরিশোধিত', 'the fee is settled');
+  assert.equal(savedPayments.reduce((s, p) => s + Number(p.amount || 0), 0), totalDue, 'payments add up to the form amount');
+  const receipts = new Set(savedPayments.map((p) => p.receiptNo));
+  assert.equal(receipts.size, savedPayments.length, 'every month got its own receipt number');
+  savedPayments.forEach((p) => assert.match(p.receiptNo || '', /^\d{11}$/, 'unique YYYYMMDDXXX receipt numbers'));
+  months.forEach((box) => assert.equal(data.db.fees.find(box.value).status, 'পরিশোধিত', 'every ticked month settled'));
 
   // Unique, sequential per-day receipt numbers — even across rapid payments.
   const today = new Date();

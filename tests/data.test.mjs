@@ -157,6 +157,56 @@ test('receivePayment clears due, records payment, notifies the student', async (
   assert.equal(dueFees().length, before.length - 1, 'due list shrank');
 });
 
+const bootDataFor = async (query) => {
+  const storage = makeLocalStorage();
+  installWindow(storage);
+  (await import('../js/store.js'))._clearMemoryStore();
+  return import(`../js/data.js?${query}`);
+};
+
+test('receiveStudentPayments settles several months oldest-first with one payment each', async () => {
+  const { db, newId, dueFees, receiveStudentPayments } = await bootDataFor('multi-month-settle');
+  const studentId = dueFees()[0].studentId;
+  const jan = db.fees.add({ id: newId('fee'), studentId, month: 'জানুয়ারি ২০২৬', amount: 500, status: 'বকেয়া', date: '—' });
+  const feb = db.fees.add({ id: newId('fee'), studentId, month: 'ফেব্রুয়ারি ২০২৬', amount: 500, status: 'বকেয়া', date: '—' });
+
+  const result = receiveStudentPayments(studentId, [feb.id, jan.id], 1000, 'অ্যাডমিন', { method: 'নগদ' });
+  assert.ok(result, 'payment accepted');
+  assert.equal(result.payments.length, 2, 'one payment per month');
+  assert.equal(db.fees.find(jan.id).status, 'পরিশোধিত');
+  assert.equal(db.fees.find(feb.id).status, 'পরিশোধিত');
+  assert.equal(result.payments[0].month, 'জানুয়ারি ২০২৬', 'oldest month collects first even if passed last');
+  assert.equal(new Set(result.payments.map((p) => p.receiptNo)).size, 2, 'receipt numbers never repeat');
+});
+
+test('receiveStudentPayments keeps a partial amount on the newest month', async () => {
+  const { db, newId, dueFees, dueRemaining, receiveStudentPayments } = await bootDataFor('multi-month-partial');
+  const studentId = dueFees()[0].studentId;
+  const jan = db.fees.add({ id: newId('fee'), studentId, month: 'জানুয়ারি ২০২৬', amount: 500, status: 'বকেয়া', date: '—' });
+  const feb = db.fees.add({ id: newId('fee'), studentId, month: 'ফেব্রুয়ারি ২০২৬', amount: 500, status: 'বকেয়া', date: '—' });
+
+  const result = receiveStudentPayments(studentId, [jan.id, feb.id], 700, 'অ্যাডমিন');
+  assert.ok(result, 'partial payment accepted');
+  assert.equal(db.fees.find(jan.id).status, 'পরিশোধিত', 'oldest month settled first');
+  const febAfter = db.fees.find(feb.id);
+  assert.equal(febAfter.status, 'বকেয়া', 'newest month stays due');
+  assert.equal(dueRemaining(febAfter), 300, 'remaining balance survives');
+});
+
+test('receiveStudentPayments refuses bad money and foreign fees', async () => {
+  const { db, newId, dueFees, receiveStudentPayments } = await bootDataFor('multi-month-refuse');
+  const studentId = dueFees()[0].studentId;
+  const mine = db.fees.add({ id: newId('fee'), studentId, month: 'জানুয়ারি ২০২৬', amount: 500, status: 'বকেয়া', date: '—' });
+  const other = dueFees().find((d) => d.studentId !== studentId);
+  const before = db.payments.list().length;
+
+  assert.equal(receiveStudentPayments(studentId, [mine.id], 501, 'অ্যাডমিন'), null, 'more than owed refused');
+  assert.equal(receiveStudentPayments(studentId, [mine.id], 0, 'অ্যাডমিন'), null, 'zero refused');
+  assert.equal(receiveStudentPayments(studentId, [mine.id, other.id], 500, 'অ্যাডমিন'), null, 'another student fee refused');
+  assert.equal(receiveStudentPayments(studentId, [], 500, 'অ্যাডমিন'), null, 'empty month list refused');
+  assert.equal(db.payments.list().length, before, 'nothing written on refusal');
+});
+
 test('scoreExam grades answers correctly', async () => {
   const storage = makeLocalStorage();
   installWindow(storage);
