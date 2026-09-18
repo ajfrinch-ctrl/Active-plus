@@ -370,27 +370,18 @@
           <div class="list" id="notif-list"></div>
         </section>
 
-        <section class="tab-panel" id="tab-analytics" hidden>
-          <h2 class="section-title">অ্যাকাডেমিক অ্যানালিটিক্স</h2>
-          <div class="stat-grid" id="analytics-cards"></div>
-          <div class="card" style="margin-top:1rem"><h3>শিক্ষার্থী বৃদ্ধি (ভর্তি ট্রেন্ড)</h3><div id="chart-admissions"></div></div>
-          <div class="card" style="margin-top:1rem"><h3>ফি সংগ্রহ ট্রেন্ড</h3><div id="chart-collection"></div></div>
-          <div class="card" style="margin-top:1rem"><h3>বকেয়া ট্রেন্ড</h3><div id="chart-due"></div></div>
-          <div class="card" style="margin-top:1rem"><h3>পাসের হার</h3><div id="chart-passrate"></div></div>
-          <div class="card" style="margin-top:1rem"><h3>ক্লাস পারফরম্যান্স</h3><div id="class-perf"></div></div>
-          <div class="card" style="margin-top:1rem"><h3>বিষয়ভিত্তিক পারফরম্যান্স</h3><div id="subject-perf"></div></div>
-        </section>
-
+        <!-- Report centre: three groups of icon cards (Finance / Student /
+             Notice). A tap builds the branded document and opens the shared
+             preview, which downloads a PDF or an Excel (CSV) file. There is no
+             analytics dashboard, no chart and no browser print dialog here. -->
         <section class="tab-panel" id="tab-reports" hidden>
           <h2 class="section-title">রিপোর্ট সেন্টার</h2>
-          <div class="form-row">
-            <div class="form-group"><label for="report-type">রিপোর্টের ধরন</label><select id="report-type" class="form-input form-select"></select></div>
-            <div class="form-group"><label for="report-class">ক্লাস নির্বাচন</label><select id="report-class" class="form-input form-select"></select></div>
+          <div class="form-group report-filter">
+            <label for="report-class">ক্লাস নির্বাচন</label>
+            <select id="report-class" class="form-input form-select"></select>
           </div>
-          <button type="button" class="btn btn-block" id="report-generate">📄 রিপোর্ট Generate করুন</button>
-          <p class="form-hint">Generate চাপলে প্রথমে রিপোর্টের প্রিভিউ দেখানো হবে — সেখান থেকে PDF ডাউনলোড করতে পারবেন।</p>
-          <div class="table-wrap" style="margin-top:.75rem"><table class="table" id="report-table"><thead><tr></tr></thead><tbody></tbody></table></div>
-          <div class="row-actions" style="margin-top:.75rem"><button type="button" class="btn btn-small btn-secondary" id="report-csv">এক্সেল/CSV</button></div>
+          <div class="report-groups" id="report-groups"></div>
+          <p class="form-hint">যেকোনো কার্ডে ট্যাপ করলে প্রতিষ্ঠানের লোগো ও প্যাডসহ রিপোর্টের প্রিভিউ খুলবে — সেখান থেকে সরাসরি PDF বা এক্সেল ডাউনলোড করুন। ব্রাউজারের প্রিন্ট উইন্ডো খোলার দরকার নেই।</p>
         </section>
 
         <section class="tab-panel" id="tab-users" hidden>
@@ -640,8 +631,9 @@
         </div>
         <div class="doc-preview-body" id="document-preview-body"></div>
         <div class="doc-preview-actions">
-          <button type="button" class="btn" id="document-preview-download">⬇️ Download PDF</button>
-          <button type="button" class="btn btn-success" id="document-preview-share">📱 Share Image</button>
+          <button type="button" class="btn" id="document-preview-download">⬇️ PDF ডাউনলোড</button>
+          <button type="button" class="btn btn-secondary" id="document-preview-excel">📊 এক্সেল ডাউনলোড</button>
+          <button type="button" class="btn btn-success" id="document-preview-share">📱 ছবি শেয়ার</button>
         </div>
       </div>
     </div>

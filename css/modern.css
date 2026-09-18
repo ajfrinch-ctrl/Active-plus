@@ -175,7 +175,8 @@
   .stat .stat-value { color: #fff; }
 
   /* ---------- Gradient icon chips (tiles, nav cards, analytics) ----------- */
-  .tile .ico, .nav-card .ico, .analytics-cell .ico, .quickadd-option .qo-ico {
+  .tile .ico, .nav-card .ico, .analytics-cell .ico, .quickadd-option .qo-ico,
+  .report-card .ico, .report-group-title .ico {
     display: grid;
     place-items: center;
     border-radius: 14px;
@@ -187,15 +188,21 @@
   .nav-card .ico { width: 48px; height: 48px; font-size: 1.4rem; border-radius: 15px; }
   .analytics-cell .ico { width: 42px; height: 42px; font-size: 1.2rem; }
   .quickadd-option .qo-ico { width: 58px; height: 58px; font-size: 1.7rem; border-radius: 18px; }
+  .report-card .ico { width: 48px; height: 48px; font-size: 1.4rem; }
+  .report-group-title .ico { width: 34px; height: 34px; font-size: 1.05rem; border-radius: 11px; border: none; }
 
   /* Rotate chip hues across each grid so every icon feels distinct. */
   .feature-grid > :nth-child(6n+1) .ico, .analytics-grid > :nth-child(6n+1) .ico,
+  .report-grid > :nth-child(6n+1) .ico,
   .quickadd-grid > :nth-child(6n+1) .qo-ico { --chip-grad: linear-gradient(135deg, #6366f1, #8b5cf6); }
   .feature-grid > :nth-child(6n+2) .ico, .analytics-grid > :nth-child(6n+2) .ico,
+  .report-grid > :nth-child(6n+2) .ico,
   .quickadd-grid > :nth-child(6n+2) .qo-ico { --chip-grad: linear-gradient(135deg, #ec4899, #f43f5e); }
   .feature-grid > :nth-child(6n+3) .ico, .analytics-grid > :nth-child(6n+3) .ico,
+  .report-grid > :nth-child(6n+3) .ico,
   .quickadd-grid > :nth-child(6n+3) .qo-ico { --chip-grad: linear-gradient(135deg, #06b6d4, #3b82f6); }
-  .feature-grid > :nth-child(6n+4) .ico, .analytics-grid > :nth-child(6n+4) .ico { --chip-grad: var(--grad-amber); }
+  .feature-grid > :nth-child(6n+4) .ico, .analytics-grid > :nth-child(6n+4) .ico,
+  .report-grid > :nth-child(6n+4) .ico { --chip-grad: var(--grad-amber); }
   .feature-grid > :nth-child(6n+5) .ico, .analytics-grid > :nth-child(6n+5) .ico { --chip-grad: var(--grad-fresh); }
   .feature-grid > :nth-child(6n) .ico, .analytics-grid > :nth-child(6n) .ico { --chip-grad: linear-gradient(135deg, #8b5cf6, #d946ef); }
 
@@ -209,6 +216,18 @@
   }
   .tile:hover { border-color: rgba(167, 139, 250, 0.55); transform: translateY(-2px); }
   .tile:active { transform: scale(0.97); }
+
+  /* Report cards share the frosted-glass language of the tiles. */
+  .report-card {
+    border-radius: 18px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 22px rgba(2, 4, 12, 0.4);
+    gap: 0.5rem;
+  }
+  .report-card:hover { border-color: rgba(167, 139, 250, 0.55); transform: translateY(-2px); }
+  .report-card:active { transform: scale(0.97); }
+  .report-card .rc-label { color: #fff; }
 
   .nav-card { border-radius: 18px; }
   .nav-card:hover { border-color: rgba(167, 139, 250, 0.55); transform: translateY(-1px); }

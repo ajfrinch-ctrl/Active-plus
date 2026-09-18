@@ -137,7 +137,7 @@ test('admin portal boots and wires the home-content tabs', async () => {
   const homeText = adminHome.textContent;
   assert.ok(homeText.includes('৪'), 'real counts shown in Bengali digits');
   assert.equal((homeText.match(/মোট বকেয়া/g) || []).length, 1, 'no duplicated due-total figure');
-  for (const key of ['analytics', 'dues', 'notices', 'activity']) {
+  for (const key of ['reports', 'dues', 'notices', 'activity']) {
     assert.ok(doc.querySelector(`#admin-home [data-goto="${key}"]`), `navigation card routes to "${key}"`);
   }
   // database status chip is present and never exposes credentials
@@ -263,62 +263,141 @@ async function waitFor(predicate, { timeout = 4000, step = 10 } = {}) {
   return predicate();
 }
 
-test('every report in the report centre renders without error', async () => {
+/**
+ * Captures the files a document download produces. jsdom has no object URLs, so
+ * the blob handed to `URL.createObjectURL` and the anchor's download name are
+ * recorded instead — that pair is exactly what a browser would write to disk.
+ */
+function captureDownloads(win) {
+  const blobs = [];
+  const clicked = [];
+  win.URL.createObjectURL = (blob) => { blobs.push(blob); return 'blob:stub'; };
+  win.URL.revokeObjectURL = () => {};
+  globalThis.URL = win.URL;
+  const originalClick = win.HTMLAnchorElement.prototype.click;
+  win.HTMLAnchorElement.prototype.click = function () {
+    clicked.push({ name: this.download, blob: blobs[blobs.length - 1] });
+  };
+  return {
+    clicked,
+    restore() { win.HTMLAnchorElement.prototype.click = originalClick; },
+    async last() {
+      const entry = clicked[clicked.length - 1];
+      assert.ok(entry, 'a file download was triggered');
+      // `text` is UTF-8 decoded (a BOM is stripped by the decoder), `bytes` is
+      // what really lands on disk — the BOM has to be checked there.
+      return {
+        name: entry.name,
+        text: await entry.blob.text(),
+        bytes: new Uint8Array(await entry.blob.arrayBuffer())
+      };
+    }
+  };
+}
+
+/** Points the report class filter at one class ('সব' keeps every class). */
+function selectReportClass(doc, className) {
+  const sel = doc.getElementById('report-class');
+  sel.value = className;
+  sel.dispatchEvent(new sel.ownerDocument.defaultView.Event('change', { bubbles: true }));
+}
+
+/** Taps one report card and waits for its document preview. */
+async function openReport(doc, key) {
+  const card = doc.querySelector(`#report-groups [data-report="${key}"]`);
+  assert.ok(card, `report card "${key}" exists`);
+  card.dispatchEvent(new card.ownerDocument.defaultView.MouseEvent('click', { bubbles: true }));
+  assert.ok(await waitFor(() => doc.getElementById('document-preview-modal').classList.contains('active')),
+    `report "${key}" opened the preview`);
+  return card;
+}
+
+/** Closes the shared document preview again. */
+async function closePreview(doc) {
+  doc.querySelector('#document-preview-modal [data-close]')
+    .dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+  await waitFor(() => !doc.getElementById('document-preview-modal').classList.contains('active'));
+}
+
+test('the report centre is three icon-card groups and every card previews a document', async () => {
   const { doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'reports'
   });
   const win = doc.defaultView;
-  const sel = doc.getElementById('report-type');
-  assert.ok(sel, 'report selector exists');
-  const options = [...sel.options];
-  assert.ok(options.length >= 15, `spec 45 asks for 15+ reports, found ${options.length}`);
 
-  const table = doc.getElementById('report-table');
-  // No data is shown before Generate — only a hint.
-  assert.match(table.textContent, /Generate/, 'placeholder shown before Generate');
+  // Exactly the three groups that were asked for, in order.
+  const groups = [...doc.querySelectorAll('#report-groups .report-group')];
+  assert.deepEqual(
+    groups.map((g) => g.querySelector('.report-group-title strong').textContent),
+    ['Finance Reports', 'Student Reports', 'Notice Reports'],
+    'three report groups and nothing else'
+  );
 
-  for (const opt of options) {
-    sel.value = opt.value;
-    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
-    doc.getElementById('report-generate')
-      .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    // a report either renders rows or shows an honest empty state — never blanks out
-    const body = table.querySelector('tbody');
-    const rendered = body.children.length > 0 || /নেই|কোনো/.test(table.textContent);
-    assert.ok(rendered, `report "${opt.textContent}" (${opt.value}) rendered rows or an empty state`);
-    assert.ok(table.querySelector('thead th'), `report "${opt.value}" has column headers`);
-    const preview = doc.getElementById('document-preview-modal');
+  // Eight cards — 4 finance + 3 student + 1 notice. No duplicate due/finance
+  // variants and no exam, result, assignment, routine or teacher report.
+  const cards = [...doc.querySelectorAll('#report-groups .report-card')];
+  assert.deepEqual(cards.map((c) => c.dataset.report), [
+    'collection', 'due', 'studentFinance', 'paymentHistory',
+    'students', 'classwise', 'activeInactive',
+    'noticeHistory'
+  ], 'the eight simplified reports, grouped');
+  assert.equal(groups[0].querySelectorAll('.report-card').length, 4, 'four finance reports');
+  assert.equal(groups[1].querySelectorAll('.report-card').length, 3, 'three student reports');
+  assert.equal(groups[2].querySelectorAll('.report-card').length, 1, 'one notice report');
+  for (const card of cards) {
+    assert.ok(card.querySelector('.ico').textContent.trim(), `"${card.dataset.report}" shows an icon`);
+    assert.ok(card.querySelector('.rc-label').textContent.trim(), `"${card.dataset.report}" is labelled`);
+    assert.ok(card.querySelector('.rc-bn').textContent.trim(), `"${card.dataset.report}" keeps its Bangla name`);
+  }
+
+  // The dropdown → Generate → table chrome is gone with the removed reports.
+  for (const id of ['report-type', 'report-generate', 'report-csv', 'report-table']) {
+    assert.equal(doc.getElementById(id), null, `#${id} no longer exists`);
+  }
+
+  // One tap per card: the branded document opens in the shared preview offering
+  // a PDF and an Excel download — never an image share for a multi-page report.
+  const preview = doc.getElementById('document-preview-modal');
+  for (const card of cards) {
+    card.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     assert.ok(await waitFor(() => preview.classList.contains('active')),
-      `report "${opt.value}" opened the preview`);
+      `card "${card.dataset.report}" opened the preview`);
+    const title = doc.getElementById('document-preview-title').textContent;
+    assert.ok(title.startsWith(card.querySelector('.rc-label').textContent),
+      `preview is titled for "${card.dataset.report}": "${title}"`);
+    assert.ok(doc.querySelectorAll('#document-preview-body .doc-page').length > 0,
+      `"${card.dataset.report}" drew at least one A4 page`);
+    assert.equal(doc.getElementById('document-preview-download').hidden, false, 'PDF download offered');
+    assert.equal(doc.getElementById('document-preview-excel').hidden, false, 'Excel download offered');
+    assert.equal(doc.getElementById('document-preview-share').hidden, true, 'a report is not shared as an image');
+    assert.ok(await waitFor(() => card.getAttribute('aria-busy') === 'false'),
+      `"${card.dataset.report}" is ready to be tapped again`);
+    await closePreview(doc);
   }
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
-  assert.deepEqual(fatal, [], `no console errors while cycling reports: ${fatal.join(' | ')}`);
+  assert.deepEqual(fatal, [], `no console errors while opening every report: ${fatal.join(' | ')}`);
 });
 
-test('analytics dashboard renders real charts with accessible labels', async () => {
+test('the analytics dashboard and its charts are gone from the admin panel', async () => {
   const { doc, errors } = await bootPage('admin.html', {
-    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'analytics'
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'noanalytics'
   });
 
-  // admission + collection trends have seeded data, so bars must render
-  for (const id of ['chart-admissions', 'chart-collection', 'chart-due']) {
-    const host = doc.getElementById(id);
-    assert.ok(host, `#${id} exists`);
-    assert.ok(host.querySelectorAll('.mini-chart .bar').length > 0, `#${id} rendered bars`);
-    const chart = host.querySelector('.mini-chart');
-    assert.ok(chart.getAttribute('role') === 'img', `#${id} chart exposes role=img`);
-    assert.ok(chart.getAttribute('aria-label'), `#${id} chart is labelled`);
-    assert.ok(host.querySelector('.chart-legend'), `#${id} has a text legend`);
+  assert.equal(doc.getElementById('tab-analytics'), null, 'the analytics panel was removed');
+  for (const id of ['analytics-cards', 'chart-admissions', 'chart-collection', 'chart-due',
+    'chart-passrate', 'class-perf', 'subject-perf']) {
+    assert.equal(doc.getElementById(id), null, `#${id} went with it`);
   }
+  assert.equal(doc.querySelectorAll('#admin-home .mini-chart').length, 0,
+    'no graph is drawn anywhere in the admin panel');
+  assert.equal(doc.querySelector('[data-goto="analytics"]'), null,
+    'nothing routes to the removed panel');
 
-  // no results seeded by default -> honest empty states, not blank panels
-  for (const id of ['chart-passrate', 'subject-perf']) {
-    const host = doc.getElementById(id);
-    assert.ok(host, `#${id} exists`);
-    assert.ok(host.textContent.trim().length > 0, `#${id} shows an empty state rather than nothing`);
-    assert.match(host.textContent, /নেই/, `#${id} says there is no data yet`);
-  }
+  // The handful of live figures the owner checks daily stay on the home card.
+  assert.ok(doc.getElementById('admin-overview'), 'সামগ্রিক অবস্থা overview is still there');
+  assert.ok(doc.querySelectorAll('#admin-overview .analytics-cell').length >= 6,
+    'its numbers still render');
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
@@ -643,20 +722,23 @@ test('saving the permission matrix really changes what a teacher may do', async 
   assert.equal(can('teacher', 'manageMaterials'), true, 'other rights are untouched');
 });
 
-test('the report centre replaces Print with PDF download and offers class reports', async () => {
+test('the report centre exports documents and never opens the browser print dialog', async () => {
   const { doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'reportpdf'
   });
 
-  // Print and direct-download are gone; the filter → Generate → Preview flow is present.
+  // Print is gone from the whole admin report flow: no button, no window.print.
   assert.equal(doc.getElementById('report-print'), null, 'the Print button is removed');
-  assert.equal(doc.getElementById('report-pdf'), null, 'the direct Download PDF button is removed');
-  assert.equal(doc.getElementById('report-class-pdf'), null, 'the direct Download Class PDF button is removed');
-  assert.equal(doc.getElementById('report-all-pdf'), null, 'the direct Download All Classes PDF button is removed');
-  assert.ok(doc.getElementById('report-type'), 'report type selector present');
-  assert.ok(doc.getElementById('report-generate'), 'Generate → Preview button present');
+  for (const file of ['admin.html', 'js/admin-modules.js', 'js/preview.js']) {
+    assert.equal(/window\s*\.\s*print/.test(read(file)), false, `${file} never calls window.print`);
+  }
 
-  // Class dropdown offers the real class list.
+  // The old direct-download buttons went too — every document is reviewed first.
+  for (const id of ['report-pdf', 'report-class-pdf', 'report-all-pdf']) {
+    assert.equal(doc.getElementById(id), null, `#${id} is removed`);
+  }
+
+  // The class dropdown offers the real class list and drives every card.
   const classSel = doc.getElementById('report-class');
   assert.ok(classSel, 'class dropdown exists');
   const labels = [...classSel.options].map((o) => o.textContent);
@@ -668,39 +750,53 @@ test('the report centre replaces Print with PDF download and offers class report
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
-test('the report class filter yields only that class data', async () => {
-  const { doc, errors } = await bootPage('admin.html', {
+test('the class filter narrows a report down to that class', async () => {
+  const { dom, doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'clsfilter'
   });
-  const win = doc.defaultView;
-  const sel = doc.getElementById('report-type');
-  const classSel = doc.getElementById('report-class');
-  const generate = doc.getElementById('report-generate');
-  const tableRows = () => [...doc.querySelectorAll('#report-table tbody tr')].map((r) => r.textContent);
+  const win = dom.window;
+  const files = captureDownloads(win);
 
-  sel.value = 'students';
-  sel.dispatchEvent(new win.Event('change', { bubbles: true }));
+  /** Opens one report for one class and returns the Excel file it produced. */
+  const excelFor = async (report, className) => {
+    selectReportClass(doc, className);
+    await openReport(doc, report);
+    files.clicked.length = 0;
+    doc.getElementById('document-preview-excel')
+      .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const file = await files.last();
+    await closePreview(doc);
+    return {
+      name: file.name,
+      rows: file.text.split('\n').slice(1).filter(Boolean)
+    };
+  };
 
-  // Nothing is shown before Generate, even after picking type + class.
-  classSel.value = 'নবম';
-  classSel.dispatchEvent(new win.Event('change', { bubbles: true }));
-  assert.match(doc.getElementById('report-table').textContent, /Generate/, 'no data before Generate');
+  try {
+    // One class: only its own students reach the document.
+    const ninth = await excelFor('students', 'নবম');
+    assert.equal(ninth.name, 'student-list-report-Class-9.csv', 'named after the report and the class');
+    assert.equal(ninth.rows.length, 2, 'only the two নবম students are exported');
+    assert.ok(ninth.rows.every((r) => r.includes('নবম')), 'every exported row belongs to নবম');
+    assert.ok(!ninth.rows.some((r) => r.includes('নাফিস ইকবাল')), 'a দশম student is excluded');
 
-  // One specific class: only its students are rendered after Generate.
-  generate.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 50));
-  let rows = tableRows();
-  assert.equal(rows.length, 2, 'only the নবম students are shown');
-  assert.ok(rows.every((t) => t.includes('নবম')), 'every rendered row belongs to নবম');
-  assert.ok(!rows.some((t) => t.includes('নাফিস ইকবাল')), 'a দশম student is excluded');
+    // Every class: all four seeded students are in the file.
+    const all = await excelFor('students', 'সব');
+    assert.equal(all.name, 'student-list-report-All-Classes.csv', 'the all-class file says so');
+    assert.equal(all.rows.length, 4, 'all four seeded students are exported');
 
-  // All classes: every seeded student appears.
-  classSel.value = 'সব ক্লাস';
-  classSel.dispatchEvent(new win.Event('change', { bubbles: true }));
-  generate.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  await new Promise((r) => setTimeout(r, 50));
-  rows = tableRows();
-  assert.equal(rows.length, 4, 'all four seeded students are shown without a filter');
+    // The same filter reaches the finance reports.
+    const dues = await excelFor('due', 'নবম');
+    assert.ok(dues.rows.length > 0, 'নবম has an outstanding fee in the seed data');
+    assert.ok(dues.rows.every((r) => r.includes('নবম')), 'only নবম dues are exported');
+
+    // A class-wise list of one class is that single row, never the whole school.
+    const classwise = await excelFor('classwise', 'নবম');
+    assert.equal(classwise.rows.length, 1, 'one class, one row');
+    assert.ok(classwise.rows[0].includes('নবম'), 'the row is the selected class');
+  } finally {
+    files.restore();
+  }
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
@@ -751,40 +847,45 @@ test('student save requires a name and assigns a unique auto ID', async () => {
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
-test('the report centre exports the selected report as CSV', async () => {
-  const out = await bootPage('admin.html', {
+test('a report downloads as Excel and as a PDF straight from its preview', async () => {
+  const { dom, doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'csv'
   });
-  const doc = out.dom.window.document;
-
-  // jsdom has no object URLs; capture the anchor the downloader clicks.
-  const win = out.dom.window;
-  win.URL.createObjectURL = () => 'blob:stub';
-  win.URL.revokeObjectURL = () => {};
-  globalThis.URL = win.URL;
-  const clicked = [];
-  const originalClick = win.HTMLAnchorElement.prototype.click;
-  win.HTMLAnchorElement.prototype.click = function () { clicked.push({ name: this.download, href: this.href }); };
+  const win = dom.window;
+  const files = captureDownloads(win);
 
   try {
-    const sel = doc.getElementById('report-type');
-    sel.value = 'students';
-    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
-    doc.getElementById('report-csv')
-      .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    await openReport(doc, 'collection');
 
-    assert.equal(clicked.length, 1, 'a file download was triggered');
-    assert.equal(clicked[0].name, 'students-report.csv', 'named after the selected report');
-
-    clicked.length = 0;
-    sel.value = 'due';
-    sel.dispatchEvent(new win.Event('change', { bubbles: true }));
-    doc.getElementById('report-csv')
+    // Excel: a UTF-8 CSV with a BOM, so Excel opens the Bengali columns cleanly.
+    doc.getElementById('document-preview-excel')
       .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    assert.equal(clicked[0].name, 'due-report.csv', 'switching reports changes the export');
+    const excel = await files.last();
+    assert.equal(excel.name, 'collection-report-All-Classes.csv',
+      'named after the report and the class filter');
+    assert.deepEqual([...excel.bytes.slice(0, 3)], [0xEF, 0xBB, 0xBF],
+      'the CSV carries a UTF-8 BOM so Excel reads the Bengali columns');
+    const [header, ...rows] = excel.text.split('\n');
+    assert.deepEqual(header.split(','), ['"মাস"', '"লেনদেন"', '"শিক্ষার্থী"', '"আদায়"'],
+      'the Excel columns are the Collection columns');
+    assert.ok(rows.length > 0 && rows[0].includes('৳'), 'the seeded collection is in the sheet');
+
+    // PDF: the same document, branded, built without touching the print dialog.
+    files.clicked.length = 0;
+    doc.getElementById('document-preview-download')
+      .dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    assert.ok(await waitFor(() => files.clicked.length > 0), 'a PDF download was triggered');
+    const pdf = await files.last();
+    assert.equal(pdf.name, 'collection-report-All-Classes.pdf', 'the PDF is named the same way');
+    assert.ok(pdf.text.startsWith('%PDF-'), 'a real PDF was downloaded');
+    assert.match(doc.getElementById('toast-container').textContent, /ডাউনলোড/,
+      'the admin is told the file landed');
   } finally {
-    win.HTMLAnchorElement.prototype.click = originalClick;
+    files.restore();
   }
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
 test('the submissions review table paginates instead of painting every row', async () => {

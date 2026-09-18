@@ -169,7 +169,6 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
               ${cell('🧾', bn(db.activityLogs.list().length), 'সাম্প্রতিক কার্যক্রম')}
             </div>
           </details>
-          <button type="button" class="btn btn-secondary btn-block" data-goto="analytics" style="margin-top:.625rem">📈 পুরো অ্যানালিটিক্স দেখুন ›</button>
         </div>
       </section>`;
   };

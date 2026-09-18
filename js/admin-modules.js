@@ -5,14 +5,14 @@
  */
 
 import {
-  db, analytics, examSummary, classPerformance, leaderboard, exportBackup, importBackup,
+  db, analytics, examSummary, leaderboard, exportBackup, importBackup,
   parseMcqPaste, parseMcqCsv, toCSV, downloadText, logActivity, activityLogs,
   todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor,
-  admissionTrend, collectionTrend, dueTrend, subjectPerformance, passRate,
+  bnMonthLabel, isThisMonth,
   PERMISSIONS, DEFAULT_PERMISSIONS, getDbStatus
 } from './data.js';
 import { mountCrud } from './crud.js';
-import { escapeHtml, renderTable, statGrid, showToast, openModal, closeModal, getAuthMode, requireOnline } from './app.js';
+import { escapeHtml, renderTable, showToast, openModal, closeModal, getAuthMode, requireOnline } from './app.js';
 import { checkConnectionStatus } from './firebase.js';
 import { listUsers, updateProfile, changePassword } from './auth.js';
 import { previewDocument } from './preview.js';
@@ -37,7 +37,8 @@ export function mountExtraAdmin(session) {
   mountQuestionBank(session);
   mountResults(session);
   mountNotifications(session);
-  mountAnalytics();
+  // No analytics/chart dashboard: the report centre is the only place numbers
+  // are summarised, and it exports documents instead of drawing graphs.
   mountReports(session);
   mountUsers(session);
   mountActivity();
@@ -436,345 +437,369 @@ function mountNotifications(session) {
   render();
 }
 
-/* ---------------- Analytics ---------------- */
-function mountAnalytics() {
-  const a = analytics();
-  statGrid('#analytics-cards', [
-    { label: 'মোট শিক্ষার্থী', value: bn(a.totalStudents), tone: 'accent' },
-    { label: 'সক্রিয়', value: bn(a.activeStudents), tone: 'success' },
-    { label: 'নিষ্ক্রিয়', value: bn(a.inactiveStudents), tone: 'warning' },
-    { label: 'শিক্ষক', value: bn(a.totalTeachers) },
-    { label: 'মোট বকেয়া', value: `৳${bn(a.totalDue)}`, tone: 'warning' },
-    { label: 'মাসিক সংগ্রহ', value: `৳${bn(a.monthlyCollection)}`, tone: 'success' }
-  ]);
-  const perf = classPerformance();
-  document.getElementById('class-perf').innerHTML = perf.length
-    ? perf.map((c) => `<div class="form-group"><label>${escapeHtml(c.name)} — ${bn(c.avg)}%</label>
-        <div class="progress-bar"><div class="progress-fill" style="width:${c.avg}%"></div></div></div>`).join('')
-    : '<div class="empty-state">যথেষ্ট ডেটা নেই।</div>';
-
-  // Accessible bar charts: each bar is labelled and the chart carries a summary.
-  const barChart = (host, rows, { labelKey, valueKey, format }) => {
-    const el = document.getElementById(host);
-    if (!el) return;
-    if (!rows.length) { el.innerHTML = '<div class="empty-state">যথেষ্ট ডেটা নেই।</div>'; return; }
-    const max = Math.max(...rows.map((r) => Number(r[valueKey]) || 0), 1);
-    const summary = rows.map((r) => `${r[labelKey]}: ${format(r[valueKey])}`).join(', ');
-    el.innerHTML = `<div class="mini-chart" role="img" aria-label="${escapeHtml(summary)}">${
-      rows.map((r) => {
-        const v = Number(r[valueKey]) || 0;
-        const pct = Math.round(v / max * 100);
-        return `<div class="bar" style="height:${Math.max(pct, 4)}%" title="${escapeHtml(String(r[labelKey]))}: ${escapeHtml(format(v))}"></div>`;
-      }).join('')}</div>
-      <div class="chart-legend">${rows.map((r) => `<span>${escapeHtml(String(r[labelKey]))} · ${escapeHtml(format(r[valueKey]))}</span>`).join('')}</div>`;
-  };
-
-  barChart('chart-admissions', admissionTrend(), { labelKey: 'month', valueKey: 'count', format: (v) => `${bn(v)} জন` });
-  barChart('chart-collection', collectionTrend(), { labelKey: 'month', valueKey: 'amount', format: (v) => `৳${bn(v)}` });
-  barChart('chart-due', dueTrend(), { labelKey: 'month', valueKey: 'amount', format: (v) => `৳${bn(v)}` });
-
-  const pr = passRate();
-  const prEl = document.getElementById('chart-passrate');
-  if (prEl) {
-    prEl.innerHTML = pr
-      ? `<div class="stat-grid">
-          <div class="stat"><span class="stat-value">${bn(pr.passPercent)}%</span><span class="stat-label">পাস</span></div>
-          <div class="stat"><span class="stat-value">${bn(pr.failPercent)}%</span><span class="stat-label">ফেল</span></div>
-          <div class="stat"><span class="stat-value">${bn(pr.total)}</span><span class="stat-label">মোট ফলাফল</span></div>
-        </div>
-        <div class="progress-bar" role="img" aria-label="পাস ${bn(pr.passPercent)} শতাংশ, পাস মার্ক ${bn(pr.passMark)}">
-          <div class="progress-fill" style="width:${pr.passPercent}%"></div></div>
-        <p class="meta">পাস মার্ক: ${bn(pr.passMark)}%</p>`
-      : '<div class="empty-state">এখনো কোনো ফলাফল নেই।</div>';
-  }
-
-  const subjects = subjectPerformance();
-  const subEl = document.getElementById('subject-perf');
-  if (subEl) {
-    subEl.innerHTML = subjects.length
-      ? subjects.map((s) => `<div class="form-group"><label>${escapeHtml(s.subject)} — ${bn(s.avg)}% (${bn(s.count)} ফলাফল)</label>
-          <div class="progress-bar"><div class="progress-fill" style="width:${s.avg}%"></div></div></div>`).join('')
-      : '<div class="empty-state">এখনো কোনো ফলাফল নেই।</div>';
-  }
-}
-
 /* ---------------- Reports ---------------- */
+/**
+ * Report centre — three groups, eight documents, nothing else.
+ *
+ *   Finance Reports   Collection · Due / Outstanding · Student-wise Finance · Payment History
+ *   Student Reports   Student List · Class-wise List · Active / Inactive List
+ *   Notice Reports    Notice History
+ *
+ * Everything the panel used to pile up here is gone on purpose: the duplicate
+ * due/finance/ledger variants, exam, result, merit, performance, assignment,
+ * material, routine, batch, teacher, discount and activity reports, plus the
+ * whole analytics + chart dashboard. The owner asked for a phone-sized screen
+ * where one tap on an icon card yields one branded PDF or Excel file — and
+ * never the browser print dialog.
+ *
+ * Rows are computed when a card is tapped, so money taken a minute ago is
+ * already inside the next download. The document itself flows through the
+ * shared preview (js/preview.js), which offers the PDF and the Excel (CSV)
+ * download side by side.
+ */
 function mountReports(session) {
-  const sel = document.getElementById('report-type');
+  const host = document.getElementById('report-groups');
   const classSel = document.getElementById('report-class');
-  const passMark = Number(db.settings.get().passMark) || 40;
-  const pct = (r) => Math.round((Number(r.score) || 0) / (Number(r.total) || 1) * 100);
+  if (!host || !classSel) return;
+
   const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
+  const total = (rows, key = '_amount') => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+
+  /** The class filter: 'সব' accepts every row, a class name only its own. */
+  const wanted = (cls) => (className) => !cls || cls === ALL_CLASSES || className === cls;
   const classNameOf = (row) => row.className
     || (row.studentId ? db.students.find(row.studentId)?.className : null)
     || null;
-  const payRows = (payments) => payments.map((p) => {
-    const st = db.students.find(p.studentId);
-    return { studentId: p.studentId, name: st?.name || '—', className: st?.className || '—', month: p.month, amount: taka(p.amount), date: p.date, method: p.method || '—', reference: p.reference || '—', _amount: Number(p.amount) || 0 };
-  });
+  const studentsIn = (cls) => db.students.list().filter((s) => wanted(cls)(s.className));
+  const paymentsIn = (cls) => db.payments.list()
+    .map((p) => ({ ...p, student: db.students.find(p.studentId) || null }))
+    .filter((p) => wanted(cls)(p.student?.className));
+  const duesIn = (cls) => dueFees().filter((f) => wanted(cls)(f.student?.className));
+  const monthKey = (bnDate) => String(bnDate || '').slice(0, 7);
 
-  const reports = {
-    /* Mandatory branded reports as per Institution Pad spec */
-    students: {
-      label: 'শিক্ষার্থী তালিকা — Student List', classScoped: true, cols: CLASS_REPORT_COLUMNS,
-      rows: () => classReportRows(db.students.list()).rows,
-      summary: (rows) => [{ label: 'মোট শিক্ষার্থী', value: bn(rows.length) }]
-    },
-    studentStatement: {
-      label: 'শিক্ষার্থী বিবরণী — Student Statement', classScoped: true,
-      cols: [{ key: 'field', label: 'বিবরণ' }, { key: 'value', label: 'তথ্য' }],
-      rows: () => db.students.list().slice(0,1).flatMap((st) => {
-        const fees = db.fees.list().filter((f) => f.studentId === st.id);
-        const payments = db.payments.list().filter((p) => p.studentId === st.id);
-        const total = fees.reduce((s,f)=>s+Number(f.amount||0),0);
-        const paid = payments.reduce((s,p)=>s+Number(p.amount||0),0);
+  /** Newest first; a missing or hand-written date sorts last, never first. */
+  const dateKey = (v) => (/^[০-৯]{4}-[০-৯]{2}(-[০-৯]{2})?$/.test(String(v || '').trim()) ? String(v).trim() : '');
+  const byDateDesc = (a, b) => dateKey(b.date).localeCompare(dateKey(a.date));
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''));
+
+  /**
+   * The eight reports. `rows(cls)` and `summary(rows, cls)` are called when a
+   * card is tapped, so both always describe the data as it is right now.
+   * `byClass` splits the document into one section per class and `file` is the
+   * download slug both the PDF and the Excel file are named after.
+   */
+  const REPORTS = {
+    /* ---- Finance Reports ---- */
+    collection: {
+      icon: '📥', label: 'Collection', bn: 'আদায় রিপোর্ট', file: 'collection',
+      cols: [
+        { key: 'month', label: 'মাস' },
+        { key: 'transactions', label: 'লেনদেন' },
+        { key: 'students', label: 'শিক্ষার্থী' },
+        { key: 'collected', label: 'আদায়' }
+      ],
+      rows: (cls) => {
+        const byMonth = new Map();
+        for (const p of paymentsIn(cls)) {
+          const key = monthKey(p.date) || 'তারিখ নেই';
+          const row = byMonth.get(key) || { key, _count: 0, _students: new Set(), _amount: 0 };
+          row._count += 1;
+          row._students.add(p.studentId);
+          row._amount += Number(p.amount) || 0;
+          byMonth.set(key, row);
+        }
+        return [...byMonth.values()]
+          .sort((a, b) => b.key.localeCompare(a.key))
+          .map((r) => ({
+            month: r.key === 'তারিখ নেই' ? r.key : bnMonthLabel(r.key),
+            transactions: bn(r._count),
+            students: bn(r._students.size),
+            collected: taka(r._amount),
+            _amount: r._amount
+          }));
+      },
+      summary: (rows, cls) => {
+        const all = paymentsIn(cls);
         return [
-          { field: 'নাম', value: st.name },
-          { field: 'আইডি', value: st.id },
-          { field: 'শ্রেণি', value: st.className },
-          { field: 'মোট ফি', value: taka(total) },
-          { field: 'পরিশোধিত', value: taka(paid) },
-          { field: 'বকেয়া', value: taka(total-paid) }
-        ];
-      }),
-      summary: (rows) => [{ label: 'রেকর্ড', value: bn(rows.length) }]
-    },
-    dueStatement: {
-      label: 'বকেয়া বিবরণী — Due Statement', classScoped: true,
-      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'বকেয়া' }],
-      rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.remaining ?? f.amount), _amount: Number(f.remaining ?? f.amount) || 0 })),
-      summary: (rows) => [{ label: 'মোট বকেয়া', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
-    },
-    finance: {
-      label: 'অর্থ বিবরণী — Finance Report', classScoped: true,
-      cols: [{ key: 'date', label: 'তারিখ' }, { key: 'student', label: 'শিক্ষার্থী' }, { key: 'type', label: 'ধরন' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'method', label: 'মাধ্যম' }],
-      rows: () => payRows(db.payments.list()),
-      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }, { label: 'লেনদেন', value: bn(rows.length) }]
-    },
-    teachers: {
-      label: 'শিক্ষক তালিকা — Teacher Report', classScoped: false,
-      cols: [{ key: 'name', label: 'নাম' }, { key: 'subject', label: 'বিষয়' }, { key: 'phone', label: 'মোবাইল' }, { key: 'classes', label: 'ক্লাস/সপ্তাহ' }],
-      rows: () => db.teachers.list(),
-      summary: (rows) => [{ label: 'মোট শিক্ষক', value: bn(rows.length) }]
-    },
-    classes: {
-      label: 'ক্লাস রিপোর্ট — Class/Batch Report', classScoped: true,
-      cols: [{ key: 'className', label: 'ক্লাস' }, { key: 'students', label: 'শিক্ষার্থী' }, { key: 'batches', label: 'ব্যাচ' }],
-      rows: () => CLASS_OPTIONS.map((c) => ({
-        className: c,
-        students: db.students.list().filter((s) => s.className === c).length,
-        batches: db.batches.list().filter((b) => String(b.className || b.name).includes(c)).length
-      })).filter((r) => r.students || r.batches),
-      summary: (rows) => [{ label: 'মোট ক্লাস', value: bn(rows.length) }]
-    },
-    batches: {
-      label: 'ব্যাচ রিপোর্ট — Batch Report', classScoped: false,
-      cols: [{ key: 'name', label: 'ব্যাচ' }, { key: 'className', label: 'ক্লাস' }, { key: 'teacher', label: 'শিক্ষক' }, { key: 'students', label: 'শিক্ষার্থী' }],
-      rows: () => db.batches.list(),
-      summary: (rows) => [{ label: 'মোট ব্যাচ', value: bn(rows.length) }]
-    },
-    notices: {
-      label: 'নোটিশ — Notice', classScoped: true,
-      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'audience', label: 'কাদের জন্য' }, { key: 'date', label: 'তারিখ' }],
-      rows: () => db.notices.list(),
-      summary: (rows) => [{ label: 'মোট নোটিশ', value: bn(rows.length) }]
-    },
-    routine: {
-      label: 'ক্লাস রুটিন — Class Routine', classScoped: true,
-      cols: [{ key: 'day', label: 'দিন' }, { key: 'time', label: 'সময়' }, { key: 'subject', label: 'বিষয়' }, { key: 'teacher', label: 'শিক্ষক' }, { key: 'room', label: 'কক্ষ' }],
-      rows: () => db.routine.list(),
-      summary: (rows) => [{ label: 'মোট ক্লাস', value: bn(rows.length) }]
-    },
-    exams: {
-      label: 'পরীক্ষা রিপোর্ট', classScoped: true,
-      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'subject', label: 'বিষয়' }, { key: 'startDate', label: 'তারিখ' }],
-      rows: () => db.exams.list(),
-      summary: (rows) => [{ label: 'মোট পরীক্ষা', value: bn(rows.length) }]
-    },
-    results: {
-      label: 'ফলাফল রিপোর্ট', classScoped: true,
-      cols: [{ key: 'studentName', label: 'শিক্ষার্থী' }, { key: 'className', label: 'ক্লাস' }, { key: 'examId', label: 'পরীক্ষা' }, { key: 'score', label: 'প্রাপ্ত' }, { key: 'total', label: 'পূর্ণ' }],
-      rows: () => db.examResults.list().map((r) => ({ ...r, className: db.students.find(r.studentId)?.className || '—' })),
-      summary: (rows) => {
-        const pcts = rows.map(pct);
-        return [
-          { label: 'মোট ফলাফল', value: bn(rows.length) },
-          { label: 'গড় ফলাফল', value: pcts.length ? `${bn(Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length))}%` : '—' }
+          { label: 'মোট আদায়', value: taka(all.reduce((s, p) => s + (Number(p.amount) || 0), 0)) },
+          { label: 'মোট লেনদেন', value: bn(all.length) },
+          { label: 'এই মাসের আদায়', value: taka(all.filter((p) => isThisMonth(p.date)).reduce((s, p) => s + (Number(p.amount) || 0), 0)) }
         ];
       }
     },
-    merit: {
-      label: 'মেধা তালিকা', classScoped: true,
-      cols: [{ key: 'position', label: 'অবস্থান' }, { key: 'studentName', label: 'শিক্ষার্থী' }, { key: 'className', label: 'ক্লাস' }, { key: 'percent', label: 'শতাংশ' }],
-      rows: () => leaderboard().slice(0, 50).map((r) => ({ position: r.position, studentName: r.studentName, className: db.students.find(r.studentId)?.className || '—', percent: `${r.pct}%` })),
+    due: {
+      icon: '⚠️', label: 'Due / Outstanding', bn: 'বকেয়া তালিকা', byClass: true, file: 'due-outstanding',
+      cols: [
+        { key: 'studentId', label: 'আইডি' },
+        { key: 'name', label: 'নাম' },
+        { key: 'className', label: 'শ্রেণি' },
+        { key: 'month', label: 'বকেয়া মাস' },
+        { key: 'due', label: 'বকেয়া' }
+      ],
+      rows: (cls) => duesIn(cls).map((f) => ({
+        studentId: f.studentId,
+        name: f.student?.name || '—',
+        className: f.student?.className || '—',
+        month: f.month || '—',
+        due: taka(f.remaining ?? f.amount),
+        _amount: Number(f.remaining ?? f.amount) || 0
+      })).sort(byName),
+      summary: (rows) => [
+        { label: 'মোট বকেয়া', value: taka(total(rows)) },
+        { label: 'বকেয়া শিক্ষার্থী', value: bn(new Set(rows.map((r) => r.studentId)).size) },
+        { label: 'বকেয়া মাস', value: bn(rows.length) }
+      ]
+    },
+    studentFinance: {
+      icon: '🧮', label: 'Student-wise Finance', bn: 'শিক্ষার্থীভিত্তিক ফিন্যান্স', byClass: true, file: 'student-wise-finance',
+      cols: [
+        { key: 'studentId', label: 'আইডি' },
+        { key: 'name', label: 'নাম' },
+        { key: 'className', label: 'শ্রেণি' },
+        { key: 'billed', label: 'মোট ফি' },
+        { key: 'paid', label: 'পরিশোধিত' },
+        { key: 'due', label: 'বকেয়া' }
+      ],
+      rows: (cls) => {
+        const dues = duesIn(cls);
+        return studentsIn(cls).map((st) => {
+          const billed = db.fees.list()
+            .filter((f) => f.studentId === st.id)
+            .reduce((s, f) => s + (Number(f.amount) || 0), 0);
+          const paid = db.payments.list()
+            .filter((p) => p.studentId === st.id)
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+          const due = dues
+            .filter((d) => d.studentId === st.id)
+            .reduce((s, d) => s + (Number(d.remaining ?? d.amount) || 0), 0);
+          return {
+            studentId: st.id, name: st.name, className: st.className || '—',
+            billed: taka(billed), paid: taka(paid), due: due > 0 ? taka(due) : 'নেই',
+            _billed: billed, _paid: paid, _due: due
+          };
+        }).sort(byName);
+      },
+      summary: (rows) => [
+        { label: 'শিক্ষার্থী', value: bn(rows.length) },
+        { label: 'মোট ফি', value: taka(total(rows, '_billed')) },
+        { label: 'মোট আদায়', value: taka(total(rows, '_paid')) },
+        { label: 'মোট বকেয়া', value: taka(total(rows, '_due')) }
+      ]
+    },
+    paymentHistory: {
+      icon: '🧾', label: 'Payment History', bn: 'পেমেন্ট ইতিহাস', byClass: true, file: 'payment-history',
+      cols: [
+        { key: 'date', label: 'তারিখ' },
+        { key: 'receiptNo', label: 'রিসিট' },
+        { key: 'studentId', label: 'আইডি' },
+        { key: 'name', label: 'নাম' },
+        { key: 'className', label: 'শ্রেণি' },
+        { key: 'month', label: 'ফি মাস' },
+        { key: 'amount', label: 'পরিমাণ' },
+        { key: 'method', label: 'মাধ্যম' },
+        { key: 'reference', label: 'রেফারেন্স' }
+      ],
+      rows: (cls) => paymentsIn(cls).map((p) => ({
+        date: p.date || '—',
+        receiptNo: p.receiptNo || p.id || '—',
+        studentId: p.studentId,
+        name: p.student?.name || '—',
+        className: p.student?.className || '—',
+        month: p.month || '—',
+        amount: taka(p.amount),
+        method: p.method || '—',
+        reference: p.reference || '—',
+        _amount: Number(p.amount) || 0
+      })).sort(byDateDesc),
+      summary: (rows) => [
+        { label: 'মোট আদায়', value: taka(total(rows)) },
+        { label: 'মোট লেনদেন', value: bn(rows.length) }
+      ]
+    },
+
+    /* ---- Student Reports ---- */
+    students: {
+      icon: '📋', label: 'Student List', bn: 'শিক্ষার্থী তালিকা', byClass: true, file: 'student-list',
+      cols: CLASS_REPORT_COLUMNS,
+      rows: (cls) => classReportRows(studentsIn(cls)).rows,
       summary: (rows) => [{ label: 'মোট শিক্ষার্থী', value: bn(rows.length) }]
     },
-    performance: {
-      label: 'একাডেমিক পারফরম্যান্স', classScoped: true,
-      cols: [{ key: 'exam', label: 'পরীক্ষা' }, { key: 'className', label: 'ক্লাস' }, { key: 'participants', label: 'অংশগ্রহণ' }, { key: 'avg', label: 'গড়' }, { key: 'pass', label: 'পাস' }, { key: 'fail', label: 'ফেল' }],
-      rows: () => db.exams.list().map((e) => {
-        const rows = db.examResults.list().filter((r) => r.examId === e.id);
-        const pcts = rows.map(pct);
-        return {
-          exam: e.title, className: e.className, participants: rows.length,
-          avg: pcts.length ? `${Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)}%` : '—',
-          pass: pcts.filter((v) => v >= passMark).length,
-          fail: pcts.filter((v) => v < passMark).length
-        };
-      }),
-      summary: (rows) => [{ label: 'মোট পরীক্ষা', value: bn(rows.length) }]
+    classwise: {
+      icon: '🏫', label: 'Class-wise List', bn: 'ক্লাসভিত্তিক তালিকা', file: 'class-wise-list',
+      cols: [
+        { key: 'className', label: 'শ্রেণি' },
+        { key: 'students', label: 'মোট শিক্ষার্থী' },
+        { key: 'active', label: 'সক্রিয়' },
+        { key: 'inactive', label: 'নিষ্ক্রিয়' }
+      ],
+      rows: (cls) => CLASS_OPTIONS
+        .filter((c) => wanted(cls)(c))
+        .map((c) => {
+          const list = db.students.list().filter((s) => s.className === c);
+          return {
+            className: c,
+            students: bn(list.length),
+            active: bn(list.filter((s) => s.status === 'সক্রিয়').length),
+            inactive: bn(list.filter((s) => s.status !== 'সক্রিয়').length),
+            _students: list.length
+          };
+        })
+        // An empty class is noise in the all-class view, but a class picked on
+        // purpose must still print — with its zeroes.
+        .filter((r) => r._students > 0 || (cls && cls !== ALL_CLASSES)),
+      summary: (rows) => [
+        { label: 'মোট ক্লাস', value: bn(rows.length) },
+        { label: 'মোট শিক্ষার্থী', value: bn(total(rows, '_students')) }
+      ]
     },
-    assignments: {
-      label: 'অ্যাসাইনমেন্ট রিপোর্ট', classScoped: true,
-      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'dueDate', label: 'শেষ তারিখ' }, { key: 'submitted', label: 'জমা' }, { key: 'checked', label: 'চেক' }],
-      rows: () => db.assignments.list().map((a) => {
-        const subs = db.submissions.list().filter((s) => s.assignmentId === a.id);
-        return { ...a, submitted: subs.length, checked: subs.filter((s) => s.status === 'চেক হয়েছে').length };
-      }),
-      summary: (rows) => [{ label: 'মোট অ্যাসাইনমেন্ট', value: bn(rows.length) }]
+    activeInactive: {
+      icon: '🔄', label: 'Active / Inactive', bn: 'সক্রিয়–নিষ্ক্রিয় তালিকা', byClass: true, file: 'active-inactive',
+      cols: [
+        { key: 'studentId', label: 'আইডি' },
+        { key: 'name', label: 'নাম' },
+        { key: 'className', label: 'শ্রেণি' },
+        { key: 'phone', label: 'মোবাইল' },
+        { key: 'admissionDate', label: 'ভর্তির তারিখ' },
+        { key: 'status', label: 'অবস্থা' }
+      ],
+      // Inactive first: those are the students the owner has to call back.
+      rows: (cls) => studentsIn(cls).map((s) => ({
+        studentId: s.id,
+        name: s.name,
+        className: s.className || '—',
+        phone: s.phone || s.guardianPhone || '—',
+        admissionDate: s.admissionDate || '—',
+        status: s.status === 'সক্রিয়' ? 'সক্রিয়' : 'নিষ্ক্রিয়',
+        _active: s.status === 'সক্রিয়'
+      })).sort((a, b) => Number(a._active) - Number(b._active) || byName(a, b)),
+      summary: (rows) => [
+        { label: 'সক্রিয় শিক্ষার্থী', value: bn(rows.filter((r) => r._active).length) },
+        { label: 'নিষ্ক্রিয় শিক্ষার্থী', value: bn(rows.filter((r) => !r._active).length) },
+        { label: 'মোট শিক্ষার্থী', value: bn(rows.length) }
+      ]
     },
-    materials: {
-      label: 'ম্যাটেরিয়াল রিপোর্ট', classScoped: true,
-      cols: [{ key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'subject', label: 'বিষয়' }],
-      rows: () => db.materials.list(),
-      summary: (rows) => [{ label: 'মোট ম্যাটেরিয়াল', value: bn(rows.length) }]
-    },
-    daily: {
-      label: 'দৈনিক আদায়', classScoped: true,
-      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'method', label: 'মাধ্যম' }],
-      rows: () => payRows(db.payments.list().filter((p) => p.date === todayBn())),
-      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
-    },
-    monthly: {
-      label: 'মাসিক আদায়', classScoped: true,
-      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }],
-      rows: () => {
-        const m = String(todayBn()).slice(0, 7);
-        return payRows(db.payments.list().filter((p) => String(p.date || '').slice(0, 7) === m));
-      },
-      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
-    },
-    due: {
-      label: 'বকেয়া তালিকা — Due Statement', classScoped: true,
-      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'month', label: 'মাস' }, { key: 'amount', label: 'পরিমাণ' }],
-      rows: () => dueFees().map((f) => ({ studentId: f.studentId, name: f.student?.name || '—', className: f.student?.className || '—', month: f.month, amount: taka(f.remaining ?? f.amount), _amount: Number(f.remaining ?? f.amount) || 0 })),
-      summary: (rows) => [{ label: 'মোট বকেয়া', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
-    },
-    payments: {
-      label: 'পেমেন্ট ইতিহাস — Payment / Finance', classScoped: true,
-      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'শ্রেণি' }, { key: 'amount', label: 'পরিমাণ' }, { key: 'date', label: 'তারিখ' }, { key: 'method', label: 'মাধ্যম' }, { key: 'reference', label: 'রেফারেন্স' }],
-      rows: () => payRows(db.payments.list()),
-      summary: (rows) => [{ label: 'মোট আদায়', value: taka(rows.reduce((s, r) => s + (r._amount || 0), 0)) }]
-    },
-    ledger: {
-      label: 'শিক্ষার্থী লেজার — Student Ledger / Statement', classScoped: true,
-      cols: [{ key: 'studentId', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'paid', label: 'পরিশোধিত' }, { key: 'due', label: 'বকেয়া' }],
-      rows: () => db.students.list().map((st) => ({
-        studentId: st.id, name: st.name, className: st.className,
-        paid: taka(db.payments.list().filter((p) => p.studentId === st.id).reduce((sum, p) => sum + Number(p.amount || 0), 0)),
-        due: taka(dueFees().filter((d) => d.studentId === st.id).reduce((sum, d) => sum + Number(d.remaining ?? d.amount) || 0, 0))
-      })),
-      summary: () => []
-    },
-    discounts: {
-      label: 'ছাড় রিপোর্ট', classScoped: true,
-      cols: [{ key: 'id', label: 'আইডি' }, { key: 'name', label: 'নাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'discount', label: 'ছাড়' }],
-      rows: () => db.students.list().filter((s) => Number(s.discount) > 0).map((s) => ({ id: s.id, name: s.name, className: s.className, discount: taka(s.discount) })),
-      summary: (rows) => [{ label: 'ছাড়প্রাপ্ত শিক্ষার্থী', value: bn(rows.length) }]
-    },
-    activity: {
-      label: 'অ্যাক্টিভিটি লগ', classScoped: false,
-      cols: [{ key: 'date', label: 'তারিখ' }, { key: 'user', label: 'ব্যবহারকারী' }, { key: 'role', label: 'রোল' }, { key: 'action', label: 'কাজ' }, { key: 'target', label: 'টার্গেট' }],
-      rows: () => activityLogs(),
-      summary: (rows) => [{ label: 'মোট কার্যক্রম', value: bn(rows.length) }]
+
+    /* ---- Notice Reports ---- */
+    noticeHistory: {
+      icon: '📢', label: 'Notice History', bn: 'নোটিশ ইতিহাস', file: 'notice-history',
+      cols: [
+        { key: 'date', label: 'তারিখ' },
+        { key: 'title', label: 'শিরোনাম' },
+        { key: 'className', label: 'ক্লাস' },
+        { key: 'audience', label: 'কাদের জন্য' }
+      ],
+      rows: (cls) => db.notices.list()
+        // A notice for every class stays visible while one class is selected.
+        .filter((n) => wanted(cls)(n.className) || n.className === ALL_CLASSES)
+        .map((n) => ({
+          date: n.date || '—',
+          title: n.title || '—',
+          className: n.className === ALL_CLASSES ? 'সব ক্লাস' : (n.className || '—'),
+          // Payment receipts are personal notices — say so instead of hiding it.
+          audience: n.forStudent ? `${n.audience || 'শিক্ষার্থী'} (ব্যক্তিগত)` : (n.audience || '—'),
+          _personal: Boolean(n.forStudent)
+        }))
+        .sort(byDateDesc),
+      summary: (rows) => [
+        { label: 'মোট নোটিশ', value: bn(rows.length) },
+        { label: 'সবাইকে পাঠানো', value: bn(rows.filter((r) => !r._personal).length) }
+      ]
     }
   };
 
-  sel.innerHTML = Object.entries(reports).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+  /* Three icon groups, rendered as mobile-first cards (2 across on a phone,
+     4 across from 640px up). */
+  const GROUPS = [
+    { key: 'finance', icon: '💰', title: 'Finance Reports', bn: 'ফিন্যান্স রিপোর্ট', items: ['collection', 'due', 'studentFinance', 'paymentHistory'] },
+    { key: 'student', icon: '👨‍🎓', title: 'Student Reports', bn: 'শিক্ষার্থী রিপোর্ট', items: ['students', 'classwise', 'activeInactive'] },
+    { key: 'notice', icon: '📢', title: 'Notice Reports', bn: 'নোটিশ রিপোর্ট', items: ['noticeHistory'] }
+  ];
+
   classSel.innerHTML = `<option value="${ALL_CLASSES}">সব ক্লাস</option>`
-    + CLASS_OPTIONS.map((c) => `<option>${c}</option>`).join('');
+    + CLASS_OPTIONS.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 
-  const filteredRows = () => {
-    const r = reports[sel.value];
-    const cls = classSel.value || ALL_CLASSES;
-    let rows = r.rows();
-    if (r.classScoped && cls !== ALL_CLASSES) rows = rows.filter((row) => classNameOf(row) === cls);
-    return { r, cls, rows };
-  };
-
-  const render = () => {
-    const { r, rows } = filteredRows();
-    renderTable('#report-table', r.cols, rows);
-  };
-
-  // No data is shown before Generate — entering the Reports panel shows only a
-  // hint. Selecting a different type/class clears any previously generated data.
-  const showPlaceholder = () => {
-    const table = document.getElementById('report-table');
-    if (table) {
-      table.innerHTML = '<thead><tr></tr></thead><tbody><tr><td colspan="8"><div class="empty-state">রিপোর্ট Generate করলে তথ্য এখানে দেখাবে।</div></td></tr></tbody>';
-    }
-  };
-  sel.addEventListener('change', showPlaceholder);
-  classSel.addEventListener('change', showPlaceholder);
-
-  document.getElementById('report-csv').addEventListener('click', () => {
-    const { r, cls, rows } = filteredRows();
-    downloadText(`${sel.value}-report.csv`, toCSV(r.cols, rows), 'text/csv');
-  });
+  host.innerHTML = GROUPS.map((g) => `
+    <section class="report-group" aria-labelledby="report-group-${g.key}">
+      <h3 class="report-group-title" id="report-group-${g.key}">
+        <span class="ico" aria-hidden="true">${g.icon}</span>
+        <span class="rg-text"><strong>${escapeHtml(g.title)}</strong><small>${escapeHtml(g.bn)}</small></span>
+      </h3>
+      <div class="report-grid">
+        ${g.items.map((key) => {
+          const r = REPORTS[key];
+          return `<button type="button" class="report-card" data-report="${key}" title="${escapeHtml(`${r.label} — ${r.bn}`)}">
+            <span class="ico" aria-hidden="true">${r.icon}</span>
+            <span class="rc-label">${escapeHtml(r.label)}</span>
+            <span class="rc-bn">${escapeHtml(r.bn)}</span>
+          </button>`;
+        }).join('')}
+      </div>
+    </section>`).join('');
 
   /**
-   * Build the document canvases for the selected report + class. Class-scoped
-   * reports are split into one section per class ("সব ক্লাস" → every class in
-   * its own section; a specific class → just that class).
+   * Build the branded A4 pages for one report. Row-level reports are split into
+   * one section per class ("সব ক্লাস" → a section for every class that has rows);
+   * the aggregate reports (Collection, Class-wise List, Notice History) stay a
+   * single table because their rows are not one-per-student.
    */
   const buildDocument = async (r, cls, rows) => {
     const settings = db.settings.get();
+    const title = `${r.label} — ${r.bn}`;
+    const subtitleFor = (c) => `শ্রেণি: ${c === ALL_CLASSES ? 'সব' : c} · ${todayBn()}`;
     const canvases = [];
-    if (r.classScoped) {
+    if (r.byClass) {
       const classes = (cls && cls !== ALL_CLASSES)
         ? [cls]
-        : (CLASS_OPTIONS.filter((c) => rows.some((row) => classNameOf(row) === c)) || []);
-      const sections = classes.length ? classes : [ALL_CLASSES];
-      for (const c of sections) {
+        : CLASS_OPTIONS.filter((c) => rows.some((row) => classNameOf(row) === c));
+      for (const c of (classes.length ? classes : [ALL_CLASSES])) {
         const sectionRows = c === ALL_CLASSES ? rows : rows.filter((row) => classNameOf(row) === c);
         canvases.push(...await renderReportCanvases({
-          settings, title: r.label,
-          subtitle: sections.length === 1 ? `শ্রেণি: ${c === ALL_CLASSES ? 'সব' : c}` : `শ্রেণি: ${c}`,
-          columns: r.cols, rows: sectionRows, summary: r.summary(sectionRows)
+          settings, title, subtitle: subtitleFor(c),
+          columns: r.cols, rows: sectionRows, summary: r.summary(sectionRows, c)
         }));
       }
     } else {
       canvases.push(...await renderReportCanvases({
-        settings, title: r.label, subtitle: `তারিখ: ${todayBn()}`,
-        columns: r.cols, rows, summary: r.summary(rows)
+        settings, title, subtitle: subtitleFor(cls || ALL_CLASSES),
+        columns: r.cols, rows, summary: r.summary(rows, cls)
       }));
     }
     return canvases;
   };
 
-  // Generate → Preview → Download PDF (never a direct download). Only after
-  // Generate is the on-screen table populated, alongside the preview popup.
-  document.getElementById('report-generate').addEventListener('click', async () => {
-    const { r, cls, rows } = filteredRows();
-    render(); // show the filtered data on screen
+  // One tap → preview → PDF or Excel. The card stays disabled while the pages
+  // are being drawn so a slow phone cannot queue the same document twice.
+  host.addEventListener('click', async (event) => {
+    const card = event.target.closest('[data-report]');
+    if (!card) return;
+    const key = card.dataset.report;
+    const r = REPORTS[key];
+    if (!r || card.getAttribute('aria-busy') === 'true') return;
+
+    const cls = classSel.value || ALL_CLASSES;
+    const base = `${r.file}-report-${classFileLabel(cls)}`;
+    card.setAttribute('aria-busy', 'true');
+    card.disabled = true;
     try {
+      const rows = r.rows(cls);
       const canvases = await buildDocument(r, cls, rows);
-      const clsLabel = (cls && cls !== ALL_CLASSES) ? classFileLabel(cls) : 'All-Classes';
       await previewDocument({
-        title: r.label,
-        meta: `শ্রেণি: ${cls === ALL_CLASSES ? 'সব' : cls} · ${todayBn()}`,
-        filename: `${sel.value}-report-${clsLabel}.pdf`,
+        title: `${r.label} — ${r.bn}`,
+        meta: `শ্রেণি: ${cls === ALL_CLASSES ? 'সব' : cls} · ${todayBn()} · ${bn(rows.length)} সারি`,
+        filename: `${base}.pdf`,
         canvases,
+        excel: { filename: `${base}.csv`, csv: toCSV(r.cols, rows) },
         shareable: false
       });
       logActivity({ user: session.name, role: session.role, action: 'generated report', target: `${r.label} · ${cls}` });
     } catch (e) {
+      console.error('[Active Plus] report failed:', (e && e.stack) || e);
       showToast('রিপোর্ট তৈরি করা যায়নি।', 'error');
+    } finally {
+      card.setAttribute('aria-busy', 'false');
+      card.disabled = false;
     }
   });
-
-  showPlaceholder();
 }
 
 /* ---------------- Users & permissions ---------------- */
