@@ -201,7 +201,7 @@ export function mountExamAuthoring({ session = null } = {}) {
       if (!quiet) showToast('আগে প্রশ্ন পেস্ট করুন।', 'error');
       return;
     }
-    const { questions, errors, duplicates } = parseMcqPaste(text);
+    const { questions, errors, duplicates, ignored } = parseMcqPaste(text);
     const known = new Set(staged.map((q) => q.q.replace(/\s+/g, ' ').trim()));
     const fresh = questions.filter((q) => !known.has(q.q.replace(/\s+/g, ' ').trim()));
     staged = [...staged, ...fresh];
@@ -214,6 +214,9 @@ export function mountExamAuthoring({ session = null } = {}) {
         : '',
       already > 0 ? `<div class="alert alert-warning">${bn(already)}টি প্রশ্ন আগেই যোগ করা ছিল — বাদ দেওয়া হয়েছে।</div>` : '',
       duplicates.length ? `<div class="alert alert-warning">${bn(duplicates.length)}টি প্রশ্ন পেস্টের ভেতরেই দুইবার ছিল — একবার নেওয়া হয়েছে।</div>` : '',
+      // A copied paper usually starts with its own title; say so instead of
+      // letting the teacher wonder where that line went.
+      (ignored || []).length ? `<div class="alert alert-info">প্রশ্নপত্রের শিরোনাম মনে হওয়ায় বাদ দেওয়া হয়েছে: ${ignored.map(escapeHtml).join(' · ')}</div>` : '',
       errors.length ? `<div class="alert alert-error">⚠️ ${bn(errors.length)}টি প্রশ্ন অসম্পূর্ণ:<br>${errors.map(escapeHtml).join('<br>')}</div>` : ''
     ].join('');
 

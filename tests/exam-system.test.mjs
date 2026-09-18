@@ -80,6 +80,44 @@ test('pasting the exam template produces ready questions', async () => {
   assert.equal(parsed.questions[1].answer, 1, 'উত্তর: খ is the second option — both letter styles work');
 });
 
+test('the paste reader copes with how real question papers are copied', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+
+  // ১. One line holds the question and all four options, bracket markers.
+  const oneLine = parseMcqPaste('১. বাংলাদেশের রাজধানী কোনটি? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী\nউত্তর: ক');
+  assert.equal(oneLine.errors.length, 0);
+  assert.deepEqual(oneLine.questions[0].options, ['ঢাকা', 'চট্টগ্রাম', 'খুলনা', 'রাজশাহী']);
+  assert.equal(oneLine.questions[0].answer, 0);
+
+  // ২. The answer written at the end of that same line.
+  const allInOne = parseMcqPaste('১. ২+২=? (A) ৩ (B) ৪ (C) ৫ (D) ৬ (উত্তর: B)');
+  assert.deepEqual(allInOne.questions[0].options, ['৩', '৪', '৫', '৬'], 'the answer never becomes an option');
+  assert.equal(allInOne.questions[0].answer, 1);
+
+  // ৩. 'উত্তরঃ (খ)' — the Bengali colon and brackets.
+  assert.equal(parseMcqPaste('১. x\nA) ক\nB) খ\nC) গ\nD) ঘ\nউত্তরঃ (খ)').questions[0].answer, 1);
+
+  // ৪. Numbered options under a heading, with no blank lines anywhere.
+  const numbered = parseMcqPaste('গণিত MCQ\n১. ২+২=?\n১) ৩\n২) ৪\n৩) ৫\n৪) ৬\nউত্তর: ২');
+  assert.deepEqual(numbered.questions[0].options, ['৩', '৪', '৫', '৬']);
+  assert.equal(numbered.questions[0].answer, 1);
+  assert.deepEqual(numbered.ignored, ['গণিত MCQ'], 'the paper title is dropped, not reported as broken');
+
+  // ৫. 'ব্যাখ্যা:' explains an answer — it must not become the next question.
+  const explained = parseMcqPaste([
+    '১. ২+২=?', 'A) ৩', 'B) ৪', 'C) ৫', 'D) ৬', 'উত্তর: B', 'ব্যাখ্যা: সাধারণ যোগ।',
+    '', '২. ৩+৩=?', 'A) ৫', 'B) ৬', 'C) ৭', 'D) ৮', 'উত্তর: খ'
+  ].join('\n'));
+  assert.equal(explained.questions.length, 2);
+  assert.equal(explained.errors.length, 0, 'an explanation is never a broken question');
+  assert.equal(explained.questions[1].answer, 1);
+
+  // ৬. A real question may still start with a number that is not '?'
+  const romanish = parseMcqPaste('১. ১২৫-এর বর্গমূল কত?\n১) ৫\n২) ১৫\n৩) ২৫\n৪) ৩৫\nউত্তর: ৩');
+  assert.equal(romanish.questions[0].q, '১২৫-এর বর্গমূল কত?');
+  assert.equal(romanish.questions[0].options.length, 4);
+});
+
 test('a paper copied without blank lines still splits into questions', async () => {
   const { parseMcqPaste } = await import('../js/data.js');
   const pasted = [
@@ -190,7 +228,9 @@ test('an incomplete paste is reported instead of saved', async () => {
   mountExamAuthoring({ session: { role: 'admin', name: 'অ্যাডমিন' } });
 
   const before = data.db.exams.list().length;
-  doc.getElementById('exam-paste').value = 'প্রশ্ন: একটি অপূর্ণ প্রশ্ন';
+
+  // A question with no options: the teacher is told exactly what is missing.
+  doc.getElementById('exam-paste').value = 'প্রশ্ন ১: অপশন ছাড়া একটি প্রশ্ন\n\nপ্রশ্ন ২: অপশন ছাড়া আরেকটি প্রশ্ন';
   doc.getElementById('exam-parse').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
   assert.match(doc.getElementById('exam-parse-report').textContent, /অসম্পূর্ণ/, 'the teacher is told what is wrong');
 

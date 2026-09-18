@@ -90,12 +90,23 @@ D) রাজশাহী
 ```
 
 The parser (`parseMcqPaste()`) is deliberately forgiving about how the text was
-copied — Bengali or English digits, `A)` / `A.` / `ক)` / `১.` option markers,
-`উত্তর:` / `সঠিক:` / `Answer:` markers, answers written inline
-(`৫+৩=? (উত্তর: B)`), bold `**…**` markers from Word/Docs, stray bullets, and
-papers with no blank lines between questions. Duplicate and incomplete
-questions are reported before anything is saved — nothing is written until
-*পরীক্ষা প্রকাশ করুন*.
+copied:
+
+| Copied as | Understood |
+| --------- | ---------- |
+| `A) x` · `A. x` · `(ক) x` · `[খ] x` · `১) x` | option markers, Bengali or English, any bracket style |
+| `উত্তর: B` · `সঠিক: খ` · `Answer: d` · `উত্তরঃ (গ)` · `সঠিক উত্তর - ঘ` | the correct answer |
+| `১. প্রশ্ন? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী` | one line holding the question *and* its options |
+| `… (উত্তর: B)` at the end of the question or option line | inline answer |
+| `**প্রশ্ন ১. …**`, `# শিরোনাম`, bullet dashes | Word/Docs paste noise |
+| `৭. প্রশ্ন?` then `৭) ৩` | a question number and option numbers side by side |
+| `ব্যাখ্যা: …` | an explanation line, skipped (never a new question) |
+| a paper title on the first line | dropped with a note, not reported as broken |
+| no blank lines anywhere | questions still split correctly |
+
+Duplicate and incomplete questions are reported before anything is saved —
+nothing is written until *পরীক্ষা প্রকাশ করুন*. Incomplete blocks name the
+question number so the teacher knows exactly which one to fix.
 
 Taking an exam: the timer starts the moment the paper opens and is always
 visible (`⏱ ২৯:৫৮`, turning amber under a minute and red under 30 seconds).
@@ -320,7 +331,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 208 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 209 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class

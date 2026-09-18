@@ -1110,7 +1110,7 @@ export const MCQ_TEMPLATE = [
 ].join('\n');
 
 /** One-line reminder printed under the paste box. */
-export const MCQ_PASTE_RULES = 'প্রতিটি প্রশ্ন: প্রশ্ন + চারটি অপশন (A/B/C/D বা ক/খ/গ/ঘ) + "উত্তর: B"। যেভাবেই কপি হোক — খালি লাইন, নম্বর, বোল্ড, সব চলবে।';
+export const MCQ_PASTE_RULES = 'প্রতিটি প্রশ্নের পর অপশন (ক/খ/গ/ঘ বা A/B/C/D) আর শেষে সঠিক উত্তর (যেমন “উত্তর: খ”)। যেভাবেই কপি হোক — এক লাইনে, বন্ধনীসহ, বোল্ড, খালি লাইন ছাড়া — সব চলবে।';
 
 const BN_LETTERS = 'কখগঘ';
 
@@ -1125,10 +1125,24 @@ function markerIndex(marker) {
   return at === -1 ? -1 : at % 4;
 }
 
-const ANSWER_LINE = /^(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Correct\s*Answer|Correct|Answer|Ans)\s*[:.)\-]?\s*([A-Da-dক-ঘ১-৪])(?![A-Da-dক-ঘ১-৪\w])/i;
-const OPTION_LINE = /^([A-Da-dক-ঘ])\s*[).।:\-]?\s+(.+)$/;
+/* An answer line: 'উত্তর: B', 'সঠিক উত্তর - খ', 'উত্তরঃ (গ)', 'Answer: d'.
+   The line must END after the letter, so an option that happens to start with
+   'A' is never mistaken for the answer. */
+const ANSWER_LINE = /^(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Correct\s*Answer|Correct|Answer|Ans)\s*[:.)\-ঃ।]?\s*[([{]?\s*([A-Da-dক-ঘ১-৪])\s*[)\]}]?\s*[.।]?\s*$/i;
+/* The same marker sitting at the end of a longer line: '… (উত্তর: B)'. */
+const ANSWER_TAIL = /[([]?\s*(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Answer)\s*[:.)\-]\s*([A-Da-dক-ঘ১-৪])\s*[)\]]?\s*$/i;
+/* 'A) x', 'A. x', '(ক) x', '[খ] x' — copy-paste brings every bracket style. */
+const OPTION_LINE = /^[([{]?\s*([A-Da-dক-ঘ])\s*[)\]}.\u0964:\-]?\s+(.+)$/;
 const NUMBERED_LINE = /^([০-৯\d]{1,2})\s*[).।:\-]?\s+(.+)$/;
 const BN_DIGIT_MAP = '০১২৩৪৫৬৭৮৯';
+
+/* 'ব্যাখ্যা: …' lines explain an answer; they are not the next question. */
+const NOISE_LINE = /^(?:ব্যাখ্যা|বিশ্লেষণ|explanation|note|নোট|রেফারেন্স|reference|source|সূত্র)\s*[:.\-]/i;
+
+/* Option markers inside one line. Papers are often pasted as
+   '১. প্রশ্ন? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী' — one line, four
+   options — which the per-line rules can never see. */
+const INLINE_MARKER = /(?:^|\s)[([{]?\s*([A-Da-dক-ঘ])\s*[)\]}.\u0964:\-]\s*/g;
 
 /** '**bold**', '#', stray bullets — copy-paste noise that is not the question. */
 function cleanLine(line) {
@@ -1153,27 +1167,54 @@ function stripQuestionPrefix(text) {
   const stripped = raw
     .replace(/^\s*(?:প্রশ্ন|প্র|Question|Q)\s*(?:নং|no|No)?\s*[০-৯\d]+\s*[:.।)\-]?\s+/i, '')
     .replace(/^\s*(?:প্রশ্ন|প্র|Question|Q)\s*(?:নং|no|No)?\s*[:.।)\-]\s*/i, '')
+    .replace(/^[০-৯\d]{1,2}\s*[).।:\-]\s*/, '')            // '১. প্রশ্ন' / '12) প্রশ্ন'
     .trim();
   return stripped || raw.trim();
+}
+
+/**
+ * '১. প্রশ্ন? (ক) ঢাকা (খ) চট্টগ্রাম …' → { head: '১. প্রশ্ন?', options: [...] }.
+ * Returns null when the line does not carry at least two option markers.
+ */
+function splitInlineOptions(line) {
+  const text = String(line || '');
+  INLINE_MARKER.lastIndex = 0;
+  const marks = [];
+  let m;
+  while ((m = INLINE_MARKER.exec(text))) {
+    marks.push({ start: m.index + (m[0].startsWith(' ') ? 1 : 0), end: INLINE_MARKER.lastIndex });
+  }
+  if (marks.length < 2) return null;
+  const head = text.slice(0, marks[0].start).trim();
+  const options = marks
+    .map((mark, i) => text.slice(mark.end, i + 1 < marks.length ? marks[i + 1].start : text.length).trim())
+    .filter(Boolean);
+  if (options.length < 2) return null;
+  return { head, options };
 }
 
 /**
  * Parse a pasted MCQ paper.
  *
  * Understands what teachers actually copy: blank-line separated blocks, one
- * long stream with no blank lines, 'প্রশ্ন:'/'Q1.' prefixes, bold markers,
- * A/B/C/D options, Bengali ক/খ/গ/ঘ options, and answers written as
- * 'সঠিক: B', 'উত্তর: ৩', 'Answer: d' or inline '(উত্তর: B)' on the question.
+ * long stream with no blank lines, 'প্রশ্ন:'/'Q1.'/'১.' prefixes, bold markers,
+ * A/B/C/D options, Bengali ক/খ/গ/ঘ options, bracketed markers ('(ক) ঢাকা'),
+ * a whole question with its options on one line
+ * ('১. প্রশ্ন? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী'), numbered options,
+ * and answers written as 'সঠিক: B', 'উত্তর: ৩', 'Answer: d', 'উত্তরঃ (খ)' or
+ * inline '(উত্তর: B)' at the end of the question or of the option line.
  *
  * @returns {{questions: Array<{q: string, options: string[], answer: number}>,
- *            errors: string[], duplicates: string[]}} questions ready to save,
- *            incomplete blocks described in errors, repeated questions in duplicates.
+ *            errors: string[], duplicates: string[], ignored: string[]}}
+ *            questions ready to save, incomplete blocks described in errors,
+ *            repeated questions in duplicates, paper titles in ignored.
  */
 export function parseMcqPaste(text) {
   const lines = String(text ?? '').split(/\r?\n/);
   const raw = [];
   const errors = [];
   const duplicates = [];
+  const ignored = [];
   let current = null;
   let blockNo = 0;
 
@@ -1181,7 +1222,13 @@ export function parseMcqPaste(text) {
     if (!current) return;
     blockNo += 1;
     const question = current.q.trim();
-    if (!question || current.options.length < 2) {
+    if (!question) return;
+    // The title of a copied paper ('নবম শ্রেণি — গণিত') arrives as a block of
+    // its own. Only the very first block can be one, and it is dropped with a
+    // note instead of being reported as a broken question.
+    if (blockNo === 1 && !current.options.length && current.answer < 0 && !question.includes('?')) {
+      ignored.push(question);
+    } else if (current.options.length < 2) {
       errors.push(`প্রশ্ন ${blockNo}: প্রশ্ন বা অপশন অসম্পূর্ণ (কমপক্ষে ২টি অপশন দরকার)।`);
     } else {
       raw.push({
@@ -1195,14 +1242,45 @@ export function parseMcqPaste(text) {
 
   const start = (questionText) => { current = { q: questionText, options: [], answer: -1 }; };
 
+  /** Adds the text of a plain line to the question being built. */
+  const appendToQuestion = (text) => {
+    if (current && (current.options.length || current.answer >= 0)) finish();
+    if (!current) start(stripQuestionPrefix(text));
+    else current.q = `${current.q} ${text}`.trim();
+  };
+
   for (const line of lines) {
     const clean = cleanLine(line);
     if (!clean) { finish(); continue; }
+    if (NOISE_LINE.test(clean)) continue;     // 'ব্যাখ্যা: …' explains, never asks
 
     const answerMatch = clean.match(ANSWER_LINE);
     if (answerMatch && current) {
       const index = markerIndex(answerMatch[1]);
       if (index !== -1) current.answer = index;
+      continue;
+    }
+
+    // One line carrying the question and its options ('…? (ক) ঢাকা (খ) …'),
+    // sometimes with the answer written at the end of the same line —
+    // '১. ২+২=? (A) ৩ (B) ৪ (C) ৫ (D) ৬ (উত্তর: B)'. The answer is lifted off
+    // first, otherwise its own letter looks like one more option marker.
+    let lineAnswer = -1;
+    let optionLine = clean;
+    const tailMatch = clean.match(ANSWER_TAIL);
+    if (tailMatch) {
+      const index = markerIndex(tailMatch[1]);
+      if (index !== -1) {
+        lineAnswer = index;
+        optionLine = clean.slice(0, tailMatch.index).trim();
+      }
+    }
+    const inline = optionLine ? splitInlineOptions(optionLine) : null;
+    if (inline) {
+      if (inline.head) appendToQuestion(cleanLine(inline.head));
+      if (!current) start('');
+      inline.options.forEach((option) => current.options.push(cleanLine(option)));
+      if (lineAnswer !== -1) current.answer = lineAnswer;
       continue;
     }
 
@@ -1217,9 +1295,10 @@ export function parseMcqPaste(text) {
       const label = asciiNumber(numbered[1]);
       const text = cleanLine(numbered[2]);
       if (!current || !current.q.trim()) { start(stripQuestionPrefix(text)); continue; }
-      // '১. প্রশ্ন' starts the next question; '১. অপশন' continues this one —
-      // the option numbering always picks up where the last option left off.
-      if (label === current.options.length + 1) { current.options.push(text); continue; }
+      // A numbered line that asks something is the next question; a numbered
+      // line that just carries a value ('১) ১০') is the next option — the
+      // option numbering always picks up where the last option left off.
+      if (!text.includes('?') && label === current.options.length + 1) { current.options.push(text); continue; }
       finish();
       start(stripQuestionPrefix(text));
       continue;
@@ -1227,17 +1306,15 @@ export function parseMcqPaste(text) {
 
     // Plain text: continues a question that has no options yet, otherwise it
     // is the beginning of the next question (no blank line needed).
-    if (current && (current.options.length || current.answer >= 0)) { finish(); }
-    if (!current) start(stripQuestionPrefix(clean));
-    else current.q = `${current.q} ${clean}`.trim();
+    appendToQuestion(clean);
 
     // An inline answer on the question line — '৫+৩=? (উত্তর: B)'.
-    const inline = current.q.match(/[([]?\s*(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Answer)\s*[:.)\-]?\s*([A-Da-dক-ঘ১-৪])\s*[)\]]?\s*$/i);
-    if (inline) {
-      const index = markerIndex(inline[1]);
+    const inlineAnswer = current.q.match(ANSWER_TAIL);
+    if (inlineAnswer) {
+      const index = markerIndex(inlineAnswer[1]);
       if (index !== -1) {
         current.answer = index;
-        current.q = current.q.slice(0, inline.index).trim();
+        current.q = current.q.slice(0, inlineAnswer.index).trim();
       }
     }
   }
@@ -1251,7 +1328,7 @@ export function parseMcqPaste(text) {
     return true;
   });
 
-  return { questions, errors, duplicates };
+  return { questions, errors, duplicates, ignored };
 }
 
 /** Export rows as CSV (for Excel/print workflows). */
