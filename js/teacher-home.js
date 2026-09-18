@@ -20,12 +20,9 @@ import {
   activeBanners, timeAgo, getDbStatus, sharedNotices
 } from './data.js';
 
-/* Actions that open the real authoring flows — shortcuts, not navigation. */
+/* Minimal shortcuts — only the most common actions. */
 const QUICK_SHORTCUTS = [
-  { act: 'new-exam', icon: '＋', label: 'পরীক্ষা তৈরি' },
-  { act: 'add-mcq', icon: '＋', label: 'MCQ যোগ' },
   { act: 'give-assignment', icon: '＋', label: 'অ্যাসাইনমেন্ট' },
-  { act: 'upload-material', icon: '＋', label: 'ম্যাটেরিয়াল' },
   { act: 'publish-notice', icon: '＋', label: 'নোটিশ' },
   { act: 'enter-result', icon: '＋', label: 'ফলাফল' }
 ];
@@ -43,15 +40,11 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     host.closest('.home-shell')?.scrollTo?.({ top: 0 });
   };
 
-  /* -------------------------------------------------------------- */
-  /* 1. আজকের সামগ্রিক অবস্থা                                        */
-  /* -------------------------------------------------------------- */
   const overview = () => {
     const t = todayTeaching(name);
     const cell = (icon, value, label) => `
       <div class="analytics-cell"><span class="ico">${icon}</span><strong>${bn(value)}</strong><span>${label}</span></div>`;
 
-    /* Details (folded): next class + today's class list. */
     const slot = teacherNextClass(name);
     const cls = teacherProfile(name).classNames[0] || '';
     const slots = teacherDayClasses(name);
@@ -90,9 +83,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
       </section>`;
   };
 
-  /* -------------------------------------------------------------- */
-  /* 2. কুইক শর্টকাট                                                 */
-  /* -------------------------------------------------------------- */
   const quickShortcuts = () => `
     <section class="home-section" aria-label="কুইক শর্টকাট">
       <h2 class="sec-title">⚡ কুইক শর্টকাট</h2>
@@ -101,9 +91,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
       </div>
     </section>`;
 
-  /* -------------------------------------------------------------- */
-  /* 3. Folded information sections — minimized until tapped         */
-  /* -------------------------------------------------------------- */
   const fold = (title, body) => body.trim() ? `
     <details class="mini-details">
       <summary>${title}</summary>
@@ -143,7 +130,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
   };
 
   const noticeCard = () => {
-    // Payment receipts are personal to one student — never show them here.
     const latest = sharedNotices().slice(-1)[0];
     return `<div class="hcard"><div class="h-title">📢 সর্বশেষ নোটিশ</div>${
       latest ? `<p><strong>${escapeHtml(latest.title)}</strong></p><p class="meta">${escapeHtml(latest.date || '')} · ${escapeHtml(latest.audience || '')}</p>
@@ -169,9 +155,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
       </div>`).join('')}</div></div>`;
   };
 
-  /* -------------------------------------------------------------- */
-  /* Render + wire                                                   */
-  /* -------------------------------------------------------------- */
   function render() {
     const profile = teacherProfile(name);
     const headerSub = document.getElementById('user-role');
@@ -208,11 +191,6 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     else if (act === 'publish-notice') { tabs?.activate?.('notice'); openModal?.('teacher-notice-modal'); }
   });
 
-  /**
-   * Render with a safety net (spec 60): if anything throws, show a friendly
-   * message with a Retry action instead of leaving the panel blank, and never
-   * surface the technical error to the user.
-   */
   function renderSafe() {
     try {
       render();
@@ -229,14 +207,12 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     }
   }
 
-  /** Bottom navigation "আরও": unfold every section to see everything. */
   function openMore() {
     const folds = host.querySelectorAll('details.mini-details');
     folds.forEach((d) => { d.open = true; });
     folds[0]?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }
 
-  /** Bottom navigation "হোম": fold everything back to the minimal view. */
   function showHome() {
     host.querySelectorAll('details[open]').forEach((d) => { d.open = false; });
   }
