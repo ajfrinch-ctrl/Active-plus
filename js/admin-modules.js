@@ -1,4 +1,1 @@
-/**
- * Admin ERP modules — RESTORE IN PROGRESS - use local file
- */
-export function mountExtraAdmin() { console.error('admin-modules restore needed'); }
+LOAD_FROM_LOCAL_FILE_FAILED_USE_ARTIFACTS
