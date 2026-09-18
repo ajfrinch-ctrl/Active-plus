@@ -398,23 +398,35 @@ export function mountExamTaker({ listSelector, student }) {
     render();
   };
 
+  /** '২৯:৫৮' left on a sitting that is already running, or '' when none is. */
+  const remainingLabel = (exam) => {
+    const session = loadSession(exam.id);
+    if (!session || !session.deadline) return '';
+    const left = session.deadline - Date.now();
+    if (left <= 0) return 'সময় শেষ';
+    const totalSec = Math.floor(left / 1000);
+    return `${bn(String(Math.floor(totalSec / 60)).padStart(2, '0'))}:${bn(String(totalSec % 60).padStart(2, '0'))}`;
+  };
+
   const render = () => {
     const rows = examsFor(student.className);
     list.innerHTML = rows.length
       ? rows.map((exam) => {
         const done = examResultFor(exam.id, student.id);
         const win = examWindow(exam);
+        const running = done ? '' : remainingLabel(exam);
         return `
         <div class="list-item">
           <div class="li-main">
             <div class="li-title">${escapeHtml(exam.title)}</div>
             <div class="li-sub">${escapeHtml(exam.subject)} · ${bn(exam.questions.length)}টি প্রশ্ন · ⏱ ${bn(exam.duration || 30)} মিনিট · ${escapeHtml(exam.author)}</div>
             <div class="li-sub">📅 ${escapeHtml(formatBnDate(exam.date))}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}${win && win.state === 'active' ? '' : ` · ${escapeHtml(win ? win.label : '')}`}</div>
+            ${running ? `<div class="li-sub exam-running">⏱ ${running === 'সময় শেষ' ? 'সময় শেষ — খুললেই জমা হবে' : `চলছে · আর ${escapeHtml(running)} বাকি`}</div>` : ''}
           </div>
           ${done
             ? `<span class="badge ${done.score / done.total >= 0.5 ? 'success' : 'warning'}">${bn(done.score)}/${bn(done.total)}</span>`
             : (win && win.canStart
-              ? `<button type="button" class="btn btn-small" data-take="${escapeHtml(exam.id)}">শুরু করুন</button>`
+              ? `<button type="button" class="btn btn-small${running ? ' btn-secondary' : ''}" data-take="${escapeHtml(exam.id)}">${running && running !== 'সময় শেষ' ? 'চালিয়ে যান' : 'শুরু করুন'}</button>`
               : `<span class="badge warning">${escapeHtml(win && win.state === 'closed' ? 'সময় শেষ' : 'শুরু হয়নি')}</span>`)}
         </div>`;
       }).join('')

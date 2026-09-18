@@ -120,6 +120,42 @@ test('the countdown warns on the way down and submits itself at zero', async () 
   }
 });
 
+test('an interrupted sitting is offered as চালিয়ে যান with the time left', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+
+  // The paper is already running when the student comes back to this screen.
+  const store = await import('../js/store.js');
+  store._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamTaker } = await import('../js/exams.js');
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  dom.window.localStorage.setItem(`activeplus_exam_${student.id}_${exam.id}`, JSON.stringify({
+    deadline: Date.now() + 95000, answers: { 0: '0' }, startedAt: Date.now() - 30000
+  }));
+
+  const controller = mountExamTaker({ listSelector: '#exam-list', student });
+  try {
+    const list = doc.getElementById('exam-list');
+    assert.match(list.textContent, /চলছে · আর/, 'the card says the paper is still running');
+    assert.match(list.textContent, /০১:৩[০-৯]|০১:৪[০-৯]|০১:[০-৯]{2}/, 'and shows the time left');
+    const button = doc.querySelector(`[data-take="${exam.id}"]`);
+    assert.ok(button, 'the paper can be reopened');
+    assert.equal(button.textContent.trim(), 'চালিয়ে যান', 'offered as continue, not as a fresh start');
+
+    // Opening it restores the sitting — same deadline, saved answer kept.
+    click(dom, button);
+    const checked = doc.getElementById('exam-take-form').querySelector('input[name="q0"]:checked');
+    assert.equal(checked.value, '0', 'the answer given before is still selected');
+    const saved = JSON.parse(dom.window.localStorage.getItem(`activeplus_exam_${student.id}_${exam.id}`));
+    assert.ok(saved.deadline <= Date.now() + 96000, 'the deadline did not move forward');
+    assert.ok(!data.examResultFor(exam.id, student.id), 'nothing was submitted early');
+  } finally {
+    controller.stop();
+  }
+});
+
 test('reopening a running paper keeps the original deadline', async () => {
   const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
   const doc = dom.window.document;

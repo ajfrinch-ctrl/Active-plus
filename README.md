@@ -123,7 +123,9 @@ countdown reaches zero the paper **submits itself**, is graded, and the student
 sees “⏰ সময় শেষ — স্বয়ংক্রিয়ভাবে জমা হয়েছে” with the full answer review. A
 background tab cannot stretch the deadline either: coming back re-checks the
 clock at once, because the countdown is computed from the absolute deadline
-rather than from elapsed ticks. One attempt per exam.
+rather than from elapsed ticks. A student who leaves mid-paper finds the exam
+card marked **চলছে · আর ০১:৩০ বাকি** with a *চালিয়ে যান* button, and their saved
+answers waiting. One attempt per exam.
 
 ## Structure
 
@@ -340,7 +342,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 213 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 214 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class

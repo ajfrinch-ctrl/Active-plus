@@ -442,6 +442,11 @@ body.home-body {
   border: 1px solid var(--border); border-radius: 14px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
 }
+/* 'চলছে · আর ০১:৩০ বাকি' on an exam card whose paper is still open. */
+.exam-running {
+  color: var(--warning);
+  font-weight: 600;
+}
 .exam-timer {
   font-variant-numeric: tabular-nums;
   font-weight: 700; font-size: 1.125rem;
