@@ -384,6 +384,26 @@ test('latest result card shows the class position when leaderboard is on', async
   assert.equal(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), false, 'hidden with the leaderboard');
 });
 
+test('the Result view opens the review of a past paper', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  data.db.examResults.add({
+    id: 'res-review', examId: exam.id, studentId: student.id, studentName: student.name,
+    score: 1, total: exam.questions.length, date: data.todayBn(), autoSubmitted: false,
+    answers: exam.questions.map((q, qi) => (qi === 0 ? q.answer : null))
+  });
+
+  click(doc, '.bottom-nav button[data-view="result"]');
+  const results = doc.getElementById('result-content');
+  assert.ok(results.querySelector('[data-act="review"]'), 'a reviewable result offers the উত্তর button');
+  assert.match(results.textContent, /[০-৯]{1,2} [\u0980-\u09FF]+ [০-৯]{4}/, '');
+
+  click(doc, '#result-content [data-act="review"]');
+  assert.equal(doc.getElementById('view-exam').hidden, false, 'the review opens in the exam view');
+  assert.match(doc.getElementById('exam-player').innerHTML, /উত্তরপত্র/, 'and shows the paper');
+});
+
 test('every tile in the More quick row actually navigates (no dead buttons)', async () => {
   const { doc } = await bootHome();
   click(doc, '.bottom-nav button[data-view="more"]');

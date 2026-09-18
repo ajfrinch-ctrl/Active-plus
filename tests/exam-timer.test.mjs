@@ -156,6 +156,29 @@ test('an interrupted sitting is offered as চালিয়ে যান with 
   }
 });
 
+test('a stored result can be reviewed again from the controller', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  const { data, student, exam, controller } = await openExam(dom, '2026-09-001');
+
+  data.db.examResults.add({
+    id: 'res-review', examId: exam.id, studentId: student.id, studentName: student.name,
+    score: 1, total: exam.questions.length, date: data.todayBn(), autoSubmitted: true,
+    answers: exam.questions.map((q, qi) => (qi === 0 ? q.answer : null))
+  });
+  controller.stop();
+  controller.review(exam.id);
+  try {
+    const player = doc.getElementById('exam-player');
+    assert.equal(player.hidden, false, 'the review opens');
+    assert.match(player.innerHTML, /উত্তরপত্র/, 'it is the answer review');
+    assert.match(player.innerHTML, /স্বয়ংক্রিয়ভাবে জমা/, 'an auto-submitted paper says so');
+    assert.equal((player.innerHTML.match(/সঠিক উত্তর:/g) || []).length, exam.questions.length - 1, 'the misses are shown');
+  } finally {
+    controller.stop();
+  }
+});
+
 test('reopening a running paper keeps the original deadline', async () => {
   const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
   const doc = dom.window.document;

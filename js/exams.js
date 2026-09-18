@@ -686,5 +686,7 @@ export function mountExamTaker({ listSelector, student }) {
     if (target) takeExam(target);
   };
   render.stop = stopTimer;
+  // The Result view can open a past paper's review through this.
+  render.review = (examId) => showReview(examId);
   return render;
 }

@@ -482,6 +482,7 @@ export function initStudentHome() {
       if (act === 'startexam') refreshExams?.start?.();
     }
     else if (act === 'result' || act === 'progress') switchView('result');
+    else if (act === 'review') { switchView('exam'); refreshExams?.review?.(el.dataset.exam); }
     else if (act === 'study' || act === 'downloads') switchView('study');
     else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
     else if (act === 'challenge') doChallenge();
@@ -825,6 +826,16 @@ export function initStudentHome() {
     renderStudentSuggestions('#student-suggestion-list', student.className);
   }
 
+  // The Result view has its own container, so its actions need their own router.
+  document.getElementById('result-content').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    if (el.dataset.act === 'review') {
+      switchView('exam');
+      refreshExams?.review?.(el.dataset.exam);
+    }
+  });
+
   function renderResult() {
     const perf = performanceFor(student);
     const mine = db.examResults.list().filter((r) => r.studentId === student.id);
@@ -835,8 +846,14 @@ export function initStudentHome() {
         <div class="info-row"><span class="l">টেস্ট</span><span class="v">${bn(perf.tests)}</span></div>
         <div class="info-row"><span class="l">র‍্যাঙ্ক</span><span class="v">#${bn(perf.rank)}</span></div></div>` : ''}
       <div class="hcard"><div class="h-title">সব ফলাফল</div>${
-        mine.length ? mine.map((r) => { const ex = db.exams.find(r.examId); const pct = Math.round(r.score / r.total * 100);
-          return `<div class="info-row"><span class="l">${escapeHtml(ex?.title || '')}</span><span class="v">${bn(pct)}%</span></div>`; }).join('') : '<p>কোনো ফলাফল নেই।</p>'}</div>
+        mine.length ? mine.map((r) => {
+          const ex = db.exams.find(r.examId);
+          const pct = Math.round(r.score / r.total * 100);
+          const reviewable = Array.isArray(r.answers) && ex;
+          const when = formatBnDate(r.date);
+          return `<div class="info-row"><span class="l">${escapeHtml(ex?.title || '')}${when ? `<br><small class="meta">জমা: ${escapeHtml(when)}</small>` : ''}</span>
+            <span class="v">${bn(pct)}%${reviewable ? ` <button type="button" class="btn btn-small btn-secondary" data-act="review" data-exam="${escapeHtml(r.examId)}">উত্তর</button>` : ''}</span></div>`;
+        }).join('') : '<p>কোনো ফলাফল নেই।</p>'}</div>
       ${leaderboardCard()}`;
   }
 

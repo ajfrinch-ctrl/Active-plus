@@ -129,8 +129,9 @@ answers waiting. One attempt per exam.
 
 The chosen answers travel with the result, so a finished paper offers
 **উত্তর দেখুন** (question-by-question, with the right answer against a wrong
-one) long after the sitting ended, and the teacher's result list says which
-question numbers each student missed.
+one) long after the sitting ended — from the exam list or straight from **ফলাফল** in
+the Result view, where each result row now carries its submission date. The
+teacher's result list says which question numbers each student missed.
 
 ## Structure
 
@@ -347,7 +348,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 220 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 222 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
