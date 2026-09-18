@@ -40,7 +40,6 @@
 
     <div class="app">
       <header class="app-header admin-topbar">
-        <button type="button" class="icon-btn topbar-btn" id="admin-menu-btn" aria-label="মেনু" title="মেনু">☰</button>
         <div class="brand">
           <div class="brand-mark brand-logo" id="user-initial" aria-hidden="true"><img id="topbar-logo" src="assets/logo.png" alt="Active Plus"></div>
           <div class="brand-text">
@@ -501,7 +500,9 @@
           </div>
           <div class="form-row">
             <div class="form-group"><label for="student-guardian">অভিভাবকের নাম</label><input class="form-input" id="student-guardian" name="guardian"></div>
-            <div class="form-group"><label for="student-admission">ভর্তির তারিখ</label><input class="form-input" id="student-admission" name="admissionDate" type="date"></div>
+            <div class="form-group"><label for="student-admission">ভর্তির তারিখ</label>
+              <input class="form-input" id="student-admission" name="admissionDate" type="date">
+              <small class="form-hint" id="student-admission-hint">তারিখ এভাবে দেখানো হবে: ১৬ সেপ্টেম্বর ২০২৬</small></div>
           </div>
           <div class="form-row">
             <div class="form-group">
@@ -609,7 +610,9 @@
           </div>
           <div class="form-group"><label for="pay-amount">পরিমাণ *</label><input class="form-input" id="pay-amount" name="amount" type="number" min="1" required>
             <p class="pay-amount-hint" id="pay-amount-hint"></p></div>
-          <div class="form-group"><label for="pay-date">তারিখ *</label><input class="form-input" id="pay-date" name="date" required></div>
+          <div class="form-group"><label for="pay-date">তারিখ *</label>
+            <input class="form-input" id="pay-date" name="date" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off" required>
+            <small class="form-hint">তারিখ এভাবে লিখুন: ১৬ সেপ্টেম্বর ২০২৬</small></div>
           <div class="form-group"><label for="pay-method">মাধ্যম</label>
             <select class="form-input" id="pay-method" name="method">
               <option>নগদ</option><option>বিকাশ</option><option>নগদ (মোবাইল)</option><option>ব্যাংক</option><option>কার্ড</option>
@@ -693,41 +696,86 @@
         <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
         <h2 id="exam-modal-title">নতুন MCQ পরীক্ষা</h2>
         <form id="exam-form">
-          <div class="form-group"><label for="exam-title">শিরোনাম *</label><input class="form-input" id="exam-title" name="title" required></div>
-          <div class="form-row">
-            <div class="form-group"><label for="exam-class">ক্লাস</label><select class="form-input form-select" id="exam-class" name="className"></select></div>
-            <div class="form-group"><label for="exam-subject">বিষয়</label><input class="form-input" id="exam-subject" name="subject"></div>
+          <div class="form-group">
+            <label for="exam-title">শিরোনাম *</label>
+            <input class="form-input" id="exam-title" name="title" required>
           </div>
           <div class="form-row">
-            <div class="form-group"><label for="exam-date">তারিখ</label><input class="form-input" id="exam-date" name="date" placeholder="২০২৬-০৯-১০"></div>
-            <div class="form-group"><label for="exam-time">সময়</label><input class="form-input" id="exam-time" name="time" placeholder="১৭:০০"></div>
-          </div>
-          <div class="form-row">
-            <div class="form-group"><label for="exam-duration">সময়কাল (মিনিট)</label><input class="form-input" id="exam-duration" name="duration" type="number" min="1" value="30"></div>
-            <div class="form-group"><label for="exam-start">শুরু (YYYY-MM-DD)</label><input class="form-input" id="exam-start" name="startDate" type="date"></div>
-          </div>
-          <div class="form-group"><label for="exam-end">শেষ (YYYY-MM-DD)</label><input class="form-input" id="exam-end" name="endDate" type="date"></div>
-          <div class="card" style="margin:.75rem 0">
-            <h3>প্রশ্ন যোগ করুন</h3>
-            <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
-            <div class="form-row">
-              <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
-              <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
-              <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+            <div class="form-group">
+              <label for="exam-class">ক্লাস</label>
+              <select class="form-input form-select" id="exam-class" name="className"></select>
             </div>
             <div class="form-group">
-              <label for="q-answer">সঠিক উত্তর</label>
-              <select class="form-input form-select" id="q-answer">
-                <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
-                <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
-              </select>
+              <label for="exam-subject">বিষয়</label>
+              <input class="form-input" id="exam-subject" name="subject">
             </div>
-            <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
           </div>
-          <div class="form-group"><label>যুক্ত প্রশ্ন</label><div class="list" id="exam-staged"></div></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="exam-duration">সময়কাল (মিনিট)</label>
+              <input class="form-input" id="exam-duration" name="duration" type="number" min="1" value="30">
+            </div>
+            <div class="form-group">
+              <label for="exam-date">পরীক্ষার তারিখ</label>
+              <input class="form-input" id="exam-date" name="date" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="exam-start">শুরুর তারিখ</label>
+              <input class="form-input" id="exam-start" name="startDate" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="exam-end">শেষ তারিখ</label>
+              <input class="form-input" id="exam-end" name="endDate" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off">
+            </div>
+          </div>
+
+          <!-- Paste a whole paper: the template turns it into ready MCQs. -->
+          <div class="card mcq-builder" style="margin:.75rem 0">
+            <h3>📋 প্রশ্ন পেস্ট করুন</h3>
+            <p class="form-hint">যেকোনো জায়গা থেকে প্রশ্ন কপি করে নিচে পেস্ট করুন — প্রশ্ন, চারটি অপশন ও সঠিক উত্তর আলাদা হয়ে প্রশ্ন তৈরি হয়ে যাবে।</p>
+            <pre class="mcq-template" id="exam-template-view"></pre>
+            <div class="row-actions">
+              <button type="button" class="btn btn-small btn-secondary" id="exam-template">টেমপ্লেট বসান</button>
+              <button type="button" class="btn btn-small btn-secondary" id="exam-copy-template">টেমপ্লেট কপি</button>
+            </div>
+            <div class="form-group">
+              <label for="exam-paste">প্রশ্ন ও অপশন</label>
+              <textarea class="form-input form-textarea" id="exam-paste" rows="9" spellcheck="false" placeholder="১. বাংলাদেশের রাজধানী কোনটি?&#10;A) ঢাকা&#10;B) চট্টগ্রাম&#10;C) খুলনা&#10;D) রাজশাহী&#10;উত্তর: A"></textarea>
+              <small class="form-hint" id="exam-paste-rules">প্রতিটি প্রশ্ন: প্রশ্ন + চারটি অপশন (A/B/C/D বা ক/খ/গ/ঘ) + “উত্তর: B”।</small>
+            </div>
+            <button type="button" class="btn btn-secondary btn-block" id="exam-parse">প্রশ্ন তৈরি করুন</button>
+            <div id="exam-parse-report"></div>
+          </div>
+
+          <details class="mini-details" style="margin:.75rem 0">
+            <summary>✍️ একটি একটি করে লিখুন (ঐচ্ছিক)</summary>
+            <div class="mini-body">
+              <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
+              <div class="form-row">
+                <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
+                <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
+                <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+              </div>
+              <div class="form-group">
+                <label for="q-answer">সঠিক উত্তর</label>
+                <select class="form-input form-select" id="q-answer">
+                  <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
+                  <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
+            </div>
+          </details>
+
+          <div class="form-group">
+            <label>তৈরি হওয়া প্রশ্ন <span class="badge accent" id="exam-question-count">এখনো কোনো প্রশ্ন যোগ করা হয়নি</span></label>
+            <div class="list" id="exam-staged"></div>
+          </div>
           <button type="submit" class="btn btn-block" id="exam-save">পরীক্ষা প্রকাশ করুন</button>
         </form>
       </div>
@@ -752,8 +800,8 @@
         </div>
         <button type="button" data-tab="dues"><span class="ico">💰</span>পেমেন্ট</button>
         <button type="button" data-tab="reports"><span class="ico">📊</span>রিপোর্ট</button>
-        <!-- Screen-reader-hidden alias: the ☰ menu lives in the Top Bar now,
-             but the "more" tab key still drives the More grid. -->
+        <!-- Screen-reader-hidden alias: the "more" tab key still drives the
+             extra-features grid (the ☰ top-bar button was removed). -->
         <button type="button" data-tab="more" class="sr-only" tabindex="-1" aria-hidden="true">আরও</button>
       </div>
     </nav>
@@ -793,7 +841,7 @@
       import { initAdminHome } from './js/admin-home.js';
       import { mountInstallButton } from './js/install.js';
       import { listUsers, seedUsers } from './js/auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, dueMonthKey, sharedNotices, receivePayment, receiveStudentPayments, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan } from './js/data.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, dueMonthKey, sharedNotices, receivePayment, receiveStudentPayments, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan, formatBnDate, parseBnDateInput, toAsciiDate, formatBnDateTime } from './js/data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { mountExtraAdmin } from './js/admin-modules.js';
       import { shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from './js/docs.js';
@@ -835,7 +883,7 @@
         ];
         if (st.school) lines.push(`🏫 স্কুল/কলেজ: ${st.school}`);
         if (st.guardian) lines.push(`👨‍👩‍👧 অভিভাবক: ${st.guardian}`);
-        if (st.admissionDate) lines.push(`📅 ভর্তির তারিখ: ${st.admissionDate}`);
+        if (st.admissionDate) lines.push(`📅 ভর্তির তারিখ: ${formatBnDate(st.admissionDate)}`);
         lines.push(``, `ধন্যবাদ।`);
         return lines.join('\n');
       };
@@ -862,10 +910,13 @@
         const addrEl = document.getElementById('ph-addr');
         const contactEl = document.getElementById('ph-contact');
         const logoEl = document.querySelector('.print-header img');
+        const dateEl = document.getElementById('ph-date');
         if (orgEl) orgEl.textContent = org.name;
         if (addrEl) addrEl.textContent = org.address;
         if (contactEl) contactEl.textContent = org.contactLine;
         if (logoEl) logoEl.src = org.orgLogo || 'assets/logo.png';
+        // Every printed sheet carries the Bengali long date (১৬ সেপ্টেম্বর ২০২৬).
+        if (dateEl) dateEl.textContent = formatBnDate(todayBn());
       };
 
       /* ------------------------------------------------------------ */
@@ -952,6 +1003,20 @@
       const classSelect = document.getElementById('student-class');
       classSelect.innerHTML = CLASS_OPTIONS.map((c) => `<option>${c}</option>`).join('');
 
+      // The native date picker stays (it is the fastest way on a phone), but
+      // the chosen date is echoed back in the app's Bengali long format.
+      const admissionInput = document.getElementById('student-admission');
+      const admissionHint = document.getElementById('student-admission-hint');
+      const paintAdmissionHint = () => {
+        if (!admissionHint || !admissionInput) return;
+        const pretty = formatBnDate(admissionInput.value);
+        admissionHint.textContent = pretty
+          ? `নির্বাচিত তারিখ: ${pretty}`
+          : 'তারিখ এভাবে দেখানো হবে: ১৬ সেপ্টেম্বর ২০২৬';
+      };
+      admissionInput?.addEventListener('change', paintAdmissionHint);
+      admissionInput?.addEventListener('input', paintAdmissionHint);
+
       const openStudentModal = (editId = null) => {
         studentForm.reset();
         document.getElementById('student-edit-id').value = '';
@@ -971,7 +1036,7 @@
           studentForm.elements.batch.value = student.batch || '';
           studentForm.elements.guardian.value = student.guardian || '';
           studentForm.elements.guardianPhone.value = student.guardianPhone || '';
-          studentForm.elements.admissionDate.value = student.admissionDate || '';
+          studentForm.elements.admissionDate.value = toAsciiDate(student.admissionDate);
           studentForm.elements.photo.value = student.photo || '';
           studentForm.elements.status.value = student.status || 'সক্রিয়';
         } else {
@@ -979,6 +1044,7 @@
           document.getElementById('student-save').textContent = 'ভর্তি করুন';
           document.getElementById('student-id-hint').textContent = 'স্টুডেন্ট আইডি স্বয়ংক্রিয়ভাবে তৈরি হবে (বছর-শ্রেণি-ক্রম)· যেমন: ২০২৬ সালে নবম শ্রেণির প্রথম ভর্তি = 2609001';
         }
+        paintAdmissionHint();
         openModal('student-modal');
       };
 
@@ -998,7 +1064,7 @@
           batch: String(data.get('batch') || '').trim(),
           guardian: String(data.get('guardian') || '').trim(),
           guardianPhone: String(data.get('guardianPhone') || '').trim(),
-          admissionDate: String(data.get('admissionDate') || '').trim(),
+          admissionDate: parseBnDateInput(data.get('admissionDate')),
           photo: String(data.get('photo') || '').trim(),
           roll: String(data.get('roll')),
           phone: String(data.get('phone') || '').trim(), // never store a dash as a phone number
@@ -1083,7 +1149,7 @@
               ${field('স্কুল / কলেজ', student.school || '—')}
               ${field('অভিভাবকের নাম', student.guardian || '—')}
               ${field('অভিভাবকের মোবাইল', student.guardianPhone || student.phone || '—')}
-              ${field('ভর্তির তারিখ', student.admissionDate || '—')}
+              ${field('ভর্তির তারিখ', formatBnDate(student.admissionDate) || '—')}
             </div>
             <div class="af-sign">
               <div class="af-sign-col"><div class="af-line"></div><div>অভিভাবকের স্বাক্ষর</div></div>
@@ -1153,7 +1219,7 @@
             <div class="meta">${escapeHtml(st.id)}</div>
             <div class="meta">${escapeHtml(st.className || '')}${st.section ? ` · ${escapeHtml(st.section)}` : ''}${st.roll ? ` · রোল ${escapeHtml(st.roll)}` : ''}</div>
             <div class="meta">${escapeHtml(st.phone || '')}</div>
-            <div class="meta">ভর্তি: ${escapeHtml(st.admissionDate || '—')}</div>
+            <div class="meta">ভর্তি: ${escapeHtml(formatBnDate(st.admissionDate) || '—')}</div>
           </div>
 
           <h3 style="margin-top:1rem">অভিভাবক তথ্য</h3>
@@ -1163,7 +1229,7 @@
           <h3 style="margin-top:1rem">ফি লেজার</h3>
           ${row('পরিশোধিত', `৳${bn(paidTotal)}`)}${row('বকেয়া', `৳${bn(dueTotal)}`)}
           ${paid.length ? `<div class="table-wrap"><table class="table"><thead><tr><th>তারিখ</th><th>পরিমাণ</th><th>মাধ্যম</th></tr></thead><tbody>${
-            paid.map((p) => `<tr><td>${escapeHtml(p.date || '')}</td><td>৳${bn(p.amount || 0)}</td><td>${escapeHtml(p.method || '—')}</td></tr>`).join('')
+            paid.map((p) => `<tr><td>${escapeHtml(formatBnDate(p.date))}</td><td>৳${bn(p.amount || 0)}</td><td>${escapeHtml(p.method || '—')}</td></tr>`).join('')
           }</tbody></table></div>` : '<div class="empty-state">কোনো পেমেন্ট রেকর্ড নেই।</div>'}
           ${dues.length ? `<div class="table-wrap" style="margin-top:.5rem"><table class="table"><thead><tr><th>মাস</th><th>বকেয়া</th></tr></thead><tbody>${
             dues.map((d) => `<tr><td>${escapeHtml(d.month || '')}</td><td>৳${bn(d.amount || 0)}</td></tr>`).join('')
@@ -1344,7 +1410,7 @@
             <div class="list-item">
               <div class="li-main">
                 <div class="li-title">${escapeHtml(notice.title)}</div>
-                <div class="li-sub">ক্লাস: ${escapeHtml(notice.className || 'সব')} · ${escapeHtml(notice.date)} · ${escapeHtml(notice.audience)}</div>
+                <div class="li-sub">ক্লাস: ${escapeHtml(notice.className || 'সব')} · ${escapeHtml(formatBnDate(notice.date))} · ${escapeHtml(notice.audience)}</div>
               </div>
               <span class="row-actions">
                 <button type="button" class="btn btn-small btn-secondary" data-edit-notice="${escapeHtml(notice.id)}">সম্পাদনা</button>
@@ -1482,7 +1548,7 @@
             <div class="list-item">
               <div class="li-main">
                 <div class="li-title">${escapeHtml(st?.name || p.studentId)}</div>
-                <div class="li-sub">${escapeHtml(p.month)} · ৳${bn(p.amount)} · ${escapeHtml(p.date)}${p.method ? ` · ${escapeHtml(p.method)}` : ''}</div>
+                <div class="li-sub">${escapeHtml(p.month)} · ৳${bn(p.amount)} · ${escapeHtml(formatBnDate(p.date))}${p.method ? ` · ${escapeHtml(p.method)}` : ''}</div>
                 ${p.receiptNo ? `<div class="li-sub">রিসিট ${escapeHtml(p.receiptNo)}</div>` : ''}
               </div>
               <button type="button" class="btn btn-small" data-receipt="${escapeHtml(p.id)}">রিসিট</button>
@@ -1541,7 +1607,8 @@
             <span class="pm-name">${escapeHtml(fee.month)}</span>
             <span class="pm-amt">৳${bn(dueRemaining(fee))}</span>
           </label>`).join('');
-        document.getElementById('pay-date').value = todayBn();
+        // Shown the Bengali long way (১৬ সেপ্টেম্বর ২০২৬), stored canonically.
+        document.getElementById('pay-date').value = formatBnDate(todayBn());
         document.getElementById('pay-reference').value = '';
         document.getElementById('pay-remarks').value = '';
         syncPayAmount();
@@ -1555,11 +1622,13 @@
         const studentId = String(d.get('studentId') || '');
         const feeIds = [...document.querySelectorAll('#pay-months [data-pay-month]:checked')].map((box) => String(box.value));
         const amount = Number(d.get('amount'));
-        const date = String(d.get('date') || '').trim();
+        // The date is typed the Bengali long way (১৬ সেপ্টেম্বর ২০২৬) and
+        // stored as the canonical Bengali ISO date the rest of the app uses.
+        const date = parseBnDateInput(d.get('date'));
         if (!studentId) { showToast('শিক্ষার্থী নির্বাচন করুন।', 'error'); return; }
         if (!feeIds.length) { showToast('কমপক্ষে একটি মাস টিক দিন।', 'error'); return; }
         if (!Number.isFinite(amount) || amount <= 0) { showToast('সঠিক পরিমাণ লিখুন।', 'error'); return; }
-        if (!date) { showToast('তারিখ দিন।', 'error'); return; }
+        if (!date) { showToast('তারিখটি বোঝা যায়নি। এভাবে লিখুন: ১৬ সেপ্টেম্বর ২০২৬', 'error'); return; }
 
         // Validate against what is really owed *before* anything is written:
         // the old flow marked the fee পরিশোধিত first and only then copied the
@@ -1838,7 +1907,7 @@
         document.getElementById('system-list').innerHTML = [
           ['ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)'],
           ['লগিন করা', session.name],
-          ['সেশন শুরু', new Date(session.loginTime).toLocaleString('bn-BD')]
+          ['সেশন শুরু', formatBnDateTime(session.loginTime)]
         ].map(([label, value]) => `
           <div class="list-item">
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
@@ -2015,13 +2084,9 @@
       // The home render writes the header too — repaint it as institution-first.
       syncTopbar();
 
-      /* ============ Icon-based shell: menu, profile, Quick Add ============ */
-      // Top Bar ☰ opens the same More grid the old bottom "আরও" button did.
-      document.getElementById('admin-menu-btn')?.addEventListener('click', () => {
-        tabs?.activate?.('home');
-        adminHome?.openMore();
-      });
-
+      /* ============ Icon-based shell: profile, Quick Add ============ */
+      // The ☰ was removed from the top bar: the "সব ফিচার" shortcut on the
+      // home (and the bottom navigation's আরও tab) opens the same feature grid.
       // Top Bar 👤 profile dropdown (profile / settings / logout).
       const profileBtn = document.getElementById('admin-profile-btn');
       const profileMenu = document.getElementById('admin-profile-menu');

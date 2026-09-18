@@ -24,10 +24,17 @@ export const ALL_CLASSES = 'সব';
    days — a September deadline turns every "pending" assignment into "overdue"
    and closes the demo exam window — so the sample centre always looks alive. */
 const SEED_DIGITS = '০১২৩৪৫৬৭৮৯';
-const BN_MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+export const BN_MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
   'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
 
-const toBnDigits = (value) => String(value).replace(/\d/g, (d) => SEED_DIGITS[d]);
+const EN_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december'];
+
+export const toBnDigits = (value) => String(value).replace(/\d/g, (d) => SEED_DIGITS[d]);
+
+/** ১৬/০৯/২০২৬ → '16/09/2026' — everything below parses on plain digits. */
+export const toAsciiDigits = (value) => String(value ?? '')
+  .replace(/[০-৯]/g, (d) => String(SEED_DIGITS.indexOf(d)));
 
 /** 2026-09-12 → ২০২৬-০৯-১২ (UTC based, exactly like todayBn()). */
 function seedDay(date) {
@@ -590,10 +597,126 @@ export function todayBn() {
   return iso.replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 }
 
-/** True when a Bengali ISO date ('২০২৬-০৯-১২') falls in the current month. */
+/* ------------------------------------------------------------------ */
+/* Dates: one Bengali long format everywhere                            */
+/*                                                                     */
+/* Every date the app *shows* is written ১৬ সেপ্টেম্বর ২০২৬            */
+/* (formatBnDate). Records keep the canonical Bengali ISO date          */
+/* ('২০২৬-০৯-১৬') they have always used, so sorting, exam windows and   */
+/* month grouping keep working — and any date a person types (Bengali,  */
+/* English, slash, dot or the long form itself) is normalised on save   */
+/* with parseBnDateInput().                                            */
+/* ------------------------------------------------------------------ */
+
+/** What a date field expects: the same long Bengali form the app prints. */
+export const BN_DATE_PLACEHOLDER = '১৬ সেপ্টেম্বর ২০২৬';
+
+const MONTH_INDEX = (name) => {
+  const key = String(name || '').toLowerCase().replace(/,$/, '');
+  const bn = BN_MONTHS.indexOf(key);
+  if (bn !== -1) return bn + 1;
+  const en = EN_MONTHS.findIndex((month) => month === key || (key.length >= 3 && month.startsWith(key)));
+  return en === -1 ? 0 : en + 1;
+};
+
+function dateParts(year, month, day) {
+  if (!(year >= 1000 && year <= 9999)) return null;
+  if (!(month >= 1 && month <= 12)) return null;
+  if (day !== null && !(day >= 1 && day <= 31)) return null;
+  return { year, month, day };
+}
+
+/**
+ * Everything the app could be handed → { year, month, day } (day: null for a
+ * month-only label) or null when the text is not a date at all.
+ */
+export function parseDateParts(value) {
+  const raw = toAsciiDigits(value).trim();
+  if (!raw) return null;
+
+  // 2026-09-16 · 2026/9/16 · 2026-09-16T10:30:00Z (timestamps sort first)
+  let m = raw.match(/^(\d{4})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?/);
+  if (m) return dateParts(+m[1], +m[2], m[3] ? +m[3] : null);
+  // 16-09-2026 · 16/09/2026 · 16.09.2026
+  m = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (m) return dateParts(+m[3], +m[2], +m[1]);
+  // 16 September 2026 · 16 সেপ্টেম্বর ২০২৬ · 16th Sep 2026
+  m = raw.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([^\s,]+),?\s+(\d{4})$/i);
+  if (m) { const index = MONTH_INDEX(m[2]); return index ? dateParts(+m[3], index, +m[1]) : null; }
+  // September 2026 · সেপ্টেম্বর ২০২৬ (month labels — used by fee months)
+  m = raw.match(/^([^\s\d,]+),?\s+(\d{4})$/);
+  if (m) { const index = MONTH_INDEX(m[1]); return index ? dateParts(+m[2], index, null) : null; }
+  return null;
+}
+
+/**
+ * Any supported date → '১৬ সেপ্টেম্বর ২০২৬'.
+ *
+ * Text that is not a date ('—', 'আজ', 'চলমান', a fee month label…) is returned
+ * unchanged so a report never prints an empty cell where a value existed.
+ */
+export function formatBnDate(value, { fallback = '' } = {}) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  const parts = parseDateParts(raw);
+  if (!parts) return raw;
+  if (!parts.day) return `${BN_MONTHS[parts.month - 1]} ${toBnDigits(parts.year)}`;
+  return `${toBnDigits(parts.day)} ${BN_MONTHS[parts.month - 1]} ${toBnDigits(parts.year)}`;
+}
+
+/**
+ * A stored date that carries a time ('2026-09-18T09:12:00.000Z') →
+ * '১৮ সেপ্টেম্বর ২০২৬ · ০৯:১২'. Same date format as everywhere else, with the
+ * clock appended only when the value really has one.
+ */
+export function formatBnDateTime(value, { fallback = '' } = {}) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  const date = formatBnDate(raw);
+  if (!/\d{1,2}:\d{2}/.test(raw)) return date;
+  const when = new Date(raw);
+  if (Number.isNaN(when.getTime())) return date;
+  const hh = String(when.getHours()).padStart(2, '0');
+  const mm = String(when.getMinutes()).padStart(2, '0');
+  return `${date} · ${toBnDigits(hh)}:${toBnDigits(mm)}`;
+}
+
+/**
+ * A typed date (Bengali long form, English, ISO, slashes…) → the canonical
+ * Bengali ISO date the store keeps, or '' when it cannot be understood.
+ */
+export function parseBnDateInput(value) {
+  const parts = parseDateParts(value);
+  if (!parts) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return toBnDigits(`${parts.year}-${pad(parts.month)}-${pad(parts.day || 1)}`);
+}
+
+/** True for values that look like a date to the store (used for display). */
+export function looksLikeDate(value) {
+  return Boolean(parseDateParts(value));
+}
+
+/**
+ * A stored date as the plain `YYYY-MM-DD` a native <input type="date"> needs
+ * (those inputs only speak ISO), or '' when it is not a date.
+ */
+export function toAsciiDate(value) {
+  const parts = parseDateParts(value);
+  if (!parts) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day || 1)}`;
+}
+
+/**
+ * True when a date falls in the current month — in any format the app accepts
+ * (Bengali ISO, plain ISO, the long Bengali form, or a 'সেপ্টেম্বর ২০২৬' label).
+ */
 export function isThisMonth(bnDate) {
-  const value = String(bnDate || '');
-  return value.length >= 7 && value.slice(0, 7) === todayBn().slice(0, 7);
+  const parts = parseDateParts(bnDate);
+  const today = parseDateParts(todayBn());
+  if (!parts || !today) return false;
+  return parts.year === today.year && parts.month === today.month;
 }
 
 /**
@@ -966,38 +1089,169 @@ export function importBackup(text) {
   return { ok: true, restored: Object.keys(collections).length };
 }
 
-/** Parse pasted MCQ blocks:  Question / A. B. C. D. / Correct. */
+/**
+ * The paste template teachers copy. Every question is written the way a
+ * Bangladeshi question paper reads, so a whole paper can be pasted in one go.
+ */
+export const MCQ_TEMPLATE = [
+  '১. বাংলাদেশের রাজধানী কোনটি?',
+  'A) ঢাকা',
+  'B) চট্টগ্রাম',
+  'C) খুলনা',
+  'D) রাজশাহী',
+  'উত্তর: A',
+  '',
+  '২. ৫ + ৩ × ২ = কত?',
+  'ক) ১০',
+  'খ) ১১',
+  'গ) ১৬',
+  'ঘ) ২০',
+  'উত্তর: খ'
+].join('\n');
+
+/** One-line reminder printed under the paste box. */
+export const MCQ_PASTE_RULES = 'প্রতিটি প্রশ্ন: প্রশ্ন + চারটি অপশন (A/B/C/D বা ক/খ/গ/ঘ) + "উত্তর: B"। যেভাবেই কপি হোক — খালি লাইন, নম্বর, বোল্ড, সব চলবে।';
+
+const BN_LETTERS = 'কখগঘ';
+
+/** Which option (0-3) a marker letter/number stands for, or -1. */
+function markerIndex(marker) {
+  const ch = String(marker || '').trim();
+  if (!ch) return -1;
+  const bnLetter = BN_LETTERS.indexOf(ch);
+  if (bnLetter !== -1) return bnLetter;
+  const map = 'abcdABCD১২৩৪';
+  const at = map.indexOf(ch);
+  return at === -1 ? -1 : at % 4;
+}
+
+const ANSWER_LINE = /^(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Correct\s*Answer|Correct|Answer|Ans)\s*[:.)\-]?\s*([A-Da-dক-ঘ১-৪])(?![A-Da-dক-ঘ১-৪\w])/i;
+const OPTION_LINE = /^([A-Da-dক-ঘ])\s*[).।:\-]?\s+(.+)$/;
+const NUMBERED_LINE = /^([০-৯\d]{1,2})\s*[).।:\-]?\s+(.+)$/;
+const BN_DIGIT_MAP = '০১২৩৪৫৬৭৮৯';
+
+/** '**bold**', '#', stray bullets — copy-paste noise that is not the question. */
+function cleanLine(line) {
+  return String(line || '')
+    .replace(/\*\*/g, '')               // bold markers from Word/Google Docs
+    .replace(/^[\s•·◦‣]+/, '')
+    .replace(/^#{1,6}\s*/, '')          // markdown headings
+    .replace(/^\s*[-–—]\s+/, '')        // bullet dashes
+    .replace(/[_\s]+$/, '')
+    .trim();
+}
+
+const asciiNumber = (text) => Number(String(text).replace(/[০-৯]/g, (d) => String(BN_DIGIT_MAP.indexOf(d))));
+
+/**
+ * 'প্রশ্ন: ৫+৩=?' / 'প্রশ্ন ১. …' / 'Q1. …' / 'Question 2) …' → the question
+ * itself. The prefix must be followed by a separator (or a number, then a
+ * separator) so a question that merely starts with 'প্রশ্নপত্র' is untouched.
+ */
+function stripQuestionPrefix(text) {
+  const raw = String(text || '');
+  const stripped = raw
+    .replace(/^\s*(?:প্রশ্ন|প্র|Question|Q)\s*(?:নং|no|No)?\s*[০-৯\d]+\s*[:.।)\-]?\s+/i, '')
+    .replace(/^\s*(?:প্রশ্ন|প্র|Question|Q)\s*(?:নং|no|No)?\s*[:.।)\-]\s*/i, '')
+    .trim();
+  return stripped || raw.trim();
+}
+
+/**
+ * Parse a pasted MCQ paper.
+ *
+ * Understands what teachers actually copy: blank-line separated blocks, one
+ * long stream with no blank lines, 'প্রশ্ন:'/'Q1.' prefixes, bold markers,
+ * A/B/C/D options, Bengali ক/খ/গ/ঘ options, and answers written as
+ * 'সঠিক: B', 'উত্তর: ৩', 'Answer: d' or inline '(উত্তর: B)' on the question.
+ *
+ * @returns {{questions: Array<{q: string, options: string[], answer: number}>,
+ *            errors: string[], duplicates: string[]}} questions ready to save,
+ *            incomplete blocks described in errors, repeated questions in duplicates.
+ */
 export function parseMcqPaste(text) {
-  const blocks = String(text).trim().split(/\n\s*\n/);
-  const questions = [];
+  const lines = String(text ?? '').split(/\r?\n/);
+  const raw = [];
   const errors = [];
-  blocks.forEach((block, bi) => {
-    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
-    if (!lines.length) return;
-    const q = lines[0].replace(/^Q(uestion)?[:.)]?\s*/i, '');
-    const opts = [];
-    let answer = -1;
-    for (const line of lines.slice(1)) {
-      const om = line.match(/^([A-Da-d১-৪])[:.)]?\s*(.+)$/);
-      // No \b here: Bengali digits are not \w, so a word boundary never matches
-      // after them and the answer line would be silently ignored.
-      const am = line.match(/^(?:সঠিক|Correct|Answer)[:.)]?\s*([A-Da-d১-৪])(?![A-Da-d১-৪])/i);
-      if (am) { answer = 'abcdABCD১২৩৪'.indexOf(am[1]) % 4; }
-      else if (om) opts.push(om[2]);
+  const duplicates = [];
+  let current = null;
+  let blockNo = 0;
+
+  const finish = () => {
+    if (!current) return;
+    blockNo += 1;
+    const question = current.q.trim();
+    if (!question || current.options.length < 2) {
+      errors.push(`প্রশ্ন ${blockNo}: প্রশ্ন বা অপশন অসম্পূর্ণ (কমপক্ষে ২টি অপশন দরকার)।`);
+    } else {
+      raw.push({
+        q: question,
+        options: current.options.slice(0, 4),
+        answer: current.answer < 0 ? 0 : current.answer     // no answer line → first option
+      });
     }
-    if (!q || opts.length < 2) { errors.push(`ব্লক ${bi + 1}: প্রশ্ন/অপশন অসম্পূর্ণ।`); return; }
-    if (answer < 0) answer = 0;
-    const key = 'abcdABCD১২৩৪'.indexOf; void key;
-    questions.push({ q, options: opts.slice(0, 4), answer });
-  });
-  const dupes = [];
+    current = null;
+  };
+
+  const start = (questionText) => { current = { q: questionText, options: [], answer: -1 }; };
+
+  for (const line of lines) {
+    const clean = cleanLine(line);
+    if (!clean) { finish(); continue; }
+
+    const answerMatch = clean.match(ANSWER_LINE);
+    if (answerMatch && current) {
+      const index = markerIndex(answerMatch[1]);
+      if (index !== -1) current.answer = index;
+      continue;
+    }
+
+    const optionMatch = clean.match(OPTION_LINE);
+    if (optionMatch && current) {
+      current.options.push(cleanLine(optionMatch[2]));
+      continue;
+    }
+
+    const numbered = clean.match(NUMBERED_LINE);
+    if (numbered) {
+      const label = asciiNumber(numbered[1]);
+      const text = cleanLine(numbered[2]);
+      if (!current || !current.q.trim()) { start(stripQuestionPrefix(text)); continue; }
+      // '১. প্রশ্ন' starts the next question; '১. অপশন' continues this one —
+      // the option numbering always picks up where the last option left off.
+      if (label === current.options.length + 1) { current.options.push(text); continue; }
+      finish();
+      start(stripQuestionPrefix(text));
+      continue;
+    }
+
+    // Plain text: continues a question that has no options yet, otherwise it
+    // is the beginning of the next question (no blank line needed).
+    if (current && (current.options.length || current.answer >= 0)) { finish(); }
+    if (!current) start(stripQuestionPrefix(clean));
+    else current.q = `${current.q} ${clean}`.trim();
+
+    // An inline answer on the question line — '৫+৩=? (উত্তর: B)'.
+    const inline = current.q.match(/[([]?\s*(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Answer)\s*[:.)\-]?\s*([A-Da-dক-ঘ১-৪])\s*[)\]]?\s*$/i);
+    if (inline) {
+      const index = markerIndex(inline[1]);
+      if (index !== -1) {
+        current.answer = index;
+        current.q = current.q.slice(0, inline.index).trim();
+      }
+    }
+  }
+  finish();
+
   const seen = new Set();
-  const clean = questions.filter((q) => {
-    const k = q.q.trim();
-    if (seen.has(k)) { dupes.push(k); return false; }
-    seen.add(k); return true;
+  const questions = raw.filter((item) => {
+    const key = item.q.replace(/\s+/g, ' ').trim();
+    if (seen.has(key)) { duplicates.push(key); return false; }
+    seen.add(key);
+    return true;
   });
-  return { questions: clean, errors, duplicates: dupes };
+
+  return { questions, errors, duplicates };
 }
 
 /** Export rows as CSV (for Excel/print workflows). */
@@ -1251,11 +1505,17 @@ function bnDigitsToAscii(text) {
   return String(text || '').replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6));
 }
 
+/**
+ * Any stored/typed date → a local Date at midnight, or null.
+ *
+ * Goes through parseDateParts(), so a date typed the Bengali long way
+ * ('১৬ সেপ্টেম্বর ২০২৬') opens and closes an exam window exactly like the
+ * canonical '২০২৬-০৯-১৬' does.
+ */
 function bnToIso(text) {
-  const ascii = bnDigitsToAscii(text);
-  const m = ascii.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const parts = parseDateParts(text);
+  if (!parts || !parts.day) return null;
+  return new Date(parts.year, parts.month - 1, parts.day);
 }
 
 /** Is an exam open right now? Drives View Exam vs Start Exam (never both). */
@@ -1264,9 +1524,15 @@ export function examWindow(exam) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const start = bnToIso(exam.startDate);
   const end = bnToIso(exam.endDate);
-  if (start && today < start) return { state: 'upcoming', label: exam.date || '', canStart: false };
+  // Labels are painted straight into lists, so they carry the one Bengali
+  // date format the whole app prints.
+  if (start && today < start) return { state: 'upcoming', label: `শুরু হবে ${formatBnDate(exam.startDate)}`, canStart: false };
   if (end && today > end) return { state: 'closed', label: 'সময় শেষ', canStart: false };
-  return { state: 'active', label: exam.date || 'চলমান', canStart: true };
+  return {
+    state: 'active',
+    label: end && String(exam.endDate).trim() ? `শেষ ${formatBnDate(exam.endDate)}` : 'চলমান',
+    canStart: true
+  };
 }
 
 /** Pending / submitted / checked / overdue + human due label. */
@@ -1282,8 +1548,9 @@ export function assignmentStatus(assignment, student) {
 
 export function dueLabel(assignment) {
   const { status, daysLeft } = assignmentStatus(assignment, arguments[1]);
-  if (status === 'submitted' || status === 'checked') return assignment.deadline;
-  if (daysLeft === null) return assignment.deadline;
+  const deadline = formatBnDate(assignment.deadline);
+  if (status === 'submitted' || status === 'checked') return deadline;
+  if (daysLeft === null) return deadline;
   if (daysLeft < 0) return 'সময় পার হয়েছে';
   if (daysLeft === 0) return 'আজই জমা দিন';
   if (daysLeft === 1) return 'আগামীকাল শেষ';
@@ -1646,15 +1913,15 @@ export function passRate() {
 export function recentActivity(limit = 6) {
   const items = [];
   db.students.list().forEach((s) => items.push({
-    icon: '🎓', text: `নতুন শিক্ষার্থী ভর্তি: ${s.name}`, meta: `${s.className} · ${s.admissionDate || ''}`,
+    icon: '🎓', text: `নতুন শিক্ষার্থী ভর্তি: ${s.name}`, meta: `${s.className} · ${formatBnDate(s.admissionDate)}`,
     at: s.admissionDate || ''
   }));
   db.payments.list().forEach((p) => items.push({
-    icon: '💰', text: `পেমেন্ট গ্রহণ: ${p.studentId || ''}`, meta: `${p.amount || 0} টাকা · ${p.date || ''}`,
+    icon: '💰', text: `পেমেন্ট গ্রহণ: ${p.studentId || ''}`, meta: `${p.amount || 0} টাকা · ${formatBnDate(p.date)}`,
     at: p.date || ''
   }));
   db.exams.list().forEach((e) => items.push({
-    icon: '📝', text: `পরীক্ষা তৈরি: ${e.title}`, meta: `${e.className || ''} · ${e.startDate || ''}`,
+    icon: '📝', text: `পরীক্ষা তৈরি: ${e.title}`, meta: `${e.className || ''} · ${formatBnDate(e.startDate)}`,
     at: e.startDate || ''
   }));
   db.activityLogs.list().forEach((l) => items.push({

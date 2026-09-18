@@ -9,7 +9,8 @@ import {
   parseMcqPaste, parseMcqCsv, toCSV, downloadText, logActivity, activityLogs,
   todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor,
   bnMonthLabel, isThisMonth,
-  PERMISSIONS, DEFAULT_PERMISSIONS, getDbStatus
+  PERMISSIONS, DEFAULT_PERMISSIONS, getDbStatus,
+  formatBnDate
 } from './data.js';
 import { mountCrud } from './crud.js';
 import { escapeHtml, renderTable, showToast, openModal, closeModal, getAuthMode, requireOnline } from './app.js';
@@ -81,9 +82,10 @@ function mountDashboard(session) {
     if (!el) return;
     const mode = getAuthMode();
     el.className = `alert ${connected || mode === 'local' ? 'alert-success' : 'alert-error'}`;
+    const synced = formatBnDate(todayBn());
     el.textContent = mode === 'local'
-      ? `ডেটাবেস: লোকাল মোড (সংযুক্ত) · শেষ সিঙ্ক: ${todayBn()}`
-      : connected ? `ডেটাবেস: সংযুক্ত · শেষ সিঙ্ক: ${todayBn()}` : 'ডেটাবেস: বিচ্ছিন্ন (অফলাইন)';
+      ? `ডেটাবেস: লোকাল মোড (সংযুক্ত) · শেষ সিঙ্ক: ${synced}`
+      : connected ? `ডেটাবেস: সংযুক্ত · শেষ সিঙ্ক: ${synced}` : 'ডেটাবেস: বিচ্ছিন্ন (অফলাইন)';
   }).catch(() => {
     // A rejected probe must not become an unhandled rejection (and must not
     // leave the status card claiming a connection it never verified).
@@ -200,7 +202,7 @@ function mountSubmissions(session) {
     renderTable('#submissions-table', [
       { key: 'studentName', label: 'শিক্ষার্থী', render: (r) => escapeHtml(r.studentName || r.studentId) },
       { key: 'assignmentId', label: 'অ্যাসাইনমেন্ট', render: (r) => escapeHtml(db.assignments.find(r.assignmentId)?.title || r.assignmentId) },
-      { key: 'date', label: 'জমার তারিখ', render: (r) => escapeHtml(r.date || '—') },
+      { key: 'date', label: 'জমার তারিখ', render: (r) => escapeHtml(formatBnDate(r.date) || '—') },
       { key: 'status', label: 'অবস্থা', render: (r) => escapeHtml(r.status) },
       { key: '_a', label: '', render: (r) => r.status === 'চেক হয়েছে'
         ? `<span class="badge success">✓ ${escapeHtml(r.feedback || '')}</span>`
@@ -419,7 +421,7 @@ function mountNotifications(session) {
     const rows = all.slice(0, 50);
     const html = rows.map((n) => `
       <div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(n.title)}</div>
-      <div class="li-sub">${escapeHtml(n.type)} · ${escapeHtml(n.target)} · ${escapeHtml(n.date)}</div></div>
+      <div class="li-sub">${escapeHtml(n.type)} · ${escapeHtml(n.target)} · ${escapeHtml(formatBnDate(n.date))}</div></div>
       <span class="badge ${n.read ? 'success' : 'warning'}">${n.read ? 'পঠিত' : 'অপঠিত'}</span></div>`).join('');
     list.innerHTML = (html
       + (all.length > rows.length
@@ -600,7 +602,7 @@ function mountReports(session) {
         { key: 'reference', label: 'রেফারেন্স' }
       ],
       rows: (cls) => paymentsIn(cls).map((p) => ({
-        date: p.date || '—',
+        date: formatBnDate(p.date) || '—',
         receiptNo: p.receiptNo || p.id || '—',
         studentId: p.studentId,
         name: p.student?.name || '—',
@@ -692,7 +694,7 @@ function mountReports(session) {
         // A notice for every class stays visible while one class is selected.
         .filter((n) => wanted(cls)(n.className) || n.className === ALL_CLASSES)
         .map((n) => ({
-          date: n.date || '—',
+          date: formatBnDate(n.date) || '—',
           title: n.title || '—',
           className: n.className === ALL_CLASSES ? 'সব ক্লাস' : (n.className || '—'),
           // Payment receipts are personal notices — say so instead of hiding it.
@@ -745,7 +747,7 @@ function mountReports(session) {
   const buildDocument = async (r, cls, rows) => {
     const settings = db.settings.get();
     const title = `${r.label} — ${r.bn}`;
-    const subtitleFor = (c) => `শ্রেণি: ${c === ALL_CLASSES ? 'সব' : c} · ${todayBn()}`;
+    const subtitleFor = (c) => `শ্রেণি: ${c === ALL_CLASSES ? 'সব' : c} · ${formatBnDate(todayBn())}`;
     const canvases = [];
     if (r.byClass) {
       const classes = (cls && cls !== ALL_CLASSES)
@@ -785,7 +787,7 @@ function mountReports(session) {
       const canvases = await buildDocument(r, cls, rows);
       await previewDocument({
         title: `${r.label} — ${r.bn}`,
-        meta: `শ্রেণি: ${cls === ALL_CLASSES ? 'সব' : cls} · ${todayBn()} · ${bn(rows.length)} সারি`,
+        meta: `শ্রেণি: ${cls === ALL_CLASSES ? 'সব' : cls} · ${formatBnDate(todayBn())} · ${bn(rows.length)} সারি`,
         filename: `${base}.pdf`,
         canvases,
         excel: { filename: `${base}.csv`, csv: toCSV(r.cols, rows) },

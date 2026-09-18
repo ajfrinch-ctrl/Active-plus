@@ -160,7 +160,10 @@ test('offline shows the indicator and blocks starting an exam', async () => {
   const { doc } = await bootHome();
   Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: false, configurable: true });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('offline'));
-  assert.equal(doc.getElementById('net-chip').classList.contains('off'), true, 'chip marked offline');
+  // The chip is gone: the top bar's own border carries the connection state.
+  assert.equal(doc.getElementById('net-chip'), null, 'no online/offline chip in the top bar');
+  assert.equal(doc.getElementById('home-header').dataset.net, 'offline', 'top bar marked offline');
+  assert.equal(doc.getElementById('home-header').classList.contains('offline'), true, 'offline styling applied');
   click(doc, '#home-content [data-act="startexam"]');
   assert.equal(doc.getElementById('view-exam').hidden, true, 'exam view not opened while offline');
 });

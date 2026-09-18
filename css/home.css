@@ -17,12 +17,59 @@ body.home-body {
   padding: calc(0.75rem + var(--safe-top)) var(--gutter) 1rem;
 }
 
-/* ---------- Header ---------- */
+/* ---------- Top bar ---------- */
+/* A single rounded card: avatar, greeting, name, class, then a thin strip with
+   today's date. Its border is the connection indicator — green while online,
+   amber while offline — so no text chip is needed. */
 .home-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.625rem 0.75rem;
+  padding: 0.75rem 0.875rem;
   margin-bottom: 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(66, 153, 225, 0.18), rgba(23, 81, 143, 0.10)),
+    var(--surface);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.20);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.home-header[data-net="online"] {
+  border-color: #2f9e6a;
+  box-shadow: 0 0 0 1px rgba(47, 158, 106, 0.45), 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+.home-header[data-net="offline"] {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 1px rgba(214, 158, 46, 0.45), 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+/* The same signal, second time and quieter: a ring around the avatar. */
+.home-header[data-net="online"] .avatar { box-shadow: 0 0 0 3px rgba(47, 158, 106, 0.35), 0 6px 16px rgba(0, 0, 0, 0.25); }
+.home-header[data-net="offline"] .avatar { box-shadow: 0 0 0 3px rgba(214, 158, 46, 0.35), 0 6px 16px rgba(0, 0, 0, 0.25); }
+.home-header .hh-actions { display: flex; gap: 0.5rem; align-items: center; }
+.home-header .hh-actions .icon-btn,
+.home-header .hh-actions .bell { margin-top: 0; }
+.home-header .hh-strip {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  font-size: 0.75rem; color: var(--text-muted);
+}
+.home-header .hh-date {
+  color: var(--text-light); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-header .hh-year {
+  letter-spacing: 0.02em; flex: 0 0 auto;
+  padding: 0.125rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+@media (max-width: 360px) {
+  .home-header .name { font-size: 1rem; }
+  .home-header .hh-strip { font-size: 0.6875rem; }
 }
 .avatar {
   width: 48px; height: 48px; flex: 0 0 auto;
@@ -169,7 +216,8 @@ body.home-body {
   .skeleton::after { animation: none; }
 }
 
-/* Online / offline indicator (PWA) */
+/* Online / offline chip — used by the teacher and admin homes (the student
+   top bar shows the connection with its own border instead). */
 .net-chip {
   flex: none;
   align-self: flex-start;
@@ -362,3 +410,67 @@ body.home-body {
   box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
 }
 .notif-badge[hidden] { display: none; }
+
+/* ==========================================================================
+   MCQ exam — paste builder (teacher/admin) + timed player (student)
+   ========================================================================== */
+
+/* ---------- Paste-to-create builder in the exam modal ---------- */
+.mcq-builder h3 { font-size: 1rem; margin-bottom: .25rem; }
+.mcq-template {
+  margin: .5rem 0;
+  padding: .75rem;
+  background: rgba(255, 255, 255, .04);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  font-family: 'Hind Siliguri', 'Noto Sans Bengali', ui-monospace, monospace;
+  font-size: .8125rem;
+  line-height: 1.7;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  direction: ltr;
+  text-align: left;
+}
+
+/* ---------- Running paper ---------- */
+.exam-topbar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  padding: .5rem .75rem;
+  background: var(--primary-dark);
+  border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+}
+.exam-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700; font-size: 1.125rem;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+  border-radius: 999px; padding: .2rem .7rem;
+}
+.exam-timer.warn { color: var(--warning); background: rgba(214, 158, 46, .16); border-color: rgba(214, 158, 46, .5); }
+.exam-timer.danger { color: #fff; background: var(--error-fill); border-color: var(--error-fill); animation: pulse 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .exam-timer.danger { animation: none; } }
+.exam-count { font-size: .8125rem; color: var(--text-muted); }
+.exam-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .08); margin: .625rem 0; overflow: hidden; }
+.exam-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-fill)); transition: width .25s ease; }
+.exam-palette { display: flex; flex-wrap: wrap; gap: .375rem; margin-bottom: .75rem; }
+.exam-dot {
+  min-width: 40px; min-height: 40px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-light);
+  font-weight: 700; cursor: pointer;
+}
+.exam-dot.done { border-color: var(--success); color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.exam-dot.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.exam-q-text { font-weight: 600; font-size: 1rem; line-height: 1.75; }
+.exam-option { margin-bottom: .375rem; }
+.exam-option b { color: var(--accent); }
+.exam-actions { display: flex; gap: .5rem; margin: .75rem 0; }
+.exam-actions .btn { flex: 1; }
+.exam-result .exam-score { font-size: 2.25rem; font-weight: 800; }
+.exam-result .exam-pct { font-size: 1rem; color: var(--text-muted); margin-bottom: .5rem; }
+.exam-review { border-left: 3px solid var(--border); padding: .5rem .75rem; margin-bottom: .5rem; }
+.exam-review.ok { border-color: var(--success); }
+.exam-review.bad { border-color: var(--danger); }

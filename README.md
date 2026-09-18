@@ -50,6 +50,61 @@ portal (শিক্ষার্থী → `student.html`, শিক্ষক �
   two digits of the mobile number, e.g. `রাহেলা আক্তার` + mobile ending `১১`
   → `রাহেলা১১`. If that would collide, a numeric suffix is appended.
 
+## Dates — one format, everywhere
+
+Every date the app *shows* reads **১৬ সেপ্টেম্বর ২০২৬** (Bengali day + Bengali
+month name + Bengali year) — on cards, tables, reports, receipts, ledgers, ID
+cards, print letterheads and exam lists alike. `formatBnDate()` in `js/data.js`
+is the single place that renders a date; `formatBnDateTime()` appends a Bengali
+clock (`১৮ সেপ্টেম্বর ২০২৬ · ০৯:১২`) when the record really carries a time.
+
+Dates are **stored** as canonical Bengali ISO (`২০২৬-০৯-১৬`) and **typed in**
+however the user likes: `১৬ সেপ্টেম্বর ২০২৬`, `16 September 2026`,
+`2026-09-16`, `১৬/০৯/২০২৬` all mean the same day (`parseBnDateInput()`). A date
+field is a text box with the `১৬ সেপ্টেম্বর ২০২৬` placeholder and a hint under
+it; an unreadable date is refused with a Bengali message instead of being saved
+as garbage. Test coverage: `tests/date-format.test.mjs` walks every student /
+teacher / admin view and fails on any leftover raw date.
+
+## MCQ exams — paste a paper, get ready questions
+
+The exam builder no longer needs a question typed field by field. The teacher
+(or admin) copies a whole paper and pastes it into **📋 প্রশ্ন পেস্ট করুন**; the
+questions appear ready to review and publish. The template is printed right
+above the paste box (with *টেমপ্লেট বসান* / *টেমপ্লেট কপি* buttons):
+
+```
+১. বাংলাদেশের রাজধানী কোনটি?
+A) ঢাকা
+B) চট্টগ্রাম
+C) খুলনা
+D) রাজশাহী
+উত্তর: A
+
+২. ৫ + ৩ × ২ = কত?
+ক) ১০
+খ) ১১
+গ) ১৬
+ঘ) ২০
+উত্তর: খ
+```
+
+The parser (`parseMcqPaste()`) is deliberately forgiving about how the text was
+copied — Bengali or English digits, `A)` / `A.` / `ক)` / `১.` option markers,
+`উত্তর:` / `সঠিক:` / `Answer:` markers, answers written inline
+(`৫+৩=? (উত্তর: B)`), bold `**…**` markers from Word/Docs, stray bullets, and
+papers with no blank lines between questions. Duplicate and incomplete
+questions are reported before anything is saved — nothing is written until
+*পরীক্ষা প্রকাশ করুন*.
+
+Taking an exam: the timer starts the moment the paper opens and is always
+visible (`⏱ ২৯:৫৮`, turning amber under a minute and red under 30 seconds).
+The sitting is remembered per student + exam, so a reload or a closed tab
+resumes the *same* deadline — reopening can never buy extra time. When the
+countdown reaches zero the paper **submits itself**, is graded, and the student
+sees “⏰ সময় শেষ — স্বয়ংক্রিয়ভাবে জমা হয়েছে” with the full answer review. One
+attempt per exam.
+
 ## Structure
 
 ```
@@ -115,6 +170,16 @@ student's own records — no hard-coded statistics anywhere:
 
 Every card answers with the student's own rows only; the data layer filters by
 class/batch before anything reaches the UI.
+
+The Home **top bar** is a single rounded card: avatar, greeting, name and
+class/roll, the profile and notification buttons, and a strip with today's date
+and the academic session. It carries the connection state itself — the border
+(and the ring around the avatar) is **green while online** and amber while
+offline, so the old “অনলাইন” chip is gone. Signing in always lands on **Home
+first** (`?home=1` on the login handoff, plus the remembered-tab store being
+cleared on sign-in); reopening the portal later restores the tab the device was
+left on. There is **no ☰ button in any top bar** — the admin's extra features
+live behind the **সব ফিচার** tile on the admin home.
 
 > **Security status (read before using real data).** Those filters run *in the
 > browser*, and so does the whole database: everything lives in `localStorage` on
@@ -255,13 +320,15 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 189 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 204 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
 filtering), the payment and receipt flow, notification badges, lazy table
 pagination, error boundaries with Retry, role-based routing guards, and the full
-login → home handoff.
+login → home handoff. The newest files cover the Bengali date format on every
+rendered portal view, the paste-template exam flow end to end (paste → publish →
+sit → auto-submit), and the top bar / entry-home rules.
 
 ## Configuring Firebase (optional)
 

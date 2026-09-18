@@ -17,7 +17,7 @@
  * Neither output contains any application UI.
  */
 
-import { db, CLASS_TO_NUMBER, ALL_CLASSES } from './data.js';
+import { db, CLASS_TO_NUMBER, ALL_CLASSES, formatBnDate, todayBn } from './data.js';
 import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, assetDataUrl, loadImage, makeCanvas, wrapText, clearLogoCache } from './pdf.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -68,20 +68,23 @@ function resolveOrg(settingsOrOpts) {
   };
 }
 
+/**
+ * Documents print the same Bengali long date as the rest of the app
+ * (১৬ সেপ্টেম্বর ২০২৬) — derived from todayBn() so a receipt made at 11pm
+ * carries the same date the app is showing.
+ */
 function formatGenDate() {
-  try {
-    return new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
-  } catch (e) {
-    return new Date().toLocaleDateString();
-  }
+  return formatBnDate(todayBn());
 }
 
 function formatGenDateTime() {
-  try {
-    return `${new Date().toLocaleDateString('bn-BD')} ${new Date().toLocaleTimeString('bn-BD')}`;
-  } catch (e) {
-    return new Date().toLocaleString();
-  }
+  const time = (() => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    return `${bn(hh)}:${bn(mm)}`;
+  })();
+  return `${formatGenDate()} · ${time}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -102,7 +105,7 @@ function receiptRows(pay, { student }) {
   const { previousDue, paidAmount, remainingDue } = receiptSummary(pay);
   const rows = [
     ['রিসিট নম্বর', pay.receiptNo || pay.id],
-    ['তারিখ', pay.date || '—'],
+    ['তারিখ', formatBnDate(pay.date) || '—'],
     ['শিক্ষার্থীর নাম', student?.name || pay.studentId],
     ['ইউনিক আইডি', pay.studentId],
     ['শ্রেণি', student?.className || '—'],
@@ -861,7 +864,7 @@ export async function renderIdCardCanvas(student, opts = {}) {
       ['আইডি', student?.id],
       ['শ্রেণি', student?.className],
       ['রোল', student?.roll],
-      ['সেশন', student?.admissionDate || org?.academicYear || '—']
+      ['সেশন', formatBnDate(student?.admissionDate) || org?.academicYear || '—']
     ];
     const labelW = Math.round(inner * 0.38);
     const valueW = inner - labelW - 26;
@@ -939,11 +942,11 @@ export async function renderLedgerCanvases(student, opts = {}) {
   const rows = [];
   for (const f of fees) {
     debit += Number(f.amount || 0);
-    rows.push({ date: f.date || '—', desc: `${f.month} ফি`, debit: taka(f.amount), credit: '', balance: taka(debit - credit) });
+    rows.push({ date: formatBnDate(f.date) || '—', desc: `${f.month} ফি`, debit: taka(f.amount), credit: '', balance: taka(debit - credit) });
   }
   for (const p of payments) {
     credit += Number(p.amount || 0);
-    rows.push({ date: p.date || '—', desc: `পেমেন্ট (${p.month})`, debit: '', credit: taka(p.amount), balance: taka(debit - credit) });
+    rows.push({ date: formatBnDate(p.date) || '—', desc: `পেমেন্ট (${p.month})`, debit: '', credit: taka(p.amount), balance: taka(debit - credit) });
   }
   const org = resolveOrg(opts.settings || opts);
   return renderReportCanvases({
@@ -979,7 +982,7 @@ export async function renderAdmissionFormCanvases(student, opts = {}) {
     ['স্কুল / কলেজ', student.school],
     ['অভিভাবকের নাম', student.guardian],
     ['অভিভাবকের মোবাইল', student.guardianPhone || student.phone],
-    ['ভর্তির তারিখ', student.admissionDate]
+    ['ভর্তির তারিখ', formatBnDate(student.admissionDate)]
   ];
   return renderReportCanvases({
     settings: org,
@@ -1066,7 +1069,7 @@ export async function renderFinanceReportCanvases({ from, to, payments, summary 
   const rows = pays.map((p) => {
     const st = db.students.find(p.studentId);
     return {
-      date: p.date || '—',
+      date: formatBnDate(p.date) || '—',
       student: st?.name || p.studentId,
       type: p.month || '—',
       amount: taka(p.amount),
@@ -1148,7 +1151,7 @@ export async function renderNoticeCanvases(notices, opts = {}) {
       title: n.title || '—',
       className: n.className || 'সব',
       audience: n.audience || 'সবাই',
-      date: n.date || '—'
+      date: formatBnDate(n.date) || '—'
     })),
     summary: [{ label: 'মোট নোটিশ', value: bn(list.length) }],
     generatedBy: opts.generatedBy || null

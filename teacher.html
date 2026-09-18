@@ -83,7 +83,9 @@
               <div class="form-group"><label for="asg-title">শিরোনাম</label><input class="form-input" id="asg-title" name="title" required></div>
               <div class="form-group"><label for="asg-class">ক্লাস</label><select class="form-input" name="className" id="asg-class"></select></div>
               <div class="form-group"><label for="asg-desc">বিবরণ</label><textarea class="form-input" id="asg-desc" name="description"></textarea></div>
-              <div class="form-group"><label for="asg-due">শেষ তারিখ</label><input class="form-input" id="asg-due" name="dueDate" required></div>
+              <div class="form-group"><label for="asg-due">শেষ তারিখ</label>
+                <input class="form-input" id="asg-due" name="dueDate" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off" required>
+                <small class="form-hint">তারিখ এভাবে লিখুন: ১৬ সেপ্টেম্বর ২০২৬</small></div>
               <div class="form-group"><label for="asg-marks">নম্বর</label><input class="form-input" id="asg-marks" name="marks" type="number" min="1" value="10"></div>
               <button type="submit" class="btn btn-block">অ্যাসাইনমেন্ট প্রকাশ করুন</button>
             </form>
@@ -313,28 +315,72 @@
             </div>
           </div>
 
-          <div class="card" style="margin:.75rem 0">
-            <h3>প্রশ্ন যোগ করুন</h3>
-            <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
-            <div class="form-row">
-              <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
-              <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
-            </div>
-            <div class="form-row">
-              <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
-              <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="exam-duration">সময়কাল (মিনিট)</label>
+              <input class="form-input" id="exam-duration" name="duration" type="number" min="1" value="30">
             </div>
             <div class="form-group">
-              <label for="q-answer">সঠিক উত্তর</label>
-              <select class="form-input form-select" id="q-answer">
-                <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
-                <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
-              </select>
+              <label for="exam-date">পরীক্ষার তারিখ</label>
+              <input class="form-input" id="exam-date" name="date" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off">
             </div>
-            <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="exam-start">শুরুর তারিখ</label>
+              <input class="form-input" id="exam-start" name="startDate" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="exam-end">শেষ তারিখ</label>
+              <input class="form-input" id="exam-end" name="endDate" placeholder="১৬ সেপ্টেম্বর ২০২৬" autocomplete="off">
+            </div>
           </div>
 
-          <div class="form-group"><label>যুক্ত প্রশ্ন</label><div class="list" id="exam-staged"></div></div>
+          <!-- Paste a whole paper: the template turns it into ready MCQs. -->
+          <div class="card mcq-builder" style="margin:.75rem 0">
+            <h3>📋 প্রশ্ন পেস্ট করুন</h3>
+            <p class="form-hint">যেকোনো জায়গা থেকে প্রশ্ন কপি করে নিচে পেস্ট করুন — প্রশ্ন, চারটি অপশন ও সঠিক উত্তর আলাদা হয়ে প্রশ্ন তৈরি হয়ে যাবে।</p>
+            <pre class="mcq-template" id="exam-template-view"></pre>
+            <div class="row-actions">
+              <button type="button" class="btn btn-small btn-secondary" id="exam-template">টেমপ্লেট বসান</button>
+              <button type="button" class="btn btn-small btn-secondary" id="exam-copy-template">টেমপ্লেট কপি</button>
+            </div>
+            <div class="form-group">
+              <label for="exam-paste">প্রশ্ন ও অপশন</label>
+              <textarea class="form-input form-textarea" id="exam-paste" rows="9" spellcheck="false" placeholder="১. বাংলাদেশের রাজধানী কোনটি?&#10;A) ঢাকা&#10;B) চট্টগ্রাম&#10;C) খুলনা&#10;D) রাজশাহী&#10;উত্তর: A"></textarea>
+              <small class="form-hint" id="exam-paste-rules">প্রতিটি প্রশ্ন: প্রশ্ন + চারটি অপশন (A/B/C/D বা ক/খ/গ/ঘ) + “উত্তর: B”।</small>
+            </div>
+            <button type="button" class="btn btn-secondary btn-block" id="exam-parse">প্রশ্ন তৈরি করুন</button>
+            <div id="exam-parse-report"></div>
+          </div>
+
+          <details class="mini-details" style="margin:.75rem 0">
+            <summary>✍️ একটি একটি করে লিখুন (ঐচ্ছিক)</summary>
+            <div class="mini-body">
+              <div class="form-group"><label for="q-text">প্রশ্ন</label><input class="form-input" id="q-text"></div>
+              <div class="form-row">
+                <div class="form-group"><label for="q-opt0">অপশন ১</label><input class="form-input" id="q-opt0"></div>
+                <div class="form-group"><label for="q-opt1">অপশন ২</label><input class="form-input" id="q-opt1"></div>
+              </div>
+              <div class="form-row">
+                <div class="form-group"><label for="q-opt2">অপশন ৩</label><input class="form-input" id="q-opt2"></div>
+                <div class="form-group"><label for="q-opt3">অপশন ৪</label><input class="form-input" id="q-opt3"></div>
+              </div>
+              <div class="form-group">
+                <label for="q-answer">সঠিক উত্তর</label>
+                <select class="form-input form-select" id="q-answer">
+                  <option value="0">অপশন ১</option><option value="1">অপশন ২</option>
+                  <option value="2">অপশন ৩</option><option value="3">অপশন ৪</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-secondary btn-block" id="add-question">+ প্রশ্ন যোগ করুন</button>
+            </div>
+          </details>
+
+          <div class="form-group">
+            <label>তৈরি হওয়া প্রশ্ন <span class="badge accent" id="exam-question-count">এখনো কোনো প্রশ্ন যোগ করা হয়নি</span></label>
+            <div class="list" id="exam-staged"></div>
+          </div>
           <button type="submit" class="btn btn-block" id="exam-save">পরীক্ষা প্রকাশ করুন</button>
         </form>
       </div>
@@ -379,7 +425,7 @@
         <button type="button" data-tab="batches"><span class="ico">📚</span>ক্লাস</button>
         <button type="button" data-tab="exam"><span class="ico">📝</span>পরীক্ষা</button>
         <button type="button" data-tab="tasks"><span class="ico">📋</span>কাজ</button>
-        <button type="button" data-tab="more"><span class="ico">☰</span>আরও</button>
+        <button type="button" data-tab="more"><span class="ico">⋯</span>আরও</button>
       </div>
     </nav>
 
@@ -392,7 +438,7 @@
         checkSubmission, assignmentStatus, logActivity, timeAgo, CLASS_OPTIONS,
         can, assertCan, teacherCanAccessClass, parseMcqPaste, parseMcqCsv,
         downloadText, PERMISSIONS, teacherUnreadCount, markTeacherNotificationsRead, getDbStatus,
-        sharedNotices } from './js/data.js';
+        sharedNotices, formatBnDate, parseBnDateInput, formatBnDateTime } from './js/data.js';
       import { updateProfile } from './js/auth.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { initTeacherHome } from './js/teacher-home.js';
@@ -519,7 +565,7 @@
           ['নাম', session.name],
           ['ইমেইল / আইডি', session.username],
           ['বিষয়', session.detail || '—'],
-          ['লগিন সময়', new Date(session.loginTime).toLocaleString('bn-BD')]
+          ['লগিন সময়', formatBnDateTime(session.loginTime)]
         ].map(([label, value]) => `
           <div class="list-item">
             <div class="li-main"><div class="li-sub">${escapeHtml(label)}</div><div class="li-title">${escapeHtml(value)}</div></div>
@@ -536,7 +582,7 @@
               <div class="list-item">
                 <div class="li-main">
                   <div class="li-title">${escapeHtml(n.title)}</div>
-                  <div class="li-sub">ক্লাস: ${escapeHtml(n.className || 'সব')} · ${escapeHtml(n.audience)} · ${escapeHtml(n.date)}</div>
+                  <div class="li-sub">ক্লাস: ${escapeHtml(n.className || 'সব')} · ${escapeHtml(n.audience)} · ${escapeHtml(formatBnDate(n.date))}</div>
                 </div>
                 <button type="button" class="btn btn-small btn-error" data-del-notice="${escapeHtml(n.id)}">মুছুন</button>
               </div>`).join('')
@@ -595,7 +641,7 @@
               <div class="list-item" style="display:block">
                 <div class="li-main">
                   <div class="li-title">${escapeHtml(n.title)}</div>
-                  <div class="li-sub">${escapeHtml(n.studentName || '')} · ${escapeHtml(n.date)}</div>
+                  <div class="li-sub">${escapeHtml(n.studentName || '')} · ${escapeHtml(formatBnDate(n.date))}</div>
                   ${n.reply ? `<div class="alert alert-success" style="margin-top:.5rem">উত্তর: ${escapeHtml(n.reply)}</div>` : ''}
                 </div>
                 <form data-reply-form="${escapeHtml(n.id)}" style="margin-top:.5rem">
@@ -707,13 +753,16 @@
           try { assertCan(session, 'manageAssignments', 'অ্যাসাইনমেন্ট দেওয়া'); }
           catch (err) { showToast(err.message, 'error'); return; }
           if (!teacherCanAccessClass(session, className)) { showToast('অনুমোদিত ক্লাস নয়।', 'error'); return; }
+          // Dates are typed the Bengali long way and stored canonically.
+          const deadline = parseBnDateInput(d.get('dueDate'));
+          if (!deadline) { showToast('শেষ তারিখটি বোঝা যায়নি। এভাবে লিখুন: ১৬ সেপ্টেম্বর ২০২৬', 'error'); return; }
           const id = newId('asg');
           db.assignments.add({
             id, title, className, description: String(d.get('description') || ''),
             // Every consumer reads `deadline` (status, due label, student view,
             // admin table); writing `dueDate` here left the deadline blank and
             // stopped overdue detection from ever firing.
-            deadline: String(d.get('dueDate') || ''), marks: Number(d.get('marks')) || 10,
+            deadline, marks: Number(d.get('marks')) || 10,
             teacher: session.name, createdAt: new Date().toISOString()
           });
           db.notifications.add({
@@ -735,7 +784,7 @@
               <div class="list-item" style="display:block">
                 <div class="li-main">
                   <div class="li-title">${escapeHtml(sub.studentName || sub.studentId)}</div>
-                  <div class="li-sub">${escapeHtml(asg?.title || sub.assignmentId)} · ${escapeHtml(sub.submittedAt || sub.date || '')}</div>
+                  <div class="li-sub">${escapeHtml(asg?.title || sub.assignmentId)} · ${escapeHtml(formatBnDate(sub.submittedAt || sub.date))}</div>
                   ${sub.note ? `<div class="li-sub">জমা: ${escapeHtml(sub.note)}</div>` : ''}
                   ${sub.checked ? `<div class="alert alert-success">✔ ${bn(sub.marks || 0)} নম্বর${sub.feedback ? ` · ${escapeHtml(sub.feedback)}` : ''}</div>` : ''}
                 </div>
@@ -847,7 +896,7 @@
             <div class="list-item">
               <div class="li-main">
                 <div class="li-title">${escapeHtml(n.title)}</div>
-                <div class="li-sub">${escapeHtml(n.studentName || '')} · ${escapeHtml(timeAgo(n.createdAt) || n.date || '')}</div>
+                <div class="li-sub">${escapeHtml(n.studentName || '')} · ${escapeHtml(timeAgo(n.createdAt) || formatBnDate(n.date))}</div>
               </div>
               <span class="badge ${n.reply ? 'success' : 'accent'}">${n.reply ? 'উত্তর দেওয়া' : 'অপেক্ষমাণ'}</span>
             </div>`).join('') : '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';

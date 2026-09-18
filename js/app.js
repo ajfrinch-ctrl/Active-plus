@@ -3,8 +3,9 @@
  * Keeps the three pages small: they call initApp() and then render their data.
  */
 
-import { requireRole, currentSession, logoutButton, homeFor, ROLES } from './auth.js';
+import { requireRole, currentSession, logoutButton, homeFor, ROLES, enteredFromLogin } from './auth.js';
 import { showToast, getAuthMode } from './firebase.js';
+import { formatBnDate, looksLikeDate } from './data.js';
 
 export { showToast, getAuthMode, ROLES, homeFor };
 /**
@@ -97,10 +98,15 @@ export function initTabs({ storageKey = 'activeplus_tab' } = {}) {
     });
   });
 
+  // After a login the portal always opens on Home ("লগিন করলে হোম এ ঢুকবে আগে"),
+  // whatever tab this device was left on last time.
   let initial = null;
-  try { initial = window.localStorage.getItem(memoryKey); } catch (e) { /* ignore */ }
-  if (!initial && window.location.hash.startsWith('#')) initial = window.location.hash.slice(1);
-  const current = activate(initial || tabNames[0]);
+  if (!enteredFromLogin()) {
+    try { initial = window.localStorage.getItem(memoryKey); } catch (e) { /* ignore */ }
+    if (!initial && window.location.hash.startsWith('#')) initial = window.location.hash.slice(1);
+  }
+  const homeTab = tabNames.includes('home') ? 'home' : tabNames[0];
+  const current = activate(initial || homeTab);
   // Expose the switcher so app-style shells (bottom nav, feature grids, More
   // menu) can drive the very same panels instead of duplicating them.
   return { activate, current, buttons };
@@ -113,6 +119,17 @@ export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[char]));
+}
+
+/**
+ * A date cell for any table/detail view: the app prints every date the same
+ * Bengali long way (১৬ সেপ্টেম্বর ২০২৬). Values that are not dates at all
+ * (a fee month label, '—', 'চলমান') are passed through untouched.
+ */
+export function dateCell(value, fallback = '—') {
+  const raw = String(value ?? '').trim();
+  if (!raw) return escapeHtml(fallback);
+  return escapeHtml(looksLikeDate(raw) ? formatBnDate(raw) : raw);
 }
 
 const SAFE_URL_SCHEMES = ['http', 'https', 'mailto', 'tel', 'sms'];
@@ -168,8 +185,16 @@ export function renderTable(tableSelector, columns, rows, emptyMessage = 'কো
     if (!st) return;
     const slice = st.all.slice(0, st.shown);
     const remaining = st.all.length - st.shown;
+    // Columns without a render() print their raw value — which is exactly
+    // where a stored '২০২৬-০৯-১৬' used to leak through. Dates are formatted
+    // here for every table in the app in one place.
+    const cell = (row, col) => {
+      if (col.render) return col.render(row);
+      const value = row[col.key];
+      return looksLikeDate(value) ? escapeHtml(formatBnDate(value)) : escapeHtml(value);
+    };
     body.innerHTML = slice.map((row) => `<tr>${
-      st.columns.map((col) => `<td>${col.render ? col.render(row) : escapeHtml(row[col.key])}</td>`).join('')
+      st.columns.map((col) => `<td>${cell(row, col)}</td>`).join('')
     }</tr>`).join('') + (remaining > 0
       ? `<tr><td colspan="${st.columns.length}"><button type="button" class="btn btn-small" data-load-more>আরও ${bnDigits(Math.min(st.pageSize, remaining))}টি দেখুন (${bnDigits(remaining)} বাকি)</button></td></tr>`
       : '');

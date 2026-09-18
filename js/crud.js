@@ -5,25 +5,39 @@
  * activity logging so each module stays tiny.
  */
 
-import { db, logActivity, newId, getDbStatus } from './data.js';
+import {
+  db, logActivity, newId, getDbStatus, formatBnDate, parseBnDateInput, looksLikeDate, BN_DATE_PLACEHOLDER
+} from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 
 let modalSeq = 0;
+
+/**
+ * A field that holds a date: a declaration date, a deadline, an exam date…
+ * They are typed and shown the Bengali long way (১৬ সেপ্টেম্বর ২০২৬) and
+ * normalised back to the canonical Bengali ISO date the store keeps.
+ */
+const isDateField = (field) => ['date', 'datetime', 'deadline'].includes(field.type)
+  || /date|deadline/i.test(String(field.name || ''));
 
 function buildFieldHtml(field) {
   const id = `f-${field.name}`;
   const label = `<label for="${id}">${escapeHtml(field.label)}${field.required ? ' *' : ''}</label>`;
   let input;
+  let hint = '';
   if (field.type === 'select') {
     input = `<select class="form-input form-select" id="${id}" name="${field.name}">
       ${(field.options || []).map((o) => `<option>${escapeHtml(o)}</option>`).join('')}</select>`;
   } else if (field.type === 'textarea') {
     input = `<textarea class="form-input form-textarea" id="${id}" name="${field.name}"></textarea>`;
+  } else if (isDateField(field)) {
+    input = `<input class="form-input" id="${id}" name="${field.name}" type="text" inputmode="text" placeholder="${BN_DATE_PLACEHOLDER}" autocomplete="off">`;
+    hint = `<small class="form-hint">তারিখ এভাবে লিখুন: ${BN_DATE_PLACEHOLDER}</small>`;
   } else {
     const attrs = field.type === 'number' ? 'type="number"' : field.type === 'tel' ? 'type="tel" inputmode="tel"' : 'type="text"';
     input = `<input class="form-input" id="${id}" name="${field.name}" ${attrs}>`;
   }
-  return `<div class="form-group">${label}${input}</div>`;
+  return `<div class="form-group">${label}${input}${hint}</div>`;
 }
 
 export function mountCrud(cfg) {
@@ -76,8 +90,13 @@ export function mountCrud(cfg) {
     const table = host.querySelector('table');
     table.querySelector('thead tr').innerHTML = [...columns, { key: '_a', label: 'অ্যাকশন' }]
       .map((c) => `<th scope="col">${escapeHtml(c.label)}</th>`).join('');
+    const cell = (row, c) => {
+      if (c.render) return c.render(row);
+      const value = row[c.key];
+      return looksLikeDate(value) ? escapeHtml(formatBnDate(value)) : escapeHtml(value);
+    };
     table.querySelector('tbody').innerHTML = rows.length
-      ? rows.map((row) => `<tr>${columns.map((c) => `<td>${c.render ? c.render(row) : escapeHtml(row[c.key])}</td>`).join('')}
+      ? rows.map((row) => `<tr>${columns.map((c) => `<td>${cell(row, c)}</td>`).join('')}
         <td><span class="row-actions">
           <button type="button" class="btn btn-small btn-secondary" data-edit="${escapeHtml(row[keyField])}">সম্পাদনা</button>
           <button type="button" class="btn btn-small btn-error" data-delete="${escapeHtml(row[keyField])}">মুছুন</button>
@@ -96,7 +115,8 @@ export function mountCrud(cfg) {
       fields.forEach((f) => {
         const el = form.elements[f.name];
         if (!el) return;
-        const value = row[f.name] ?? '';
+        const stored = row[f.name] ?? '';
+        const value = isDateField(f) && stored !== '' ? formatBnDate(stored) : stored;
         // A stored value that is not among the select's options cannot be
         // assigned — the field silently fell back to the first option and the
         // next save overwrote the record with it.
@@ -147,8 +167,16 @@ export function mountCrud(cfg) {
     const record = {};
     let invalid = null;
     let badNumber = null;
+    let badDate = null;
     fields.forEach((f) => {
       let value = String(data.get(f.name) ?? '').trim();
+      if (isDateField(f) && value !== '') {
+        // Typed dates are accepted in any shape, stored canonically — and a
+        // date nobody can read is refused instead of saved as free text.
+        const iso = parseBnDateInput(value);
+        if (!iso) badDate = badDate || f;
+        else value = iso;
+      }
       if (f.type === 'number' && value !== '') {
         const parsed = Number(value);
         // "Number(value) || 0" quietly stored 0 for anything unparsable.
@@ -158,6 +186,7 @@ export function mountCrud(cfg) {
       if (f.required && value === '') invalid = invalid || f;
       record[f.name] = value;
     });
+    if (badDate) { showToast(`"${badDate.label}" তারিখটি বোঝা যায়নি। এভাবে লিখুন: ${BN_DATE_PLACEHOLDER}`, 'error'); return; }
     if (badNumber) { showToast(`"${badNumber.label}"-এ একটি সঠিক সংখ্যা লিখুন।`, 'error'); return; }
     if (invalid) { showToast(`"${invalid.label}" পূরণ করুন।`, 'error'); return; }
     if (cfg.validate) {

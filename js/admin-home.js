@@ -61,7 +61,10 @@ const QUICK_SHORTCUTS = [
   { act: 'add-teacher', icon: '＋', label: 'শিক্ষক' },
   { act: 'create-exam', icon: '＋', label: 'পরীক্ষা' },
   { act: 'add-question', icon: '＋', label: 'প্রশ্ন' },
-  { act: 'create-notice', icon: '＋', label: 'নোটিশ' }
+  { act: 'create-notice', icon: '＋', label: 'নোটিশ' },
+  // The ☰ menu left the top bar, so the extra-features grid keeps its own
+  // one-tap entry right here on the first screen.
+  { act: 'more', icon: '⊞', label: 'সব ফিচার' }
 ];
 
 const MORE_ITEMS = [
@@ -222,6 +225,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     else if (act === 'create-exam') { tabs?.activate?.('exam'); openModal?.('exam-modal'); }
     else if (act === 'add-question') { tabs?.activate?.('questionbank'); }
     else if (act === 'create-notice') { tabs?.activate?.('notices'); openModal?.('notice-modal'); }
+    else if (act === 'more') openMore();
   });
 
   function renderSafe() {
@@ -245,7 +249,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     host.querySelectorAll('details[open]').forEach((d) => { d.open = false; });
   };
 
-  /** The ☰ / "আরও" entry point: unfold the extra features list. */
+  /** The "সব ফিচার" / "আরও" entry point: unfold the extra features list. */
   const openMore = () => {
     const sec = host.querySelector('#admin-more-sec');
     if (!sec) return;
