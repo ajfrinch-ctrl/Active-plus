@@ -109,12 +109,15 @@ nothing is written until *পরীক্ষা প্রকাশ করুন*
 question number so the teacher knows exactly which one to fix.
 
 Taking an exam: the timer starts the moment the paper opens and is always
-visible (`⏱ ২৯:৫৮`, turning amber under a minute and red under 30 seconds).
+visible (`⏱ ২৯:৫৮`, turning amber under a minute and red under 30 seconds),
+with one toast at five minutes and another at one minute left.
 The sitting is remembered per student + exam, so a reload or a closed tab
 resumes the *same* deadline — reopening can never buy extra time. When the
 countdown reaches zero the paper **submits itself**, is graded, and the student
-sees “⏰ সময় শেষ — স্বয়ংক্রিয়ভাবে জমা হয়েছে” with the full answer review. One
-attempt per exam.
+sees “⏰ সময় শেষ — স্বয়ংক্রিয়ভাবে জমা হয়েছে” with the full answer review. A
+background tab cannot stretch the deadline either: coming back re-checks the
+clock at once, because the countdown is computed from the absolute deadline
+rather than from elapsed ticks. One attempt per exam.
 
 ## Structure
 
@@ -331,7 +334,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 209 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 212 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class

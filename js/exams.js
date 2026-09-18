@@ -526,6 +526,7 @@ export function mountExamTaker({ listSelector, student }) {
     const submit = (auto) => {
       if (!onScreen) return;
       stopTimer();
+      stopWatching();
       onScreen = false;
       const chosen = {};
       exam.questions.forEach((_, qi) => {
@@ -576,6 +577,7 @@ export function mountExamTaker({ listSelector, student }) {
       showToast(auto ? 'সময় শেষ — উত্তরপত্র জমা হয়েছে।' : `আপনার স্কোর ${bn(score)}/${bn(max)}`, auto ? 'warning' : (pct >= 50 ? 'success' : 'warning'));
     };
 
+    const warned = { five: false, one: false };
     const tick = () => {
       const left = deadline - Date.now();
       if (left <= 0) {
@@ -589,7 +591,16 @@ export function mountExamTaker({ listSelector, student }) {
       timerEl.textContent = `⏱ ${bn(mins)}:${bn(secs)}`;
       timerEl.classList.toggle('warn', left <= 60000);
       timerEl.classList.toggle('danger', left <= 30000);
+      // Warn once on the way down, so the ending is never a surprise.
+      if (!warned.five && left <= 300000) { warned.five = true; showToast('⏰ আর ৫ মিনিট বাকি।', 'info'); }
+      if (!warned.one && left <= 60000) { warned.one = true; showToast('⏰ আর ১ মিনিট বাকি — উত্তরপত্র জমা দিন।', 'warning'); }
     };
+
+    /* A background tab throttles timers, so on coming back the clock is
+       re-checked at once — the paper still ends exactly on its deadline. */
+    const onVisible = () => { if (!document.hidden && onScreen) tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    const stopWatching = () => document.removeEventListener('visibilitychange', onVisible);
 
     // Answers already given (after a reload) are restored, then the countdown
     // resumes from the original deadline.

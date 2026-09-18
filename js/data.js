@@ -1120,7 +1120,8 @@ function markerIndex(marker) {
   if (!ch) return -1;
   const bnLetter = BN_LETTERS.indexOf(ch);
   if (bnLetter !== -1) return bnLetter;
-  const map = 'abcdABCD১২৩৪';
+  // 'a/A' → 1st option … 'd/D' → 4th, and the same for ১/1 … ৪/4.
+  const map = 'abcdABCD১২৩৪1234';
   const at = map.indexOf(ch);
   return at === -1 ? -1 : at % 4;
 }
@@ -1128,9 +1129,9 @@ function markerIndex(marker) {
 /* An answer line: 'উত্তর: B', 'সঠিক উত্তর - খ', 'উত্তরঃ (গ)', 'Answer: d'.
    The line must END after the letter, so an option that happens to start with
    'A' is never mistaken for the answer. */
-const ANSWER_LINE = /^(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Correct\s*Answer|Correct|Answer|Ans)\s*[:.)\-ঃ।]?\s*[([{]?\s*([A-Da-dক-ঘ১-৪])\s*[)\]}]?\s*[.।]?\s*$/i;
+const ANSWER_LINE = /^(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Correct\s*Answer|Correct|Answer|Ans)\s*[:.)\-ঃ।]?\s*[([{]?\s*([A-Da-dক-ঘ১-৪1-4])\s*[)\]}]?\s*[.।]?\s*$/i;
 /* The same marker sitting at the end of a longer line: '… (উত্তর: B)'. */
-const ANSWER_TAIL = /[([]?\s*(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Answer)\s*[:.)\-]\s*([A-Da-dক-ঘ১-৪])\s*[)\]]?\s*$/i;
+const ANSWER_TAIL = /[([]?\s*(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Answer)\s*[:.)\-]\s*([A-Da-dক-ঘ১-৪1-4])\s*[)\]]?\s*$/i;
 /* 'A) x', 'A. x', '(ক) x', '[খ] x' — copy-paste brings every bracket style. */
 const OPTION_LINE = /^[([{]?\s*([A-Da-dক-ঘ])\s*[)\]}.\u0964:\-]?\s+(.+)$/;
 const NUMBERED_LINE = /^([০-৯\d]{1,2})\s*[).।:\-]?\s+(.+)$/;
@@ -1229,7 +1230,10 @@ export function parseMcqPaste(text) {
     if (blockNo === 1 && !current.options.length && current.answer < 0 && !question.includes('?')) {
       ignored.push(question);
     } else if (current.options.length < 2) {
-      errors.push(`প্রশ্ন ${blockNo}: প্রশ্ন বা অপশন অসম্পূর্ণ (কমপক্ষে ২টি অপশন দরকার)।`);
+      // Say which part is missing, in the words the teacher would use.
+      errors.push(current.options.length
+        ? `প্রশ্ন ${blockNo}: অসম্পূর্ণ — মাত্র ${toBnDigits(current.options.length)}টি অপশন পাওয়া গেছে (কমপক্ষে ২টি দরকার)।`
+        : `প্রশ্ন ${blockNo}: অসম্পূর্ণ — কোনো অপশন পাওয়া যায়নি (ক/খ/গ/ঘ বা A/B/C/D দিয়ে ২–৪টি অপশন দিন)।`);
     } else {
       raw.push({
         q: question,

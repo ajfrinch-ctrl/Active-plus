@@ -90,6 +90,36 @@ test('a paper whose time ran out while the app was closed submits itself', async
   }
 });
 
+test('the countdown warns on the way down and submits itself at zero', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  const { data, student, exam, controller } = await openExam(dom, '2026-09-002');
+
+  // A sitting with a little over a second to go, so the live countdown can be
+  // watched all the way to zero instead of simulated.
+  dom.window.localStorage.setItem(`activeplus_exam_${student.id}_${exam.id}`, JSON.stringify({
+    deadline: Date.now() + 1300,
+    answers: { 0: String(exam.questions[0].answer) },
+    startedAt: Date.now() - 60000
+  }));
+
+  click(dom, doc.querySelector(`[data-take="${exam.id}"]`));
+  try {
+    const timer = doc.getElementById('exam-timer');
+    assert.match(timer.textContent, /^⏱ ০০:০[০-৯]$/, 'the last seconds are counting down');
+    assert.match(timer.className, /(warn|danger)/, 'the timer is flagged red/amber near the end');
+    assert.match(doc.getElementById('toast-container')?.textContent || '', /১ মিনিট বাকি/, 'the student is warned first');
+
+    await new Promise((r) => setTimeout(r, 2600));   // the 1s tick has to pass the deadline
+    const result = data.examResultFor(exam.id, student.id);
+    assert.ok(result, 'the paper submitted itself when the clock hit zero');
+    assert.equal(result.autoSubmitted, true, 'and it is marked as an automatic submission');
+    assert.match(doc.getElementById('exam-player').innerHTML, /স্বয়ংক্রিয়ভাবে জমা/, 'the student is told why');
+  } finally {
+    controller.stop();
+  }
+});
+
 test('reopening a running paper keeps the original deadline', async () => {
   const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
   const doc = dom.window.document;

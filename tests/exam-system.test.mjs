@@ -207,6 +207,42 @@ test('mountExamAuthoring turns a pasted paper into a published exam', async () =
   assert.equal(created.duration, 30);
 });
 
+test('an exam written in another language still becomes ready questions', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+  const english = parseMcqPaste([
+    'Q1. What is the capital of Bangladesh?', 'A) Dhaka', 'B) Chattogram', 'C) Khulna', 'D) Rajshahi', 'Answer: A',
+    '', 'Question 2) 5 + 3 = ?', '1) 6', '2) 7', '3) 8', '4) 9', 'Ans: 3'
+  ].join('\n'));
+  assert.equal(english.errors.length, 0);
+  assert.equal(english.questions.length, 2, 'both English blocks parsed');
+  assert.equal(english.questions[0].q, 'What is the capital of Bangladesh?');
+  assert.equal(english.questions[0].answer, 0);
+  assert.equal(english.questions[1].answer, 2, 'numbers work as answer markers too');
+
+  // Mixed digits in one paper: Bengali question numbers, English options.
+  const mixed = parseMcqPaste('৩. ১০ ÷ ২ = কত?\nA) ৪\nB) ৫\nC) ৬\nD) ৮\nউত্তর: B');
+  assert.equal(mixed.questions[0].q, '১০ ÷ ২ = কত?');
+  assert.equal(mixed.questions[0].answer, 1);
+});
+
+test('a huge paste is read without losing a question', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+  const blocks = [];
+  for (let i = 1; i <= 60; i += 1) {
+    blocks.push(`${i}. প্রশ্ন নম্বর ${i}?`, `A) ${i}0`, `B) ${i}1`, `C) ${i}2`, `D) ${i}3`, 'উত্তর: C', '');
+  }
+  const bulk = parseMcqPaste(blocks.join('\n'));
+  assert.equal(bulk.questions.length, 60, 'every question survived');
+  assert.equal(bulk.errors.length, 0);
+  assert.equal(bulk.questions[59].answer, 2, 'the last answer is still right');
+  assert.equal(bulk.questions[0].q, 'প্রশ্ন নম্বর 1?', 'the leading number is stripped');
+
+  // Repeating the same paper must not silently double it.
+  const twice = parseMcqPaste(`${blocks.join('\n')}\n${blocks.join('\n')}`);
+  assert.equal(twice.questions.length, 60, 'duplicates collapse');
+  assert.equal(twice.duplicates.length, 60, 'and are reported');
+});
+
 test('an incomplete paste is reported instead of saved', async () => {
   const dom = installDom(`
     <div id="exam-list"></div><div id="exam-staged"></div><span id="exam-question-count"></span>
