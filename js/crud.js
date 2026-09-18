@@ -127,7 +127,10 @@ export function mountCrud(cfg) {
     else if (del) {
       const key = del.dataset.delete;
       if (!onlineFor(`${singular} মুছে ফেলা`)) return;
-      if (window.confirm(`আপনি কি এই ${singular} মুছে ফেলার বিষয়ে নিশ্চিত?`)) {
+      const row = collectionApi.find?.(key) || collectionApi.list().find((r) => r[keyField] === key);
+      const label = row?.name || row?.title || row?.text || key;
+      const msg = `"${label}" ${singular} মুছে ফেলতে চান?\n\nএই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।`;
+      if (window.confirm(msg)) {
         collectionApi.remove(key);
         logActivity({ user: session?.name, role: session?.role, action: 'deleted', target: `${singular} ${key}` });
         showToast(`${singular} মুছে ফেলা হয়েছে।`, 'warning');
