@@ -42,11 +42,11 @@ export function mountSuggestionAuthoring({ author, session = null }) {
     const id = btn.dataset.deleteSuggestion;
     if (!onlineFor('সাজেশন মুছে ফেলা')) return;
     const item = db.suggestions.find(id);
-    if (window.confirm(`"${item?.title}" মুছে ফেলবেন?`)) {
-      db.suggestions.remove(id);
-      showToast('সাজেশন মুছে ফেলা হয়েছে।', 'warning');
-      render();
-    }
+    const title = item?.title || 'এই সাজেশন';
+    if (!window.confirm(`"${title}" সাজেশনটি মুছে ফেলতে চান?\n\nএই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।`)) return;
+    db.suggestions.remove(id);
+    showToast('সাজেশন মুছে ফেলা হয়েছে।', 'warning');
+    render();
   });
 
   document.getElementById('open-suggestion-modal').addEventListener('click', () => {
@@ -130,11 +130,11 @@ export function mountExamAuthoring({ session = null } = {}) {
       const id = del.dataset.deleteExam;
       if (!onlineFor('পরীক্ষা মুছে ফেলা')) return;
       const exam = db.exams.find(id);
-      if (window.confirm(`"${exam?.title}" মুছে ফেলবেন?`)) {
-        db.exams.remove(id);
-        showToast('পরীক্ষা মুছে ফেলা হয়েছে।', 'warning');
-        render();
-      }
+      const title = exam?.title || 'এই পরীক্ষা';
+      if (!window.confirm(`"${title}" পরীক্ষাটি মুছে ফেলতে চান?\n\nএই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।`)) return;
+      db.exams.remove(id);
+      showToast('পরীক্ষা মুছে ফেলা হয়েছে।', 'warning');
+      render();
     } else if (res) {
       showResults(res.dataset.results);
     }
