@@ -46,6 +46,24 @@ test('the admin top bar keeps the essentials after the ☰ left', () => {
   assert.ok(bar.querySelector('#admin-profile-btn'), 'the profile button stays in the top bar');
 });
 
+test('the student portal opens on its Home view', async () => {
+  const dom = await bootPortal('student.html', {
+    url: 'http://localhost:8080/student.html#s=token&home=1',
+    username: '2026-09-001', password: 'Student@123', role: 'student', nonce: 'studenthome',
+    beforeBoot: (d) => d.window.localStorage.setItem('activeplus_tab:student.html', 'exam')
+  });
+  const doc = dom.window.document;
+  try {
+    assert.equal(doc.getElementById('view-home').hidden, false, 'Home is the open view');
+    assert.equal(doc.getElementById('view-exam').hidden, true, 'the exam view is not opened by default');
+  } finally {
+    // The home paints its skeleton away on a 300ms timer; let it finish so the
+    // window closes with nothing pending.
+    await new Promise((r) => setTimeout(r, 350));
+    dom.window.close();
+  }
+});
+
 test('signing in opens Home first, even with a remembered tab', async () => {
   const dom = await bootPortal('admin.html', {
     url: 'http://localhost:8080/admin.html#s=token&home=1',

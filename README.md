@@ -342,7 +342,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 214 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 215 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
