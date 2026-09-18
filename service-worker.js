@@ -9,7 +9,7 @@
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v20';
+const CACHE_NAME = 'active-plus-v21';
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -75,12 +75,16 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return; // let fonts/Firebase fetch directly
 
   // Fresh pages first so deploys are visible; cache keeps us usable offline.
+  // Only successful responses are cached — a 404/500 error page must never
+  // become the offline copy of the app.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
           return response;
         })
         .catch(() =>

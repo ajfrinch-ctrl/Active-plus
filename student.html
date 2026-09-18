@@ -14,8 +14,13 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/home.css">
     <link rel="stylesheet" href="css/modern.css">
+    <!-- Fonts load without blocking first paint: a slow CDN must never
+         leave the app staring at a blank "loading" screen. Degrades to
+         system fonts when the CDN cannot be reached. -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap"></noscript>
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
   </head>
@@ -95,6 +100,57 @@
     <script type="module">
       import { initStudentHome } from './js/student-home.js';
       initStudentHome();
+      /* Boot-watchdog marker: the module finished wiring this page. */
+      document.body.dataset.boot = 'ok';
+</script>
+
+    <!-- Boot watchdog: if the module script never finished (very old browser,
+         a blocked script, or an error while booting) say so and offer a reload
+         instead of leaving a spinner or skeleton on screen forever. -->
+    <script>
+      (function () {
+        var shown = false;
+        function booted() { return document.body && document.body.getAttribute('data-boot') === 'ok'; }
+        function showBootHelp() {
+          if (shown || booted()) return;
+          shown = true;
+          var box = document.createElement('div');
+          box.setAttribute('role', 'alert');
+          box.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:99999;display:flex;justify-content:center;padding:1rem;');
+          box.innerHTML =
+            '<div style="max-width:26rem;width:100%;background:#1b1f27;color:#f1f5f9;border:1px solid #374151;' +
+              'border-radius:1rem;padding:1rem 1.15rem;box-shadow:0 12px 32px rgba(0,0,0,.55);' +
+              'font-family:\'Hind Siliguri\',\'Noto Sans Bengali\',system-ui,sans-serif">' +
+              '<strong style="display:block;font-size:1.02rem;margin-bottom:.3rem">⚠️ পেজটি ঠিকমতো লোড হয়নি</strong>' +
+              '<p style="margin:.2rem 0;font-size:.9rem;line-height:1.65;color:#cbd5e1">' +
+                'ইন্টারনেট সংযোগ দেখে পেজটি রিফ্রেশ করুন। পুরনো ব্রাউজারে সমস্যা হলে সর্বশেষ Chrome বা Firefox দিয়ে খুলুন।' +
+              '</p>' +
+              '<div style="display:flex;gap:.5rem;margin-top:.6rem">' +
+                '<button data-boot-act="retry" style="flex:1;background:#2563eb;border:0;color:#fff;border-radius:.6rem;' +
+                  'padding:.55rem .9rem;font-size:.92rem;cursor:pointer">🔄 রিফ্রেশ করুন</button>' +
+                '<button data-boot-act="dismiss" style="background:transparent;border:1px solid #4b5563;color:#cbd5e1;' +
+                  'border-radius:.6rem;padding:.55rem .9rem;font-size:.92rem;cursor:pointer">পরে দেখব</button>' +
+              '</div>' +
+            '</div>';
+          document.body.appendChild(box);
+          box.querySelector('[data-boot-act="retry"]').addEventListener('click', function () { window.location.reload(); });
+          box.querySelector('[data-boot-act="dismiss"]').addEventListener('click', function () { box.remove(); shown = false; });
+        }
+        /* Module scripts have either run or failed by window 'load'. A couple of
+           generous fallbacks cover browsers where 'load' itself is delayed. */
+        window.addEventListener('load', function () { setTimeout(showBootHelp, 4000); });
+        setTimeout(function () { if (document.readyState === 'complete') showBootHelp(); }, 12000);
+        setTimeout(showBootHelp, 30000);
+      })();
     </script>
+
+    <noscript>
+      <div style="position:fixed;left:0;right:0;bottom:0;z-index:99999;display:flex;justify-content:center;padding:1rem;">
+        <div style="max-width:26rem;width:100%;background:#1b1f27;color:#f1f5f9;border:1px solid #374151;border-radius:1rem;padding:1rem 1.15rem;font-family:'Hind Siliguri','Noto Sans Bengali',system-ui,sans-serif">
+          <strong>⚠️ জাভাস্ক্রিপ্ট বন্ধ আছে</strong>
+          <p style="margin:.3rem 0;font-size:.9rem;line-height:1.6;color:#cbd5e1">Active Plus চালাতে ব্রাউজারে JavaScript চালু থাকতে হবে। JavaScript অন করে পেজটি আবার খুলুন।</p>
+        </div>
+      </div>
+    </noscript>
   </body>
 </html>
