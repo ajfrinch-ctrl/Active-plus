@@ -610,11 +610,27 @@ export function mountExamTaker({ listSelector, student }) {
     };
 
     form.addEventListener('change', () => { persist(); paintProgress(); });
-    form.addEventListener('click', (e) => {
-      const dot = e.target.closest('[data-goto]');
-      if (dot) { goTo(Number(dot.dataset.goto)); return; }
-      if (e.target.closest('#exam-prev')) goTo(current - 1);
-      else if (e.target.closest('#exam-next')) goTo(current + 1);
+
+    // Keep navigation buttons separate from form submission. Delegating these
+    // clicks through the form made the previous-question control fragile when
+    // the player was re-rendered (and a click could appear to leave the task).
+    // They are explicit type="button" controls, and never close the player.
+    player.querySelector('#exam-prev')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      goTo(current - 1);
+    });
+    player.querySelector('#exam-next')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      goTo(current + 1);
+    });
+    player.querySelectorAll('.exam-dot[data-goto]').forEach((dot) => {
+      dot.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        goTo(Number(dot.dataset.goto));
+      });
     });
 
     form.addEventListener('submit', (event) => {

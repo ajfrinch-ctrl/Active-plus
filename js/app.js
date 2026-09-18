@@ -235,6 +235,27 @@ export function statGrid(selector, stats) {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const openModals = new Map(); // id → { opener, release }
+const wiredModals = new WeakSet();
+const escapeDocuments = new WeakSet();
+
+/**
+ * Wire one overlay's dismiss controls. Some overlays are part of the HTML,
+ * while CRUD/detail overlays are created after initApp() has already run. A
+ * querySelectorAll() in initModals() only covers the first group, which made
+ * the × button look dead in dynamically-created dialogs. Wiring from
+ * openModal() as well keeps both kinds of modal consistent.
+ */
+function wireModal(modal) {
+  if (!modal || wiredModals.has(modal)) return;
+  wiredModals.add(modal);
+  modal.addEventListener('click', (event) => {
+    const closeButton = event.target.closest?.('[data-close]');
+    if (event.target === modal || (closeButton && modal.contains(closeButton))) {
+      event.preventDefault();
+      closeModal(modal.id);
+    }
+  });
+}
 
 /** Keeps Tab inside the dialog so keyboard users cannot land on the page behind it. */
 function trapFocus(modal) {
@@ -257,6 +278,10 @@ function trapFocus(modal) {
 export function openModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return null;
+  // A modal may have been appended after initModals() (generic CRUD and
+  // student detail dialogs do exactly that). Make its × and backdrop work
+  // before showing it.
+  wireModal(modal);
   const content = modal.querySelector('.modal-content') || modal;
   if (!content.getAttribute('role')) content.setAttribute('role', 'dialog');
   content.setAttribute('aria-modal', 'true');
@@ -301,11 +326,11 @@ export function closeModal(id) {
 }
 
 export function initModals() {
-  document.querySelectorAll('.modal-overlay').forEach((modal) => {
-    modal.addEventListener('click', (event) => {
-      if (event.target === modal || event.target.closest('[data-close]')) closeModal(modal.id);
-    });
-  });
+  // Wire the overlays that are already in the document. Overlays created
+  // later are wired by openModal(), so their close button is never a dead end.
+  document.querySelectorAll('.modal-overlay').forEach(wireModal);
+  if (escapeDocuments.has(document)) return;
+  escapeDocuments.add(document);
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       document.querySelectorAll('.modal-overlay.active').forEach((modal) => closeModal(modal.id));
