@@ -632,7 +632,20 @@ export function initStudentHome() {
   }
 
   /* ---------------- More view ---------------- */
-  function renderMore() {
+
+  /**
+   * The More view comes in two shapes:
+   *
+   *  - index   — bottom-nav “আরও”: the quick row plus every card;
+   *  - focused — tapping a tile/tab: ONLY the card that was asked for, with a
+   *    way back. Nothing unrelated goes on screen (the old code rendered the
+   *    whole list and scrolled, so “প্রোফাইল” also showed রুটিন, ফি, নোটিশ…).
+   *
+   * `only` is the section id (assignments, routine, fees, notices,
+   * achievements, certificates, downloads, streak, query, profile, settings,
+   * help) or null for the full index. Unknown ids fall back to the index.
+   */
+  function renderMore(only = null) {
     const meRow = me || {};
     const editable = db.settings.get().studentEditableFields || [];
     const badges = achievementsFor(student);
@@ -643,13 +656,15 @@ export function initStudentHome() {
 
     const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
 
-    document.getElementById('more-content').innerHTML = `
-      <div class="hcard"><div class="h-title">দ্রুত যায়</div>
+    const quickRowHtml = `<div class="hcard"><div class="h-title">দ্রুত যায়</div>
         <div class="quick-row">
           ${MORE_FEATURES.filter((f) => homeFeatures().includes(f.act)).map((f) => tile(f.act, f.ico, f.label)).join('')}
         </div>
-      </div>
+      </div>`;
 
+    /* Each card stands on its own so a focused render can pick exactly one. */
+    const cards = [
+      { id: 'assignments', html: `
       <div class="hcard" id="more-assignments"><div class="h-title">অ্যাসাইনমেন্ট</div>${
         db.assignments.list().filter((a) => a.className === student.className).map((a) => {
           const st = assignmentStatus(a, student);
@@ -657,20 +672,25 @@ export function initStudentHome() {
             <span class="l">${escapeHtml(a.title)} <span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
             <span class="v">${escapeHtml(dueLabel(a, student))}</span></div>`;
         }).join('') || '<p>কোনো অ্যাসাইনমেন্ট নেই।</p>'}</div>
-
+      ` },
+      { id: 'routine', html: `
       <div class="hcard" id="more-routine"><div class="h-title">রুটিন</div>${
         db.routine.list().map((r) => row(`${r.day} · ${r.subject}`, `${r.time} · ${r.room || ''}`)).join('') || '<p>রুটিন নেই।</p>'}</div>
-
+      ` },
+      { id: 'fees', html: `
       <div class="hcard" id="more-fees"><div class="h-title">ফি</div>${
         db.fees.list().filter((f) => f.studentId === student.id).map((f) =>
           `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>
-
+      ` },
+      { id: 'notices', html: `
       <div class="hcard" id="more-notices"><div class="h-title">নোটিশ</div>${
         noticesFor(student).map((n) => row(n.title, formatBnDate(n.date))).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>
-
+      ` },
+      { id: 'achievements', html: `
       <div class="hcard" id="more-achievements"><div class="h-title">অর্জন</div>${
         badges.map((b) => row(`${b.icon} ${b.name}`, '')).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
-
+      ` },
+      { id: 'certificates', html: `
       <div class="hcard" id="more-certificates"><div class="h-title">সনদ</div>${
         badges.length
           ? `<p class="meta">প্রতিটি অর্জিত ব্যাজের জন্য একটি সনদ প্রিন্ট করা যাবে।</p>${badges.map((b, i) => `
@@ -679,19 +699,22 @@ export function initStudentHome() {
               <span class="v"><button type="button" class="btn btn-small" data-cert="${i}">সনদ দেখুন</button></span>
             </div>`).join('')}`
           : '<p>সনদের জন্য এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
-
+      ` },
+      { id: 'downloads', html: `
       <div class="hcard" id="more-downloads"><div class="h-title">ডাউনলোড সেন্টার</div>${
         downloadable.length
           ? downloadable.map((m) => m.link
               ? `<a class="info-row" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="text-decoration:none"><span class="l">⬇️ ${escapeHtml(m.title)}</span><span class="v">ডাউনলোড</span></a>`
               : `<div class="info-row" role="button" tabindex="0" data-mat2="${escapeHtml(m.id)}" style="cursor:pointer"><span class="l">📄 ${escapeHtml(m.title)}</span><span class="v">${escapeHtml(m.type || '')}</span></div>`).join('')
           : '<p>আপনার ক্লাসের জন্য ডাউনলোডযোগ্য ফাইল নেই।</p>'}</div>
-
+      ` },
+      { id: 'streak', html: `
       <div class="hcard" id="more-streak"><div class="h-title">স্টাডি স্ট্রিক</div>
         <div class="info-row"><span class="l">🔥 ধারাবাহিক দিন</span><span class="v">${bn(streak.streak)}</span></div>
         <div class="week" style="margin-top:.5rem">${streak.week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
         <p class="meta" style="margin-top:.5rem">প্রতিদিন পড়াশোনা বা MCQ দিলে স্ট্রিক বাড়ে।</p></div>
-
+      ` },
+      { id: 'query', html: `
       <div class="hcard" id="more-query"><div class="h-title">শিক্ষক প্রশ্ন</div>
         ${queries.length ? queries.map((q) => `
           ${row(q.title, formatBnDate(q.date))}
@@ -701,7 +724,8 @@ export function initStudentHome() {
             <textarea id="query-text" class="form-input" rows="3" required placeholder="যে বিষয়ে জানতে চান লিখুন…"></textarea></div>
           <button type="submit" class="btn btn-block">শিক্ষককে পাঠান</button>
         </form></div>
-
+      ` },
+      { id: 'profile', html: `
       <div class="hcard" id="more-profile"><div class="h-title">প্রোফাইল</div>
         ${meRow.photo ? `<img src="${escapeHtml(meRow.photo)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:.75rem">` : ''}
         ${row('নাম', session.name)}
@@ -719,24 +743,41 @@ export function initStudentHome() {
           ${editable.map((f) => `<div class="form-group"><label for="pf-${escapeHtml(f)}">${escapeHtml(FIELD_BN[f] || f)} (সম্পাদনাযোগ্য)</label><input id="pf-${escapeHtml(f)}" name="${escapeHtml(f)}" class="form-input" value="${escapeHtml(meRow[f] || '')}"></div>`).join('')}
           ${editable.length ? `<button type="submit" class="btn btn-block">প্রোফাইল আপডেট করুন</button>` : `<p class="meta">প্রোফাইল সম্পাদনার অনুমতি অ্যাডমিন দেননি।</p>`}
         </form></div>
-
+      ` },
+      { id: 'settings', html: `
       <div class="hcard" id="more-settings"><div class="h-title">সেটিংস</div>
         ${row('ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)')}
         ${row('অ্যাপ ভার্সন', `v${DATA_VERSION}`)}
         <button type="button" class="btn btn-secondary btn-block" id="clear-cache" style="margin-top:.75rem">অ্যাপ ক্যাশ রিফ্রেশ করুন</button>
       </div>
-
+      ` },
+      { id: 'help', html: `
       <div class="hcard" id="more-help"><div class="h-title">সহায়তা</div>
         ${row('প্রতিষ্ঠান', db.settings.get().orgName || 'Active Plus')}
         ${row('মোবাইল', db.settings.get().mobile || '—')}
         ${row('ইমেইল', db.settings.get().email || '—')}
         <p class="meta" style="margin-top:.5rem">সমস্যা হলে উপরের নম্বরে যোগাযোগ করুন অথবা শিক্ষক প্রশ্ন পাঠান।</p></div>
+      ` }
+    ];
 
-      <button type="button" class="btn btn-error btn-block" id="home-logout">লগআউট</button>`;
+    const moreHost = document.getElementById('more-content');
+    /* Focused only for a known section id; anything else gets the index so a
+       tab never lands on an empty screen. */
+    const focused = Boolean(only) && cards.some((c) => c.id === only);
+    moreHost.innerHTML = focused
+      ? `<button type="button" class="btn btn-secondary btn-block" id="more-back" style="margin-bottom:.75rem">← ফিরে যান</button>
+${cards.filter((c) => c.id === only).map((c) => c.html).join('\n')}`
+      : `${quickRowHtml}
 
-    document.getElementById('home-logout').addEventListener('click', () => signOut({ redirect: true }));
+${cards.map((c) => c.html).join('\n')}
 
-    document.getElementById('clear-cache').addEventListener('click', async () => {
+<button type="button" class="btn btn-error btn-block" id="home-logout">লগআউট</button>`;
+
+    document.getElementById('more-back')?.addEventListener('click', () => renderMore());
+
+    document.getElementById('home-logout')?.addEventListener('click', () => signOut({ redirect: true }));
+
+    document.getElementById('clear-cache')?.addEventListener('click', async () => {
       try {
         if ('caches' in window) {
           const keys = await caches.keys();
@@ -750,8 +791,9 @@ export function initStudentHome() {
       }
     });
 
-    const moreHost = document.getElementById('more-content');
-    moreHost.addEventListener('click', (e) => {
+    /* onclick (not addEventListener): renderMore re-runs on every visit, and
+       listeners would otherwise pile up on the persistent container. */
+    moreHost.onclick = (e) => {
       const asg = e.target.closest('[data-asg]');
       if (asg) { openAssignment(asg.dataset.asg); return; }
       const mat = e.target.closest('[data-mat2]');
@@ -767,9 +809,9 @@ export function initStudentHome() {
           : act === 'result' || act === 'progress' ? 'result' : 'exam');
       else if (act === 'notif') document.getElementById('bell').click();
       else openMore(act);
-    });
+    };
 
-    document.getElementById('query-form').addEventListener('submit', (e) => {
+    document.getElementById('query-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
       const text = String(document.getElementById('query-text').value || '').trim();
       if (!text) return;
@@ -782,12 +824,13 @@ export function initStudentHome() {
         studentId: student.id, studentName: session.name, date: todayBn(), createdAt: new Date().toISOString(), read: false
       });
       document.getElementById('query-text').value = '';
-      renderMore();
+      /* Re-render in place: a focused প্রশ্ন panel stays focused. */
+      renderMore(only);
       showToast('প্রশ্ন শিক্ষকের কাছে পাঠানো হয়েছে।', 'success');
     });
 
     const editForm = document.getElementById('profile-edit-form');
-    editForm.addEventListener('submit', (e) => {
+    editForm?.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!navigator.onLine) {
         showToast('অফলাইনে প্রোফাইল আপডেট করা যাবে না।', 'error');
@@ -802,14 +845,18 @@ export function initStudentHome() {
       if (!Object.keys(patch).length) { showToast('কোনো পরিবর্তন নেই।', 'info'); return; }
       db.students.update(student.id, patch);
       showToast('প্রোফাইল আপডেট হয়েছে।', 'success');
-      renderMore();
+      renderMore(only);
     });
   }
 
+  /**
+   * A tile/tab tap shows ONLY the panel it names — প্রোফাইল shows the profile
+   * card alone, রুটিন the routine alone, and so on. The bottom-nav “আরও” tab
+   * still opens the full index.
+   */
   function openMore(section) {
-    renderMore();
     switchView('more');
-    if (section) setTimeout(() => document.getElementById(`more-${section}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 60);
+    if (section) renderMore(section);
   }
 
   /* ---------------- Study / Exam / Result views ---------------- */

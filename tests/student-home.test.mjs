@@ -280,6 +280,58 @@ test('More menu carries every secondary destination without dead links', async (
   assert.ok(doc.getElementById('home-logout'), 'logout available');
 });
 
+test('a tile/tab tap shows ONLY the panel it names, with a way back', async () => {
+  const { doc } = await bootHome();
+
+  // Header 👤 → profile alone, not the whole list scrolled to it.
+  click(doc, '#profile-btn');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'profile opens in More');
+  assert.ok(doc.getElementById('more-profile'), 'the profile card is there');
+  for (const id of ['more-routine', 'more-fees', 'more-notices', 'more-assignments', 'more-streak', 'more-query', 'more-settings', 'more-help']) {
+    assert.equal(doc.getElementById(id), null, `unrelated ${id} is NOT shown`);
+  }
+
+  // The back button restores the full index.
+  click(doc, '#more-back');
+  assert.ok(doc.getElementById('more-routine'), 'back returns to the full More index');
+  assert.ok(doc.getElementById('home-logout'), 'with logout back in place');
+
+  // A home shortcut (📅 রুটিন chip) → routine alone.
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '#home-content [data-act="routine"]');
+  assert.ok(doc.getElementById('more-routine'), 'routine shortcut shows the routine card');
+  assert.equal(doc.getElementById('more-profile'), null, 'and nothing else');
+  assert.equal(doc.getElementById('more-fees'), null, 'fees stays hidden too');
+
+  // A folded home card button (অ্যাসাইনমেন্ট “সব দেখুন”) → assignments alone.
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '#home-content [data-act="assignments"]');
+  assert.ok(doc.getElementById('more-assignments'), 'the assignments card is shown');
+  assert.equal(doc.getElementById('more-routine'), null, 'routine stays hidden');
+  assert.equal(doc.getElementById('more-profile'), null, 'profile stays hidden');
+
+  // A quick-row tile inside the More index → that panel alone.
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-content [data-act="streak"]');
+  assert.ok(doc.getElementById('more-streak'), 'streak tile shows the streak card');
+  assert.equal(doc.getElementById('more-fees'), null, 'fees stays hidden');
+  assert.equal(doc.getElementById('more-help'), null, 'help stays hidden');
+
+  // Submitting a form inside a focused panel keeps the focus there.
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-content [data-act="query"]');
+  doc.getElementById('query-text').value = 'পরীক্ষা কবে?';
+  doc.getElementById('query-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
+  assert.ok(doc.getElementById('more-query'), 'the question panel re-renders in place');
+  assert.ok(doc.getElementById('more-query').textContent.includes('পরীক্ষা কবে?'), 'new question listed');
+  assert.equal(doc.getElementById('more-profile'), null, 'still nothing unrelated');
+
+  // The bottom-nav “আরও” tab always returns to the full index.
+  click(doc, '.bottom-nav button[data-view="more"]');
+  assert.ok(doc.getElementById('more-profile'), 'index shows the profile card again');
+  assert.ok(doc.getElementById('more-fees'), 'index shows the fees card again');
+});
+
 test('clickable rows work from the keyboard, not just a tap', async () => {
   const { doc } = await bootHome();
   const row = doc.querySelector('#home-content [role="button"][data-act="assignment"]');
