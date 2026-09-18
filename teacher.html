@@ -265,6 +265,24 @@
       </div>
     </div>
 
+
+    <!-- Shared document preview: question papers and answer keys -->
+    <div class="modal-overlay" id="document-preview-modal" aria-hidden="true">
+      <div class="modal-content doc-preview" role="dialog" aria-modal="true" aria-labelledby="document-preview-title">
+        <button type="button" class="modal-close" data-close aria-label="বন্ধ করুন">×</button>
+        <div class="doc-preview-head">
+          <h2 id="document-preview-title">Document Preview</h2>
+          <p class="doc-preview-meta" id="document-preview-meta"></p>
+        </div>
+        <div class="doc-preview-body" id="document-preview-body"></div>
+        <div class="doc-preview-actions">
+          <button type="button" class="btn" id="document-preview-download">⬇️ PDF ডাউনলোড</button>
+          <button type="button" class="btn btn-secondary" id="document-preview-excel">📊 এক্সেল ডাউনলোড</button>
+          <button type="button" class="btn btn-success" id="document-preview-share">📱 ছবি শেয়ার</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Suggestion modal -->
     <div class="modal-overlay" id="suggestion-modal" aria-hidden="true">
       <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="suggestion-modal-title">
@@ -443,6 +461,7 @@
       import { updateProfile } from './js/auth.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from './js/exams.js';
       import { initTeacherHome } from './js/teacher-home.js';
+      import { mountDocumentPreview } from './js/preview.js';
 
       const session = initApp({ roles: ['teacher'] });
       if (session) {
@@ -676,6 +695,7 @@
         setExamAuthor(session.name);
         mountSuggestionAuthoring({ author: session.name, session });
         mountExamAuthoring({ session });
+        mountDocumentPreview();   // প্রশ্নপত্র / উত্তরপত্র preview + PDF download
 
         /* ================= App-style home ================= */
         const teacherHome = initTeacherHome({

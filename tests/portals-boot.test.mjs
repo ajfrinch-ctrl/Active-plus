@@ -1205,3 +1205,36 @@ test('the admin builds an exam by pasting a paper into the template', async () =
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
+
+test('the teacher prints a question paper and an answer key from the exam list', async () => {
+  const out = await bootPage('teacher.html', {
+    username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'qpaper'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  const exam = data.db.exams.list()[0];
+  const paperBtn = doc.querySelector(`[data-paper="${exam.id}"]`);
+  const keyBtn = doc.querySelector(`[data-key="${exam.id}"]`);
+  assert.ok(paperBtn, 'every exam offers প্রশ্নপত্র');
+  assert.ok(keyBtn, 'and the answer key');
+
+  paperBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 120));
+  const modal = doc.getElementById('document-preview-modal');
+  assert.equal(modal.getAttribute('aria-hidden'), 'false', 'the preview opens');
+  assert.equal(doc.getElementById('document-preview-title').textContent, 'প্রশ্নপত্র');
+  assert.match(doc.getElementById('document-preview-meta').textContent, /নবম/, 'the meta names the class');
+  assert.match(doc.getElementById('document-preview-meta').textContent, /[০-৯]{1,2} [\u0980-\u09FF]+ [০-৯]{4}/, 'and the Bengali date');
+  assert.ok(doc.querySelectorAll('#document-preview-body .doc-page').length >= 1, 'the sheet is shown');
+  assert.equal(doc.getElementById('document-preview-download').hidden, false, 'PDF download offered');
+
+  // The answer key is a separate document, so a printed paper never carries it.
+  keyBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(doc.getElementById('document-preview-title').textContent, 'সঠিক উত্তরপত্র');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});

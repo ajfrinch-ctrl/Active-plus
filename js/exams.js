@@ -10,6 +10,8 @@ import {
   parseMcqPaste, parseBnDateInput, formatBnDate, MCQ_TEMPLATE, MCQ_PASTE_RULES, downloadText
 } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
+import { previewDocument } from './preview.js';
+import { renderQuestionPaperCanvases } from './docs.js';
 
 // Spec 51: never report a saved record that could not be saved.
 const onlineFor = (action) => requireOnline(action, getDbStatus);
@@ -129,6 +131,31 @@ export function mountExamAuthoring({ session = null } = {}) {
       : '<div class="empty-state">টেমপ্লেট অনুযায়ী প্রশ্ন পেস্ট করলে এখানে তৈরি হয়ে দেখা যাবে।</div>';
   };
 
+  /** Opens the printable paper (or the teacher's answer key) in the preview. */
+  const openPaper = async (examId, withAnswers) => {
+    const exam = db.exams.find(examId);
+    if (!exam) return;
+    if (!(exam.questions || []).length) {
+      showToast('এই পরীক্ষায় এখনো কোনো প্রশ্ন যোগ করা হয়নি।', 'error');
+      return;
+    }
+    try {
+      const canvases = await renderQuestionPaperCanvases(exam, {
+        settings: db.settings.get(),
+        withAnswers,
+        generatedBy: session?.name || null
+      });
+      await previewDocument({
+        title: withAnswers ? 'সঠিক উত্তরপত্র' : 'প্রশ্নপত্র',
+        meta: `${exam.title} · ${exam.className}${exam.subject ? ` · ${exam.subject}` : ''} · ${formatBnDate(exam.date)}`,
+        filename: `${exam.id}-${withAnswers ? 'answer-key' : 'question-paper'}.pdf`,
+        canvases
+      });
+    } catch (err) {
+      showToast('প্রশ্নপত্র তৈরি করা যায়নি — আবার চেষ্টা করুন।', 'error');
+    }
+  };
+
   const render = () => {
     const rows = db.exams.list();
     list.innerHTML = rows.length
@@ -143,6 +170,8 @@ export function mountExamAuthoring({ session = null } = {}) {
             <div class="li-sub">📅 ${escapeHtml(formatBnDate(exam.date))} · ⏱ ${bn(exam.duration || 30)} মিনিট · ${escapeHtml(win ? win.label : '')}</div>
           </div>
           <span class="row-actions">
+            <button type="button" class="btn btn-small btn-secondary" data-paper="${escapeHtml(exam.id)}">📄 প্রশ্নপত্র</button>
+            <button type="button" class="btn btn-small btn-secondary" data-key="${escapeHtml(exam.id)}">🗝️ উত্তরপত্র</button>
             <button type="button" class="btn btn-small btn-secondary" data-results="${escapeHtml(exam.id)}">ফলাফল</button>
             <button type="button" class="btn btn-small btn-error" data-delete-exam="${escapeHtml(exam.id)}">মুছুন</button>
           </span>
@@ -154,6 +183,10 @@ export function mountExamAuthoring({ session = null } = {}) {
   list.addEventListener('click', (e) => {
     const del = e.target.closest('[data-delete-exam]');
     const res = e.target.closest('[data-results]');
+    const paper = e.target.closest('[data-paper]');
+    const key = e.target.closest('[data-key]');
+    if (paper) { openPaper(paper.dataset.paper, false); return; }
+    if (key) { openPaper(key.dataset.key, true); return; }
     if (del) {
       const id = del.dataset.deleteExam;
       if (!onlineFor('পরীক্ষা মুছে ফেলা')) return;

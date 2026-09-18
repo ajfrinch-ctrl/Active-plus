@@ -1265,6 +1265,208 @@ export async function renderBrandedImageCanvas({ title, subtitle, lines = [], or
   return canvas;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* MCQ question paper + answer key                                     */
+/* ------------------------------------------------------------------ */
+
+/** 'ক', 'খ', 'গ', 'ঘ' — the option markers a printed paper uses. */
+const OPTION_LETTERS = ['ক', 'খ', 'গ', 'ঘ'];
+
+/** '১. প্রশ্ন' / the option lines, wrapped to the column width. */
+function questionLines(ctx, question, number, inner) {
+  setFont(ctx, BODY + 3, 600);
+  const text = wrapText(ctx, `${bn(number)}. ${question.q || ''}`, inner - 12);
+  setFont(ctx, BODY, 400);
+  const options = (question.options || []).filter(Boolean)
+    .map((opt, oi) => `${OPTION_LETTERS[oi] || bn(oi + 1)}) ${opt}`);
+  const half = (inner - 16) / 2;
+  return { text, options, optionLines: options.map((o) => wrapText(ctx, o, half - 12)) };
+}
+
+/** Height of one question block, measured with the very same rules. */
+function questionHeight(ctx, question, number, inner) {
+  const { text, options, optionLines } = questionLines(ctx, question, number, inner);
+  return text.length * (BODY + 9)
+    + Math.ceil(options.length / 2) * (BODY + 12)
+    + 16;
+}
+
+/** Paints one question block (number, text, two option columns). */
+function paintQuestion(ctx, question, number, x, y, inner) {
+  const { text, optionLines } = questionLines(ctx, question, number, inner);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = INK;
+  setFont(ctx, BODY + 3, 600);
+  text.forEach((line, i) => ctx.fillText(line, x, y + i * (BODY + 9)));
+  let cursor = y + text.length * (BODY + 9) + 4;
+
+  const half = (inner - 16) / 2;
+  optionLines.forEach((lines, oi) => {
+    const col = oi % 2;
+    const row = Math.floor(oi / 2);
+    setFont(ctx, BODY, 400);
+    ctx.fillStyle = INK;
+    lines.forEach((line, li) => ctx.fillText(
+      line, x + col * half, cursor + row * (BODY + 12) + li * (BODY + 6)
+    ));
+  });
+  return cursor + Math.ceil(optionLines.length / 2) * (BODY + 12) + 12;
+}
+
+/**
+ * Builds the printable MCQ paper for an exam: institution pad, the exam heading
+ * (class · subject · time · marks · date) and every question with its options,
+ * flowing across A4 pages. With `withAnswers` a final key page is appended —
+ * the teacher's copy, marked "শিক্ষকের জন্য".
+ *
+ * @returns {Promise<HTMLCanvasElement[]>} one canvas per page, ready for buildPdf.
+ */
+export async function renderQuestionPaperCanvases(exam, { settings, withAnswers = false, generatedBy = null } = {}) {
+  await warmFonts();
+  const org = resolveOrg(settings || {});
+  const logoImg = await loadLogo(org.orgLogo || settings?.orgLogo || null);
+  const { width, height } = PAGE;
+  const pad = PAD;
+  const inner = width - pad * 2;
+  const pageLimit = height - (pad + 90);
+
+  const questions = (exam?.questions || []).filter((q) => q && q.q);
+  const heading = [
+    exam?.className ? `শ্রেণি: ${exam.className}` : '',
+    exam?.subject ? `বিষয়: ${exam.subject}` : '',
+    exam?.duration ? `সময়: ${bn(exam.duration)} মিনিট` : '',
+    questions.length ? `পূর্ণমান: ${bn(questions.length)}` : '',
+    exam?.date ? `তারিখ: ${formatBnDate(exam.date)}` : ''
+  ].filter(Boolean).join('   ·   ');
+
+  const opts = {
+    settings: org,
+    title: exam?.title || 'MCQ পরীক্ষা',
+    subtitle: 'বহুনির্বাচনি প্রশ্নপত্র',
+    logoImg,
+    generatedBy
+  };
+
+  const probe = makeCanvas(width, 4);
+  const pctx = probe.getContext('2d');
+  pctx.textBaseline = 'top';
+  const headerH = reportHeaderPass(pctx, width, pad, opts, false);
+  const firstTop = headerH + 6 + (heading ? LH + 8 : 0) + LH + 10;
+  const nextTop = headerH + 6 + LH + 4;
+
+  // Split the questions into pages of what fits (the first page carries the
+  // heading and the instruction line).
+  const pages = [];
+  let current = [];
+  let y = firstTop;
+  questions.forEach((question, index) => {
+    const h = questionHeight(pctx, question, index + 1, inner);
+    if (current.length && y + h > pageLimit) {
+      pages.push(current);
+      current = [];
+      y = nextTop;
+    }
+    current.push({ question, number: index + 1, y });
+    y += h;
+  });
+  pages.push(current);
+  if (!questions.length) pages[0] = [];
+
+  const totalPages = pages.length + (withAnswers ? 1 : 0);
+
+  const canvases = pages.map((page, index) => {
+    const canvas = makeCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'top';
+    const top = reportHeaderPass(ctx, width, pad, opts, true);
+    let y = top + 6;
+
+    ctx.textAlign = 'center';
+    if (index === 0) {
+      if (heading) {
+        setFont(ctx, 20, 600);
+        ctx.fillStyle = INK;
+        ctx.fillText(heading, width / 2, y);
+        y += LH + 8;
+      }
+      setFont(ctx, 18, 400);
+      ctx.fillStyle = MUTED;
+      ctx.fillText('নিচের প্রতিটি প্রশ্নের সঠিক উত্তরে টিক (✓) দিন।', width / 2, y);
+      y += LH + 10;
+    } else {
+      setFont(ctx, 16, 400);
+      ctx.fillStyle = MUTED;
+      ctx.fillText(`${exam?.title || ''} · পৃষ্ঠা ${bn(index + 1)}`, width / 2, y);
+      y += LH + 4;
+    }
+
+    if (!page.length) {
+      setFont(ctx, BODY, 400);
+      ctx.fillStyle = MUTED;
+      ctx.fillText('এই পরীক্ষায় এখনো কোনো প্রশ্ন যোগ করা হয়নি।', width / 2, firstTop);
+    }
+    page.forEach(({ question, number, y: lineY }) => {
+      paintQuestion(ctx, question, number, pad + 6, lineY, inner);
+    });
+
+    paintPageFooter(ctx, width, height, pad, org, index + 1, totalPages, generatedBy, true);
+    return canvas;
+  });
+
+  if (withAnswers) {
+    const canvas = makeCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'top';
+    const top = reportHeaderPass(ctx, width, pad, { ...opts, subtitle: 'সঠিক উত্তরপত্র — শিক্ষকের জন্য' }, true);
+    let y = top + 10;
+
+    setFont(ctx, 18, 400);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = MUTED;
+    ctx.fillText(`${exam?.className || ''}${exam?.subject ? ` · ${exam.subject}` : ''} · মোট প্রশ্ন: ${bn(questions.length)}`, width / 2, y);
+    y += LH + 16;
+
+    const cols = 4;
+    const colW = inner / cols;
+    const rowH = LH + 8;
+    const maxRows = Math.max(1, Math.floor((pageLimit - y) / rowH));
+    questions.slice(0, cols * maxRows).forEach((question, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const lineY = y + row * rowH;
+      setFont(ctx, BODY + 2, 700);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = INK;
+      ctx.fillText(`${bn(index + 1)}.`, pad + col * colW, lineY);
+      ctx.fillStyle = ACCENT;
+      ctx.fillText(`${OPTION_LETTERS[question.answer] ?? ''}`, pad + col * colW + 60, lineY);
+    });
+    y += Math.min(questions.length, cols * maxRows) === 0 ? 0 : Math.ceil(Math.min(questions.length, cols * maxRows) / cols) * rowH + 16;
+    if (questions.length > cols * maxRows) {
+      setFont(ctx, 16, 400);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = MUTED;
+      ctx.fillText(`বাকি ${bn(questions.length - cols * maxRows)}টি উত্তর পরের পৃষ্ঠায়`, width / 2, y);
+      y += LH;
+    }
+
+    setFont(ctx, 15, 400);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = FAINT;
+    ctx.fillText('এই পৃষ্ঠাটি শিক্ষকের জন্য — শিক্ষার্থীদের দেওয়ার আগে সরিয়ে নিন।', width / 2, Math.min(y + 10, pageLimit));
+
+    paintPageFooter(ctx, width, height, pad, org, totalPages, totalPages, generatedBy, true);
+    canvases.push(canvas);
+  }
+
+  return canvases;
+}
+
 export function receiptPdfFileName(pay) {
   return `receipt-${pay.receiptNo || pay.id}.pdf`;
 }
