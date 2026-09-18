@@ -320,7 +320,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 204 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 208 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
@@ -328,7 +328,7 @@ filtering), the payment and receipt flow, notification badges, lazy table
 pagination, error boundaries with Retry, role-based routing guards, and the full
 login → home handoff. The newest files cover the Bengali date format on every
 rendered portal view, the paste-template exam flow end to end (paste → publish →
-sit → auto-submit), and the top bar / entry-home rules.
+sit → countdown → auto-submit), and the top bar / entry-home rules.
 
 ## Configuring Firebase (optional)
 

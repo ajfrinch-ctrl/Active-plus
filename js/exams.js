@@ -567,6 +567,9 @@ export function mountExamTaker({ listSelector, student }) {
         </details>
         <button type="button" class="btn btn-block" id="back-to-exams">ফিরে যান</button>`;
       player.querySelector('#back-to-exams').addEventListener('click', () => showList('', 'info'));
+      // Keep the (hidden) exam list in step with the result just stored, so
+      // returning to it can never offer the same paper again.
+      render();
       showToast(auto ? 'সময় শেষ — উত্তরপত্র জমা হয়েছে।' : `আপনার স্কোর ${bn(score)}/${bn(max)}`, auto ? 'warning' : (pct >= 50 ? 'success' : 'warning'));
     };
 

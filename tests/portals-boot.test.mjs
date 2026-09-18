@@ -1013,15 +1013,19 @@ test('a teacher cannot author exams or suggestions for a class they do not teach
   const sugOpts = [...doc.getElementById('sug-class').options].map((o) => o.value || o.textContent);
   assert.ok(!sugOpts.includes('দশম'), `suggestion class picker offers only assigned classes, got ${sugOpts}`);
 
+  const pastePaper = (text = '১. ১+১=?\nA) ১\nB) ২\nC) ৩\nD) ৪\nউত্তর: B') => {
+    doc.getElementById('exam-paste').value = text;
+    doc.getElementById('exam-parse').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  };
+
   // Defence in depth: a hand-edited select must still be refused by the handler.
   const examsBefore = data.db.exams.list().length;
   const examSel = doc.getElementById('exam-class');
   examSel.innerHTML = '<option value="দশম">দশম</option>';
   examSel.value = 'দশম';
   doc.getElementById('exam-title').value = 'অনুমোদিত নয় পরীক্ষা';
-  doc.getElementById('q-text').value = '১+১=?';
-  ['২', '৩', '৪', '৫'].forEach((v, i) => { doc.getElementById(`q-opt${i}`).value = v; });
-  doc.getElementById('add-question').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  pastePaper();
+  assert.match(doc.getElementById('exam-question-count').textContent, /১টি প্রশ্ন/, 'the pasted question is staged');
   doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
   assert.equal(data.db.exams.list().length, examsBefore,
     'no exam is written for a class outside the teacher assignment');
@@ -1040,9 +1044,7 @@ test('a teacher cannot author exams or suggestions for a class they do not teach
   examSel.innerHTML = '<option value="নবম">নবম</option>';
   examSel.value = 'নবম';
   doc.getElementById('exam-title').value = 'অনুমোদিত পরীক্ষা';
-  doc.getElementById('q-text').value = '২+২=?';
-  ['৩', '৪', '৫', '৬'].forEach((v, i) => { doc.getElementById(`q-opt${i}`).value = v; });
-  doc.getElementById('add-question').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  pastePaper('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬\nউত্তর: B');
   doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
   assert.equal(data.db.exams.list().length, examsBefore + 1, 'an exam for their own class is still created');
   assert.equal(data.db.exams.list().at(-1).className, 'নবম');
@@ -1132,6 +1134,43 @@ test('teacher assignment and material publishing write, notify and stay scoped',
     'a নবম student can see the material their teacher published');
   assert.ok(!visibleTo('দশম').some((m) => m.title === 'গতি অধ্যায়ের নোট'),
     'a দশম student cannot see material scoped to another class');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('the admin builds an exam by pasting a paper into the template', async () => {
+  const out = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'adminexam'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  doc.getElementById('open-exam-modal').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  // The template is on screen and can be dropped into the paste box in one tap.
+  const shown = doc.getElementById('exam-template-view');
+  assert.match(shown.textContent, /উত্তর: A/, 'the paste template is shown');
+  doc.getElementById('exam-template').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.match(doc.getElementById('exam-paste').value, /বাংলাদেশের রাজধানী/, 'the template fills the paste box');
+
+  const before = data.db.exams.list().length;
+  doc.getElementById('exam-paste').value = [
+    '১. ৭+৫=?', 'A) ১০', 'B) ১১', 'C) ১২', 'D) ১৩', 'উত্তর: C',
+    '', '২. ৯×২=?', 'A) ১৬', 'B) ১৮', 'C) ২০', 'D) ২২', 'উত্তর: B'
+  ].join('\n');
+  doc.getElementById('exam-parse').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(data.db.exams.list().length, before, 'parsing alone writes nothing');
+  assert.match(doc.getElementById('exam-question-count').textContent, /২টি প্রশ্ন/, 'both questions staged');
+  assert.match(doc.getElementById('exam-staged').textContent, /৭\+৫=\?/, 'the staged paper is previewed');
+
+  doc.getElementById('exam-title').value = 'পেস্ট করা পরীক্ষা';
+  doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  const created = data.db.exams.list().at(-1);
+  assert.equal(data.db.exams.list().length, before + 1, 'the paper is published');
+  assert.equal(created.questions.length, 2, 'both pasted questions are stored');
+  assert.equal(created.questions[0].answer, 2, 'the উত্তর marker became the right option');
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
