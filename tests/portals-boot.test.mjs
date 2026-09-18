@@ -1139,6 +1139,36 @@ test('teacher assignment and material publishing write, notify and stay scoped',
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
+test('the admin sees which questions each student missed', async () => {
+  const out = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'examresults'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  const exam = data.db.exams.list()[0];
+  const student = data.db.students.list().find((s) => s.className === exam.className);
+  // Two right, one deliberately wrong, one left blank.
+  data.db.examResults.add({
+    id: 'res-test', examId: exam.id, studentId: student.id, studentName: student.name,
+    score: 2, total: 4, date: data.todayBn(), autoSubmitted: false,
+    answers: [exam.questions[0].answer, exam.questions[1].answer, (exam.questions[2].answer + 1) % 4, null]
+  });
+  data.db.exams.update(exam.id, { questions: [...exam.questions,
+    { q: 'চতুর্থ প্রশ্ন?', options: ['১', '২', '৩', '৪'], answer: 0 }
+  ] });
+
+  doc.querySelector(`[data-results="${exam.id}"]`)?.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const list = doc.getElementById('exam-results');
+  assert.match(list.textContent, new RegExp(student.name), 'the student is listed');
+  assert.match(list.textContent, /ভুল হয়েছে: ৩, ৪/, `the missed question numbers are shown, got: ${list.textContent.slice(0, 200)}`);
+  assert.match(list.textContent, /[০-৯]{1,2} [\u0980-\u09FF]+ [০-৯]{4}/, 'with the Bengali long date');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
 test('the admin builds an exam by pasting a paper into the template', async () => {
   const out = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'adminexam'

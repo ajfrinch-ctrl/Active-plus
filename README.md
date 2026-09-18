@@ -127,6 +127,11 @@ rather than from elapsed ticks. A student who leaves mid-paper finds the exam
 card marked **চলছে · আর ০১:৩০ বাকি** with a *চালিয়ে যান* button, and their saved
 answers waiting. One attempt per exam.
 
+The chosen answers travel with the result, so a finished paper offers
+**উত্তর দেখুন** (question-by-question, with the right answer against a wrong
+one) long after the sitting ended, and the teacher's result list says which
+question numbers each student missed.
+
 ## Structure
 
 ```
@@ -342,15 +347,17 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 215 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 220 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
 filtering), the payment and receipt flow, notification badges, lazy table
 pagination, error boundaries with Retry, role-based routing guards, and the full
 login → home handoff. The newest files cover the Bengali date format on every
-rendered portal view, the paste-template exam flow end to end (paste → publish →
-sit → countdown → auto-submit), and the top bar / entry-home rules.
+rendered portal view *and* in the generated documents (receipts, reports, ID
+cards — the canvases are read back and scanned), the paste-template exam flow
+end to end (paste → publish → sit → countdown → auto-submit → review), and the
+top bar / entry-home rules.
 
 ## Configuring Firebase (optional)
 

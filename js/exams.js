@@ -321,14 +321,22 @@ export function mountExamAuthoring({ session = null } = {}) {
     const results = db.examResults.list().filter((r) => r.examId === examId);
     const host = document.getElementById('exam-results');
     host.innerHTML = results.length
-      ? `<h3>${escapeHtml(exam.title)}</h3>` + results.map((r) => `
+      ? `<h3>${escapeHtml(exam.title)}</h3>` + results.map((r) => {
+        const answers = Array.isArray(r.answers) ? r.answers : null;
+        const wrong = answers
+          ? answers.map((given, qi) => (given === null || Number(given) !== Number(exam.questions[qi]?.answer) ? qi + 1 : 0)).filter(Boolean)
+          : [];
+        const auto = r.autoSubmitted ? ' · ⏰ স্বয়ংক্রিয়ভাবে জমা' : '';
+        return `
         <div class="list-item">
           <div class="li-main">
             <div class="li-title">${escapeHtml(r.studentName)}</div>
-            <div class="li-sub">${escapeHtml(r.studentId)} · ${escapeHtml(formatBnDate(r.date))}</div>
+            <div class="li-sub">${escapeHtml(r.studentId)} · ${escapeHtml(formatBnDate(r.date))}${auto}</div>
+            ${answers ? `<div class="li-sub">ভুল হয়েছে: ${wrong.length ? wrong.map((n) => bn(n)).join(', ') + ` নম্বর প্রশ্নে` : 'একটিও নয় ✅'}</div>` : ''}
           </div>
           <span class="badge ${r.score / r.total >= 0.5 ? 'success' : 'warning'}">${bn(r.score)}/${bn(r.total)}</span>
-        </div>`).join('')
+        </div>`;
+      }).join('')
       : `<h3>${escapeHtml(exam?.title || '')}</h3><div class="empty-state">এখনো কেউ পরীক্ষা দেয়নি।</div>`;
     openModal('exam-results-modal');
   }
@@ -424,7 +432,10 @@ export function mountExamTaker({ listSelector, student }) {
             ${running ? `<div class="li-sub exam-running">⏱ ${running === 'সময় শেষ' ? 'সময় শেষ — খুললেই জমা হবে' : `চলছে · আর ${escapeHtml(running)} বাকি`}</div>` : ''}
           </div>
           ${done
-            ? `<span class="badge ${done.score / done.total >= 0.5 ? 'success' : 'warning'}">${bn(done.score)}/${bn(done.total)}</span>`
+            ? `<span class="row-actions">
+                 <span class="badge ${done.score / done.total >= 0.5 ? 'success' : 'warning'}">${bn(done.score)}/${bn(done.total)}</span>
+                 ${Array.isArray(done.answers) ? `<button type="button" class="btn btn-small btn-secondary" data-review="${escapeHtml(exam.id)}">উত্তর দেখুন</button>` : ''}
+               </span>`
             : (win && win.canStart
               ? `<button type="button" class="btn btn-small${running ? ' btn-secondary' : ''}" data-take="${escapeHtml(exam.id)}">${running && running !== 'সময় শেষ' ? 'চালিয়ে যান' : 'শুরু করুন'}</button>`
               : `<span class="badge warning">${escapeHtml(win && win.state === 'closed' ? 'সময় শেষ' : 'শুরু হয়নি')}</span>`)}
@@ -433,11 +444,49 @@ export function mountExamTaker({ listSelector, student }) {
       : '<div class="empty-state">আপনার ক্লাসের কোনো পরীক্ষা নেই।</div>';
   };
 
+  /** Opens the same review screen later, from the stored result. */
+  function showReview(examId) {
+    const exam = db.exams.find(examId);
+    const result = examResultFor(examId, student.id);
+    if (!exam || !result) return;
+    const answers = Array.isArray(result.answers) ? result.answers : null;
+    const pct = result.total ? Math.round((result.score / result.total) * 100) : 0;
+    onScreen = true;
+    list.hidden = true;
+    player.hidden = false;
+    player.innerHTML = `
+      <div class="hcard exam-result" style="text-align:center">
+        <div class="h-title" style="justify-content:center">📝 উত্তরপত্র — ${escapeHtml(exam.title)}</div>
+        <div class="exam-score">${bn(result.score)}/${bn(result.total)}</div>
+        <div class="exam-pct">${bn(pct)}%</div>
+        <p class="meta">জমা দেওয়ার তারিখ: ${escapeHtml(formatBnDate(result.date))}${result.autoSubmitted ? ' · স্বয়ংক্রিয়ভাবে জমা' : ''}</p>
+      </div>
+      ${answers ? `<details class="mini-details" open><summary>📝 সঠিক উত্তর দেখুন</summary>
+        <div class="mini-body">${reviewHtml(exam, answers)}</div></details>`
+        : '<div class="alert alert-info">এই পরীক্ষার উত্তরগুলো সংরক্ষিত হয়নি — শুধু ফলাফল আছে।</div>'}
+      <button type="button" class="btn btn-block" id="back-to-exams">ফিরে যান</button>`;
+    player.querySelector('#back-to-exams').addEventListener('click', () => showList('', 'info'));
+  }
+
   list.addEventListener('click', (e) => {
+    const review = e.target.closest('[data-review]');
+    if (review) { showReview(review.dataset.review); return; }
     const btn = e.target.closest('[data-take]');
     if (!btn) return;
     takeExam(btn.dataset.take);
   });
+
+    /** Question-by-question review: what the student chose against the answer. */
+  const reviewHtml = (exam, chosen) => exam.questions.map((q, qi) => {
+    const given = chosen ? chosen[qi] : null;
+    const answered = given !== null && given !== undefined && given !== '';
+    const right = answered && Number(given) === Number(q.answer);
+    return `<div class="exam-review ${right ? 'ok' : 'bad'}">
+      <div class="li-title">${bn(qi + 1)}. ${escapeHtml(q.q)}</div>
+      <div class="li-sub">আপনার উত্তর: ${answered ? escapeHtml(q.options[Number(given)] || '') : '<i>দেননি</i>'}</div>
+      ${right ? '' : `<div class="li-sub">সঠিক উত্তর: <b>${escapeHtml(q.options[q.answer] || '')}</b></div>`}
+    </div>`;
+  }).join('');
 
   /** Exam duration in ms — an exam can never be posted with 0 minutes. */
   const durationMs = (exam) => Math.max(1, Number(exam.duration) || 30) * 60000;
@@ -557,7 +606,10 @@ export function mountExamTaker({ listSelector, student }) {
       if (!examResultFor(examId, student.id)) {
         db.examResults.add({
           id: newId('res'), examId, studentId: student.id, studentName: student.name,
-          score, total: max, date: todayBn(), autoSubmitted: Boolean(auto)
+          score, total: max, date: todayBn(), autoSubmitted: Boolean(auto),
+          // Kept so the paper can be reviewed later — by the student, and by
+          // the teacher who wants to see which questions went wrong.
+          answers: exam.questions.map((_, qi) => (chosen[qi] === null || chosen[qi] === '' ? null : Number(chosen[qi])))
         });
       }
       clearSession(examId);
@@ -576,17 +628,7 @@ export function mountExamTaker({ listSelector, student }) {
         </div>
         <details class="mini-details" open>
           <summary>📝 সঠিক উত্তর দেখুন</summary>
-          <div class="mini-body">
-            ${exam.questions.map((q, qi) => {
-              const given = chosen[qi];
-              const right = given !== null && given !== '' && Number(given) === Number(q.answer);
-              return `<div class="exam-review ${right ? 'ok' : 'bad'}">
-                <div class="li-title">${bn(qi + 1)}. ${escapeHtml(q.q)}</div>
-                <div class="li-sub">আপনার উত্তর: ${given === null || given === '' ? '<i>দেননি</i>' : escapeHtml(q.options[Number(given)])}</div>
-                ${right ? '' : `<div class="li-sub">সঠিক উত্তর: <b>${escapeHtml(q.options[q.answer])}</b></div>`}
-              </div>`;
-            }).join('')}
-          </div>
+          <div class="mini-body">${reviewHtml(exam, chosen)}</div>
         </details>
         <button type="button" class="btn btn-block" id="back-to-exams">ফিরে যান</button>`;
       player.querySelector('#back-to-exams').addEventListener('click', () => showList('', 'info'));

@@ -412,5 +412,47 @@ test('a fresh sitting keeps its own deadline and grades the answers given', asyn
   const result = data.examResultFor(exam.id, student.id);
   assert.equal(result.score, exam.questions.length, 'every answer graded');
   assert.equal(result.autoSubmitted, false, 'a manual submission is not flagged as automatic');
+
+  // The answers are kept with the result, so the paper can be reviewed later.
+  assert.deepEqual(result.answers, exam.questions.map((q) => q.answer), 'the chosen options are stored');
+
+  click(doc, '#back-to-exams');
+  const review = doc.querySelector(`[data-review="${exam.id}"]`);
+  assert.ok(review, 'a finished exam offers উত্তর দেখুন');
+  review.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  const reviewHtml = doc.getElementById('exam-player').innerHTML;
+  assert.match(reviewHtml, /উত্তরপত্র/, 'the review screen opens');
+  assert.match(reviewHtml, new RegExp(`জমা দেওয়ার তারিখ: [০-৯]{1,2} [\\u0980-\\u09FF]+ [০-৯]{4}`), 'with the Bengali submission date');
+  assert.match(reviewHtml, /সঠিক উত্তর/, 'and the answers');
+  dom.window.localStorage.clear();
+});
+
+test('a wrong answer is shown against the right one in the review', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamTaker } = await import('../js/exams.js');
+
+  const student = data.db.students.find('2026-09-002');
+  const exam = data.examsFor(student.className)[0];
+  mountExamTaker({ listSelector: '#exam-list', student });
+  click(doc, `[data-take="${exam.id}"]`);
+
+  const form = doc.getElementById('exam-take-form');
+  // Answer everything wrong on purpose, except leave the last one blank.
+  exam.questions.forEach((q, qi) => {
+    if (qi === exam.questions.length - 1) return;
+    const radio = form.querySelector(`input[name="q${qi}"][value="${(q.answer + 1) % 4}"]`);
+    radio.checked = true;
+  });
+  form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+
+  const result = data.examResultFor(exam.id, student.id);
+  assert.equal(result.score, 0, 'nothing was right');
+  assert.equal(result.answers.at(-1), null, 'an unanswered question is stored as null');
+  const html = doc.getElementById('exam-player').innerHTML;
+  assert.equal((html.match(/সঠিক উত্তর:/g) || []).length, exam.questions.length, 'every miss shows the right answer');
+  assert.match(html, /দেননি/, 'and the unanswered question says so');
   dom.window.localStorage.clear();
 });
