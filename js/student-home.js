@@ -1,17 +1,17 @@
 /**
- * ACTIVE PLUS — modern mobile Student Home.
- * Answers: what today? / next class? / next exam? / how am I doing?
- * All data computed live from the layered store; nothing hard-coded.
+ * ACTIVE PLUS — simple Student Home.
+ * One place for each fact: what today? next class? next exam? fees?
+ * Bottom nav owns the main destinations; the profile menu owns profile/settings/logout.
  */
 
 import { initApp, escapeHtml, safeUrl, showToast, openModal, closeModal, getAuthMode } from './app.js';
 import { signOut } from './auth.js';
 import {
-  db, noticesFor, suggestionsFor, examsFor, examResultFor, scoreExam,
+  db, noticesFor,
   greetingByHour, studyStreak, todayProgress, nextClass, upcomingExam,
-  challengeState, addChallengeProgress, performanceFor, feeStatusFor,
+  performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
-  recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial,
+  recordStudyActivity, todayBn, homeCards, lastAccessedMaterial,
   examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION, subscribeRemote,
   formatBnDate, orgInfo,
   submitAssignment, markMaterialComplete, completedMaterialIds, materialProgressFor, timeAgo,
@@ -19,24 +19,21 @@ import {
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
 
-/** Secondary features revealed by "See More" — configurable, nothing dead. */
-const MORE_FEATURES = [
-  { act: 'questionbank', ico: '🧩', label: 'প্রশ্ন ব্যাংক' },
-  { act: 'progress', ico: '📈', label: 'আমার প্রগ্রেস' },
+/** More-menu items that are not already on the bottom nav or profile menu. */
+const MORE_MENU = [
+  { act: 'routine', ico: '📅', label: 'রুটিন' },
+  { act: 'assignments', ico: '📋', label: 'অ্যাসাইনমেন্ট' },
+  { act: 'fees', ico: '💰', label: 'ফি' },
+  { act: 'notices', ico: '📢', label: 'নোটিশ' },
   { act: 'achievements', ico: '🏅', label: 'অর্জন' },
   { act: 'certificates', ico: '🎓', label: 'সনদ' },
   { act: 'downloads', ico: '⬇️', label: 'ডাউনলোড' },
-  { act: 'query', ico: '✉️', label: 'শিক্ষক প্রশ্ন' },
   { act: 'streak', ico: '🔥', label: 'স্ট্রিক' },
-  { act: 'profile', ico: '👤', label: 'প্রোফাইল' },
-  { act: 'settings', ico: '⚙️', label: 'সেটিংস' },
   { act: 'help', ico: '❓', label: 'সহায়তা' }
 ];
 
 const FIELD_BN = { phone: 'মোবাইল', guardianPhone: 'অভিভাবকের মোবাইল' };
-
 const STATUS_BN = { pending: 'বাকি', submitted: 'জমা হয়েছে', checked: 'চেক হয়েছে', overdue: 'সময় পার' };
-
 const BN = '০১২৩৪৫৬৭৮৯';
 const bn = (n) => String(n).replace(/\d/g, (d) => BN[Number(d)]);
 
@@ -47,12 +44,11 @@ export function initStudentHome() {
   const me = db.students.find(session.username) || null;
   const student = { id: me?.id || session.username, name: session.name, className: me?.className };
 
-  /* Header */
+  /* ---------- Header identity ---------- */
   document.getElementById('greet').textContent = `${greetingByHour()} 👋`;
   document.getElementById('student-name').textContent = session.name;
   const batch = me?.batch ? ` · ব্যাচ ${me.batch}` : '';
   document.getElementById('student-meta').textContent = me ? `${me.className}${batch} · রোল ${me.roll}` : session.detail || '';
-  // The top bar carries today's date in the one format the app uses everywhere.
   const todayEl = document.getElementById('today-date');
   if (todayEl) todayEl.textContent = `📅 আজ ${formatBnDate(todayBn())}`;
   const sessionEl = document.getElementById('today-session');
@@ -63,7 +59,53 @@ export function initStudentHome() {
   } else {
     avatar.textContent = (session.name || 'A').charAt(0);
   }
-  document.getElementById('profile-btn')?.addEventListener('click', () => openMore('profile'));
+
+  /* Profile menu: profile / settings / logout — nowhere else. */
+  const profileBtn = document.getElementById('profile-btn');
+  const profileMenu = document.getElementById('student-profile-menu');
+  const pmName = document.getElementById('pm-name');
+  const pmDetail = document.getElementById('pm-detail');
+  const pmAvatar = document.getElementById('pm-avatar');
+  if (pmName) pmName.textContent = session.name;
+  if (pmDetail) pmDetail.textContent = me
+    ? `${me.className || ''}${me.batch ? ` · ব্যাচ ${me.batch}` : ''}${me.roll ? ` · রোল ${me.roll}` : ''}`.trim()
+    : (session.detail || 'শিক্ষার্থী');
+  if (pmAvatar) {
+    if (me?.photo) pmAvatar.innerHTML = `<img src="${escapeHtml(me.photo)}" alt="">`;
+    else pmAvatar.textContent = (session.name || 'A').charAt(0);
+  }
+  const closeProfileMenu = () => {
+    if (!profileMenu || profileMenu.hidden) return;
+    profileMenu.hidden = true;
+    profileBtn?.setAttribute('aria-expanded', 'false');
+  };
+  profileBtn?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!profileMenu) { openMore('profile'); return; }
+    const willOpen = profileMenu.hidden;
+    profileMenu.hidden = !willOpen;
+    profileBtn.setAttribute('aria-expanded', String(willOpen));
+  });
+  document.addEventListener('click', (event) => {
+    if (!profileMenu || profileMenu.hidden) return;
+    if (event.target.closest('#student-profile-menu') || event.target.closest('#profile-btn')) return;
+    closeProfileMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeProfileMenu();
+  });
+  document.getElementById('pm-view-profile')?.addEventListener('click', () => {
+    closeProfileMenu();
+    openMore('profile');
+  });
+  document.getElementById('pm-settings')?.addEventListener('click', () => {
+    closeProfileMenu();
+    openMore('settings');
+  });
+  document.getElementById('logout-btn')?.addEventListener('click', () => {
+    closeProfileMenu();
+    signOut({ redirect: true });
+  });
 
   const bellCount = document.getElementById('bell-count');
   const unread = unreadNotifications(student);
@@ -83,15 +125,8 @@ export function initStudentHome() {
     openModal('detail-modal');
   };
 
-  /* Live data: when Firebase backs the store, re-render on remote changes. */
   subscribeRemote(() => { renderHomeSafe(); });
 
-
-  /**
-   * Connection state lives on the top bar itself: its border is green while
-   * online and amber while offline. The state is also announced to screen
-   * readers through the bar's label, so nothing is lost by dropping the chip.
-   */
   const headerBar = document.getElementById('home-header');
   const paintNet = () => {
     if (!headerBar) return;
@@ -104,12 +139,11 @@ export function initStudentHome() {
   window.addEventListener('online', () => { paintNet(); renderHomeSafe(); });
   window.addEventListener('offline', paintNet);
 
-  /* ---------------- Bottom nav ---------------- */
+  /* ---------- Bottom nav ---------- */
   const views = { home: 'view-home', study: 'view-study', exam: 'view-exam', result: 'view-result', more: 'view-more' };
   const switchView = (name) => {
     Object.entries(views).forEach(([k, id]) => { document.getElementById(id).hidden = k !== name; });
     document.querySelectorAll('.bottom-nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === name)));
-    // Render lazily so the data shown is always current.
     if (name === 'home') renderHomeSafe();
     else if (name === 'exam') refreshExams?.();
     else if (name === 'more') renderMore();
@@ -122,7 +156,7 @@ export function initStudentHome() {
     if (b) switchView(b.dataset.view);
   });
 
-  /* ---------------- Notification center ---------------- */
+  /* ---------- Notification centre ---------- */
   document.getElementById('bell').addEventListener('click', () => {
     const rows = noticesFor(student);
     document.getElementById('notif-list').innerHTML = rows.length
@@ -134,224 +168,43 @@ export function initStudentHome() {
     bellCount.hidden = true;
   });
 
-  /* ---------------- Home content ---------------- */
   const host = document.getElementById('home-content');
   let refreshExams = null;
 
+  const classMaterials = () =>
+    db.materials.list().filter((m) => !m.className || m.className === student.className);
+
+  /**
+   * Home = glance only. No shortcuts (bottom nav), no folds, no “more features”.
+   * Each fact appears once.
+   */
   const renderHome = () => {
     const cards = homeCards();
     const progress = todayProgress(student);
     const { streak, week } = studyStreak();
     const next = cards.nextClass ? nextClass() : null;
     const exam = cards.exam ? upcomingExam(student.className) : null;
-    const challenge = challengeState();
-    const perf = cards.performance ? performanceFor(student) : null;
     const fee = feeStatusFor(student);
-    const badges = cards.achievements ? achievementsFor(student) : [];
     const tip = cards.tip ? latestTip() : null;
     const banners = cards.banners ? activeBanners() : [];
-    const allMaterials = cards.materials ? suggestionsMaterials() : [];
-    const resume = cards.materials ? (lastAccessedMaterial() || allMaterials[0] || null) : null;
-    const materials = allMaterials;
-    const enabled = homeFeatures();
-    const moreFeatures = MORE_FEATURES.filter((f) => enabled.includes(f.act));
+    const resume = cards.materials ? (lastAccessedMaterial() || classMaterials()[0] || null) : null;
     const previewNotes = cards.notices ? latestNotifications(student, 2) : [];
     const assignments = cards.assignments
       ? db.assignments.list().filter((a) => a.className === student.className) : [];
+    const pendingAsg = assignments.filter((a) => {
+      const st = assignmentStatus(a, student).status;
+      return st === 'pending' || st === 'overdue';
+    });
 
-    /* Admin-home layout for the student too:
-       1) আজকের অবস্থা — the few figures that matter at a glance,
-       2) quick shortcuts, and
-       3) every information card folded away — minimized until tapped. */
+    const cell = (icon, value, label) =>
+      `<div class="analytics-cell"><span class="ico">${icon}</span><strong>${value}</strong><span>${label}</span></div>`;
 
-    const cell = (icon, value, label) => `
-      <div class="analytics-cell"><span class="ico">${icon}</span><strong>${value}</strong><span>${label}</span></div>`;
+    const parts = [];
 
-    const fold = (title, body, id = '') => body.trim() ? `
-      <details class="mini-details"${id ? ` id="${id}"` : ''}>
-        <summary>${title}</summary>
-        <div class="mini-body">${body}</div>
-      </details>` : '';
-
-    const sections = [];
-
-    /* ---- 1. আজকের অবস্থা (overview) ---- */
-    const cells = [
-      ...(cards.progress ? [
-        cell('📈', `${bn(progress.pct)}%`, 'আজকের প্রগ্রেস'),
-        cell('🔥', bn(streak), 'দিন স্ট্রিক'),
-        cell('📚', bn(progress.classes), 'আজকের ক্লাস'),
-        cell('📋', bn(progress.assignments), 'অ্যাসাইনমেন্ট')
-      ] : []),
-      ...(cards.exam ? [cell('📝', bn(exam ? 1 : 0), 'আসন্ন পরীক্ষা')] : []),
-      ...(cards.fee ? [cell('💰', fee.due > 0 ? `৳${bn(fee.due)}` : '✓', 'ফি স্ট্যাটাস')] : [])
-    ];
-    if (cells.length) {
-      sections.push(`
-      <section class="home-section" aria-label="আজকের অবস্থা">
-        <h2 class="sec-title">📊 আজকের অবস্থা</h2>
-        <div class="hcard overview-card" id="student-overview">
-          <div class="analytics-grid">${cells.join('')}</div>
-          ${cards.progress ? `
-          <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
-          <details class="mini-details in-card">
-            <summary>স্ট্রিক ক্যালেন্ডার</summary>
-            <div class="meta" style="margin:.5rem 0">${bn(progress.done)} / ${bn(progress.total)} সম্পন্ন</div>
-            <div class="week">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
-          </details>` : ''}
-        </div>
-      </section>`);
-    }
-
-    /* ---- 2. কুইক শর্টকাট ---- */
-    const shortcuts = [
-      ...(cards.challenge ? [{ act: 'challenge', ico: '🔥', label: 'চ্যালেঞ্জ' }] : []),
-      ...(enabled.includes('questionbank') ? [{ act: 'questionbank', ico: '🧩', label: 'প্রশ্ন ব্যাংক' }] : []),
-      { act: 'routine', ico: '📅', label: 'রুটিন' },
-      ...(enabled.includes('query') ? [{ act: 'query', ico: '💬', label: 'শিক্ষক প্রশ্ন' }] : [])
-    ];
-    if (shortcuts.length) {
-      sections.push(`
-      <section class="home-section" aria-label="কুইক শর্টকাট">
-        <h2 class="sec-title">⚡ কুইক শর্টকাট</h2>
-        <div class="quick-row" id="student-quick">
-          ${shortcuts.map((q) => `<button type="button" class="chip" data-act="${q.act}">${q.ico} ${escapeHtml(q.label)}</button>`).join('')}
-        </div>
-      </section>`);
-    }
-
-    /* ---- 3. Folded information cards ---- */
-    const folds = [];
-
-    /* পড়াশোনা */
-    let studyBody = '';
-    if (cards.nextClass) {
-      studyBody += next ? `
-      <div class="hcard">
-        <div class="h-title">পরবর্তী ক্লাস</div>
-        <div class="big">${escapeHtml(next.item.subject)}</div>
-        <div class="info-row"><span class="l">সময়</span><span class="v">${escapeHtml(next.when)} · ${escapeHtml(next.item.time)}</span></div>
-        <div class="info-row"><span class="l">শিক্ষক</span><span class="v">${escapeHtml(next.item.teacher)}</span></div>
-        <div class="info-row"><span class="l">কক্ষ</span><span class="v">${escapeHtml(next.item.room)}</span></div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="routine" style="margin-top:.5rem">রুটিন দেখুন</button>
-      </div>` : `
-      <div class="hcard">
-        <div class="h-title">পরবর্তী ক্লাস</div>
-        <p>আপাতত কোনো ক্লাস নির্ধারিত নেই 🎉</p>
-      </div>`;
-    }
-    if (resume) {
-      const mp = materialProgressFor(student, student.className);
-      const doneThis = completedMaterialIds(student).includes(resume.id);
-      studyBody += `
-      <div class="hcard">
-        <div class="h-title">পড়া চালিয়ে যান</div>
-        <div class="big">${escapeHtml(resume.title)}</div>
-        <div class="meta">${escapeHtml(resume.subject)} · ${escapeHtml(resume.type || '')}</div>
-        <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${mp.pct}%"></div></div>
-        <div class="meta">${doneThis ? 'এই ম্যাটেরিয়াল সম্পন্ন ✓ · ' : ''}${bn(mp.done)} / ${bn(mp.total)} ম্যাটেরিয়াল সম্পন্ন (${bn(mp.pct)}%)</div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="material" data-id="${escapeHtml(resume.id)}" style="margin-top:.5rem">চালিয়ে যান</button>
-      </div>`;
-    } else if (cards.materials) {
-      studyBody += `
-      <div class="hcard">
-        <div class="h-title">পড়া চালিয়ে যান</div>
-        <p>নতুন কিছু শেখা শুরু করুন 📚</p>
-        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">ম্যাটেরিয়াল দেখুন</button>
-      </div>`;
-    }
-    if (cards.materials && materials.length) {
-      const recent = [...materials].slice(-3).reverse();
-      studyBody += `
-      <div class="hcard">
-        <div class="h-title">স্টাডি ম্যাটেরিয়াল</div>
-        ${recent.map((m) => `<div class="info-row" role="button" tabindex="0" data-act="material" data-id="${escapeHtml(m.id)}" style="cursor:pointer">
-          <span class="l">📖 ${escapeHtml(m.title)}<br><span class="meta">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')}</span></span>
-          <span class="v">${escapeHtml(formatBnDate(m.date))}</span></div>`).join('')}
-        <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">সব ম্যাটেরিয়াল</button>
-      </div>`;
-    }
-    folds.push(fold('📚 পড়াশোনা', studyBody));
-
-    /* পরীক্ষা ও ফলাফল */
-    let examBody = '';
-    if (cards.exam) {
-      const win = examWindow(exam);
-      examBody += exam ? `
-      <div class="hcard">
-        <div class="h-title">আসন্ন পরীক্ষা</div>
-        <div class="big">${escapeHtml(exam.title)}</div>
-        <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(exam.subject)}</span></div>
-        <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(exam.date) || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
-        <div class="info-row"><span class="l">সময়</span><span class="v">${bn(exam.duration || 0)} মিনিট</span></div>
-        <div class="info-row"><span class="l">প্রশ্ন</span><span class="v">${bn(exam.questions.length)}</span></div>
-        ${win.canStart
-          ? `<button type="button" class="btn btn-block" data-act="startexam" style="margin-top:.5rem">পরীক্ষা শুরু করুন</button>`
-          : `<button type="button" class="btn btn-secondary btn-block" data-act="exam" style="margin-top:.5rem">পরীক্ষা দেখুন</button>
-             <p class="meta" style="margin-top:.5rem">${escapeHtml(win.state === 'closed' ? 'এই পরীক্ষার সময় শেষ।' : 'পরীক্ষা শুরুর সময় হয়নি।')}</p>`}
-      </div>` : `
-      <div class="hcard">
-        <div class="h-title">আসন্ন পরীক্ষা</div>
-        <p>কোনো পরীক্ষা নির্ধারিত নেই।</p>
-      </div>`;
-    }
-    examBody += lastResultHtml();
-    if (perf) {
-      examBody += `
-      <div class="hcard">
-        <div class="h-title">আমার পারফরম্যান্স</div>
-        <div class="feature-grid" style="grid-template-columns:repeat(4,1fr)">
-          <div class="tile"><span class="ico">${bn(perf.avg)}%</span>গড়</div>
-          <div class="tile"><span class="ico">${bn(perf.best)}%</span>সেরা</div>
-          <div class="tile"><span class="ico">${bn(perf.tests)}</span>টেস্ট</div>
-          ${cards.leaderboard ? `<div class="tile"><span class="ico">#${bn(perf.rank)}</span>র‍্যাঙ্ক</div>` : ''}
-        </div>
-        <div class="mini-chart" role="img" aria-label="সাম্প্রতিক পরীক্ষার স্কোর: ${perf.series.map((v) => `${bn(v)}%`).join(', ')}">${perf.series.map((v, i) => `<div class="bar" style="height:${v}%" title="${bn(v)}%"></div>`).join('')}</div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">পুরো প্রগ্রেস দেখুন</button>
-      </div>`;
-    }
-    folds.push(fold('📝 পরীক্ষা ও ফলাফল', examBody));
-
-    /* অ্যাসাইনমেন্ট ও ফি */
-    let workBody = '';
-    if (cards.assignments) {
-      const asgRows = assignments.map((a) => {
-        const st = assignmentStatus(a, student);
-        return `<div class="info-row" role="button" tabindex="0" data-act="assignment" data-id="${escapeHtml(a.id)}" style="cursor:pointer">
-          <span class="l">📋 ${escapeHtml(a.title)}<br><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
-          <span class="v">${escapeHtml(dueLabel(a, student))}</span>
-        </div>`;
-      }).join('');
-      workBody += assignments.length ? `
-      <div class="hcard">
-        <div class="h-title">অ্যাসাইনমেন্ট</div>
-        ${asgRows}
-        <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">সব দেখুন</button>
-      </div>` : `
-      <div class="hcard">
-        <div class="h-title">অ্যাসাইনমেন্ট</div>
-        <p>সব শেষ! 🎉</p>
-      </div>`;
-    }
-    if (cards.fee) {
-      workBody += `
-      <div class="hcard">
-        <div class="h-title">💰 ফি স্ট্যাটাস</div>
-        ${fee.due > 0
-          ? `<div class="info-row"><span class="l">মোট</span><span class="v">৳${bn(fee.total)}</span></div>
-             <div class="info-row"><span class="l">পরিশোধিত</span><span class="v">৳${bn(fee.paid)}</span></div>
-             <div class="info-row"><span class="l">বকেয়া</span><span class="v" style="color:var(--warning)">৳${bn(fee.due)}</span></div>
-             ${fee.nextDue ? `<div class="info-row"><span class="l">পরবর্তী পেমেন্ট</span><span class="v">${escapeHtml(fee.nextDue.month)}</span></div>` : ''}
-             <button type="button" class="btn btn-secondary btn-block" data-act="fees" style="margin-top:.5rem">বিস্তারিত</button>`
-          : `<p>সব ফি পরিশোধিত ✓</p>`}
-      </div>`;
-    }
-    folds.push(fold('📋 অ্যাসাইনমেন্ট ও ফি', workBody));
-
-    /* নোটিশ ও টিপ */
-    let noticeBody = '';
+    /* 1. Notices & tip — under the fixed identity bar */
+    const bannerParts = [];
     if (cards.banners && banners.length) {
-      noticeBody += `
+      bannerParts.push(`
       <div class="carousel">
         <div class="carousel-track" id="banner-track">
           ${banners.map((b) => `
@@ -363,12 +216,12 @@ export function initStudentHome() {
           </div>`).join('')}
         </div>
         ${banners.length > 1 ? `<div class="carousel-dots" id="banner-dots">${banners.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
-      </div>`;
+      </div>`);
     }
     if (cards.notices && previewNotes.length) {
-      noticeBody += `
-      <div class="hcard">
-        <div class="h-title">🔔 নোটিফিকেশন</div>
+      bannerParts.push(`
+      <div class="notice-banner" id="home-notice-banner">
+        <div class="h-title">🔔 নোটিশ</div>
         ${previewNotes.map((n) => `
         <div class="notif-preview">
           <span class="dot"></span>
@@ -378,50 +231,169 @@ export function initStudentHome() {
           </div>
         </div>`).join('')}
         <button type="button" class="btn btn-secondary btn-block" data-act="notif" style="margin-top:.5rem">সব দেখুন</button>
-      </div>`;
+      </div>`);
     }
     if (tip) {
-      noticeBody += `<div class="hcard"><div class="h-title">💡 শিক্ষকের টিপ</div><p>"${escapeHtml(tip.text)}"</p></div>`;
+      bannerParts.push(`
+      <div class="tip-banner" id="home-tip-banner">
+        <div class="h-title">💡 শিক্ষকের টিপ</div>
+        <p>"${escapeHtml(tip.text)}"</p>
+      </div>`);
     }
-    folds.push(fold('📢 নোটিশ ও টিপ', noticeBody));
+    if (bannerParts.length) {
+      parts.push(`<section class="home-section home-banners" aria-label="নোটিশ ও টিপ">${bannerParts.join('')}</section>`);
+    }
 
-    /* আরও ফিচার */
-    let moreBody = '';
-    if (cards.challenge) {
-      moreBody += `
-      <div class="hcard">
-        <div class="h-title">🔥 ডেইলি চ্যালেঞ্জ</div>
-        <p>${challenge.done >= challenge.target ? '🎉 চ্যালেঞ্জ সম্পূর্ণ!' : `আজ ${bn(challenge.target)}টি MCQ উত্তর দিন`}</p>
-        <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${Math.round((challenge.done / challenge.target) * 100)}%"></div></div>
-        <div class="meta">${bn(challenge.done)} / ${bn(challenge.target)}</div>
-        ${challenge.done < challenge.target ? `<button type="button" class="btn btn-block" data-act="challenge" style="margin-top:.5rem">চ্যালেঞ্জ শুরু</button>` : ''}
-      </div>`;
-    }
-    if (badges.length) {
-      moreBody += `
-      <div class="hcard">
-        <div class="h-title">অর্জন</div>
-        <div class="quick-row">${badges.map((b) => `<div class="tile"><span class="ico">${b.icon}</span>${escapeHtml(b.name)}</div>`).join('')}</div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="achievements" style="margin-top:.5rem">সব অর্জন দেখুন</button>
-      </div>`;
-    }
-    if (moreFeatures.length) {
-      moreBody += `<div class="feature-grid more-grid" id="more-features">${moreFeatures.map((f) => tile(f.act, f.ico, f.label)).join('')}</div>`;
-    }
-    folds.push(fold('✨ আরও ফিচার', moreBody, 'student-more-sec'));
-
-    if (folds.some(Boolean)) {
-      sections.push(`
-      <section class="home-section" aria-label="বিস্তারিত তথ্য">
-        <h2 class="sec-title">📂 বিস্তারিত (ট্যাপ করে দেখুন)</h2>
-        ${folds.join('')}
+    /* 2. Today's glance */
+    if (cards.progress || cards.exam || cards.fee) {
+      const cells = [
+        ...(cards.progress ? [
+          cell('📈', `${bn(progress.pct)}%`, 'আজকের প্রগ্রেস'),
+          cell('🔥', bn(streak), 'দিন স্ট্রিক')
+        ] : []),
+        ...(cards.exam ? [cell('📝', bn(exam ? 1 : 0), 'আসন্ন পরীক্ষা')] : []),
+        ...(cards.fee ? [cell('💰', fee.due > 0 ? `৳${bn(fee.due)}` : '✓', 'ফি')] : [])
+      ];
+      parts.push(`
+      <section class="home-section" aria-label="আজকের অবস্থা">
+        <h2 class="sec-title">📊 আজকের অবস্থা</h2>
+        <div class="hcard overview-card" id="student-overview">
+          <div class="analytics-grid">${cells.join('')}</div>
+          ${cards.progress ? `
+          <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
+          <div class="week" style="margin-top:.625rem">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>` : ''}
+        </div>
       </section>`);
     }
 
-    host.innerHTML = sections.join('\n');
+    /* 3. Next class — once */
+    if (cards.nextClass) {
+      parts.push(next ? `
+      <div class="hcard" id="home-next-class">
+        <div class="h-title">পরবর্তী ক্লাস</div>
+        <div class="big">${escapeHtml(next.item.subject)}</div>
+        <div class="info-row"><span class="l">সময়</span><span class="v">${escapeHtml(next.when)} · ${escapeHtml(next.item.time)}</span></div>
+        <div class="info-row"><span class="l">শিক্ষক</span><span class="v">${escapeHtml(next.item.teacher)}</span></div>
+        <div class="info-row"><span class="l">কক্ষ</span><span class="v">${escapeHtml(next.item.room)}</span></div>
+        <button type="button" class="btn btn-secondary btn-block" data-act="routine" style="margin-top:.5rem">পূর্ণ রুটিন</button>
+      </div>` : `
+      <div class="hcard" id="home-next-class">
+        <div class="h-title">পরবর্তী ক্লাস</div>
+        <p>আপাতত কোনো ক্লাস নির্ধারিত নেই 🎉</p>
+      </div>`);
+    }
+
+    /* 4. Continue learning — once (full list lives on Study tab) */
+    if (cards.materials) {
+      if (resume) {
+        const mp = materialProgressFor(student, student.className);
+        const doneThis = completedMaterialIds(student).includes(resume.id);
+        parts.push(`
+        <div class="hcard" id="home-resume">
+          <div class="h-title">পড়া চালিয়ে যান</div>
+          <div class="big">${escapeHtml(resume.title)}</div>
+          <div class="meta">${escapeHtml(resume.subject)} · ${escapeHtml(resume.type || '')}</div>
+          <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${mp.pct}%"></div></div>
+          <div class="meta">${doneThis ? 'এই ম্যাটেরিয়াল সম্পন্ন ✓ · ' : ''}${bn(mp.done)} / ${bn(mp.total)} সম্পন্ন (${bn(mp.pct)}%)</div>
+          <button type="button" class="btn btn-block" data-act="material" data-id="${escapeHtml(resume.id)}" style="margin-top:.5rem">চালিয়ে যান</button>
+        </div>`);
+      } else {
+        parts.push(`
+        <div class="hcard" id="home-resume">
+          <div class="h-title">পড়া চালিয়ে যান</div>
+          <p>নতুন কিছু শেখা শুরু করুন 📚</p>
+          <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">স্টাডি খুলুন</button>
+        </div>`);
+      }
+    }
+
+    /* 5. Upcoming exam — once (list lives on Exam tab) */
+    if (cards.exam) {
+      if (exam) {
+        const win = examWindow(exam);
+        parts.push(`
+        <div class="hcard" id="home-exam">
+          <div class="h-title">আসন্ন পরীক্ষা</div>
+          <div class="big">${escapeHtml(exam.title)}</div>
+          <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(exam.subject)}</span></div>
+          <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(exam.date) || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
+          <div class="info-row"><span class="l">সময়</span><span class="v">${bn(exam.duration || 0)} মিনিট · ${bn(exam.questions.length)} প্রশ্ন</span></div>
+          ${win.canStart
+            ? `<button type="button" class="btn btn-block" data-act="startexam" style="margin-top:.5rem">পরীক্ষা শুরু করুন</button>`
+            : `<button type="button" class="btn btn-secondary btn-block" data-act="exam" style="margin-top:.5rem">পরীক্ষা দেখুন</button>
+               <p class="meta" style="margin-top:.5rem">${escapeHtml(win.state === 'closed' ? 'এই পরীক্ষার সময় শেষ।' : 'পরীক্ষা শুরুর সময় হয়নি।')}</p>`}
+        </div>`);
+      } else {
+        parts.push(`
+        <div class="hcard" id="home-exam">
+          <div class="h-title">আসন্ন পরীক্ষা</div>
+          <p>কোনো পরীক্ষা নির্ধারিত নেই।</p>
+        </div>`);
+      }
+    }
+
+    /* 6. Assignments — up to 3 rows; full list lives in More */
+    if (cards.assignments) {
+      if (assignments.length) {
+        const show = (pendingAsg.length ? pendingAsg : assignments).slice(0, 3);
+        parts.push(`
+        <div class="hcard" id="home-assignments">
+          <div class="h-title">${pendingAsg.length ? 'বাকি অ্যাসাইনমেন্ট' : 'অ্যাসাইনমেন্ট'}</div>
+          ${show.map((a) => {
+            const st = assignmentStatus(a, student);
+            return `<div class="info-row" role="button" tabindex="0" data-act="assignment" data-id="${escapeHtml(a.id)}" style="cursor:pointer">
+              <span class="l">📋 ${escapeHtml(a.title)}<br><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
+              <span class="v">${escapeHtml(dueLabel(a, student))}</span>
+            </div>`;
+          }).join('')}
+          <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">সব দেখুন</button>
+        </div>`);
+      } else {
+        parts.push(`
+        <div class="hcard" id="home-assignments">
+          <div class="h-title">অ্যাসাইনমেন্ট</div>
+          <p>সব শেষ! 🎉</p>
+        </div>`);
+      }
+    }
+
+    /* 7. Latest result — once (full history on Result tab) */
+    if (cards.performance || cards.exam) {
+      const mine = db.examResults.list().filter((r) => r.studentId === student.id).slice(-1)[0];
+      if (mine) {
+        const ex = db.exams.find(mine.examId);
+        const pct = Math.round(mine.score / mine.total * 100);
+        const rank = cards.leaderboard ? performanceFor(student)?.rank : null;
+        parts.push(`
+        <div class="hcard" id="home-result">
+          <div class="h-title">🏆 সাম্প্রতিক ফলাফল</div>
+          <div class="big">${escapeHtml(ex?.title || 'পরীক্ষা')}</div>
+          <div class="info-row"><span class="l">স্কোর</span><span class="v">${bn(mine.score)}/${bn(mine.total)} (${bn(pct)}%)</span></div>
+          ${rank != null ? `<div class="info-row"><span class="l">অবস্থান</span><span class="v">#${bn(rank)}</span></div>
+          <div class="info-row"><span class="l">র‍্যাঙ্ক</span><span class="v">#${bn(rank)}</span></div>` : ''}
+          <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">ফলাফল দেখুন</button>
+        </div>`);
+      }
+    }
+
+    /* 8. Fee status */
+    if (cards.fee) {
+      parts.push(fee.due > 0 ? `
+      <div class="hcard" id="home-fee">
+        <div class="h-title">💰 ফি বকেয়া</div>
+        <div class="info-row"><span class="l">বকেয়া</span><span class="v" style="color:var(--warning)">৳${bn(fee.due)}</span></div>
+        ${fee.nextDue ? `<div class="info-row"><span class="l">মাস</span><span class="v">${escapeHtml(fee.nextDue.month)}</span></div>` : ''}
+        <button type="button" class="btn btn-secondary btn-block" data-act="fees" style="margin-top:.5rem">বিস্তারিত</button>
+      </div>` : `
+      <div class="hcard" id="home-fee">
+        <div class="h-title">💰 ফি</div>
+        <p>সব ফি পরিশোধিত ✓</p>
+      </div>`);
+    }
+
+    host.innerHTML = parts.join('\n');
   };
 
-  /** Friendly error state with retry — never a blank screen. */
   const renderHomeSafe = () => {
     try {
       renderHome();
@@ -438,35 +410,15 @@ export function initStudentHome() {
     }
   };
 
-  function tile(act, ico, label, badge = '') {
-    return `<button type="button" class="tile" data-act="${act}">${badge ? `<span class="fb">${escapeHtml(badge)}</span>` : ''}<span class="ico">${ico}</span>${escapeHtml(label)}</button>`;
-  }
-  function suggestionsMaterials() {
-    return db.materials.list().filter((m) => !m.className || m.className === student.className);
-  }
-  function lastResultHtml() {
-    const mine = db.examResults.list().filter((r) => r.studentId === student.id).slice(-1)[0];
-    if (!mine) return `<div class="hcard"><div class="h-title">🏆 সাম্প্রতিক ফলাফল</div><p>এখনো কোনো ফলাফল প্রকাশিত হয়নি।</p></div>`;
-    const exam = db.exams.find(mine.examId);
-    const pct = Math.round(mine.score / mine.total * 100);
-    return `<div class="hcard"><div class="h-title">🏆 সাম্প্রতিক ফলাফল</div>
-      <div class="big">${escapeHtml(exam?.title || 'পরীক্ষা')}</div>
-      <div class="info-row"><span class="l">স্কোর</span><span class="v">${bn(mine.score)}/${bn(mine.total)} (${bn(pct)}%)</span></div>
-      ${homeCards().leaderboard && performanceFor(student) ? `<div class="info-row"><span class="l">অবস্থান</span><span class="v">#${bn(performanceFor(student).rank)}</span></div>` : ''}
-      <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">ফলাফল দেখুন</button></div>`;
-  }
-
-  /* Keyboard parity: rows marked role="button" must work with Enter/Space. */
-  const keyboardActivate = (e) => {
+  /* Keyboard parity for role=button rows */
+  host.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const row = e.target.closest('[role="button"][data-act], [role="button"][data-asg]');
     if (!row) return;
     e.preventDefault();
     row.click();
-  };
-  host.addEventListener('keydown', keyboardActivate);
+  });
 
-  /* ---------------- Home actions ---------------- */
   host.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (!el) return;
@@ -477,23 +429,17 @@ export function initStudentHome() {
         return;
       }
       switchView('exam');
-      // "পরীক্ষা শুরু করুন" starts the paper — and with it the countdown —
-      // instead of only opening the exam list.
       if (act === 'startexam') refreshExams?.start?.();
-    }
-    else if (act === 'result' || act === 'progress') switchView('result');
+    } else if (act === 'result' || act === 'progress') switchView('result');
     else if (act === 'review') { switchView('exam'); refreshExams?.review?.(el.dataset.exam); }
     else if (act === 'study' || act === 'downloads') switchView('study');
-    else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
-    else if (act === 'challenge') doChallenge();
-    else if (act === 'questionbank') openPractice();
+    else if (['routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
     else if (act === 'assignment') openAssignment(el.dataset.id);
-    else if (act === 'notif') { document.getElementById('bell').click(); }
+    else if (act === 'notif') document.getElementById('bell').click();
     else if (act === 'material') openMaterial(el.dataset.id);
     else if (act === 'banner') openBanner(el.dataset.id);
   });
 
-  /** Printable certificate for an earned badge. */
   function openCertificate(badge) {
     if (!badge) return;
     showDetail('🎓 সনদ', `
@@ -512,43 +458,6 @@ export function initStudentHome() {
       if (typeof window.print === 'function') window.print();
       else showToast('এই ব্রাউজারে প্রিন্ট করা যায়নি।', 'warning');
     });
-  }
-
-  /** Practice mode: random MCQs from this student's own class question pool. */
-  function openPractice() {
-    const pool = examsFor(student.className).flatMap((ex) => ex.questions);
-    if (!pool.length) {
-      showDetail('🧩 প্রশ্ন ব্যাংক', '<p>আপনার ক্লাসের জন্য এখনো কোনো প্রশ্ন যোগ করা হয়নি।</p>');
-      return;
-    }
-    const ask = () => {
-      const q = pool[Math.floor(Math.random() * pool.length)];
-      showDetail('🧩 প্রশ্ন ব্যাংক প্র্যাকটিস', `
-        <p style="font-weight:600">${escapeHtml(q.q)}</p>
-        <div class="role-grid" style="grid-template-columns:1fr;margin-top:.5rem">
-          ${q.options.filter(Boolean).map((o, i) => `<button type="button" class="role-option" data-opt="${i}"><span>${escapeHtml(o)}</span></button>`).join('')}
-        </div>
-        <p class="meta" id="practice-tally" style="margin-top:.5rem"></p>`);
-
-      const body = detail.querySelector('#detail-body');
-      body.addEventListener('click', (ev) => {
-        const btn = ev.target.closest('[data-opt]');
-        if (!btn) return;
-        const correct = Number(btn.dataset.opt) === q.answer;
-        recordStudyActivity('mcq', 1);
-        const tally = detail.querySelector('#practice-tally');
-        if (tally) tally.textContent = correct ? 'সঠিক ✓ — পরের প্রশ্ন নিতে আবার ট্যাপ করুন।' : 'ভুল — আবার চেষ্টা করুন।';
-        body.querySelectorAll('[data-opt]').forEach((b) => { b.disabled = true; });
-        const again = document.createElement('button');
-        again.type = 'button';
-        again.className = 'btn btn-block';
-        again.style.marginTop = '.75rem';
-        again.textContent = 'পরের প্রশ্ন';
-        again.addEventListener('click', ask);
-        body.appendChild(again);
-      }, { once: true });
-    };
-    ask();
   }
 
   function openBanner(id) {
@@ -611,86 +520,52 @@ export function initStudentHome() {
     });
   }
 
-  function doChallenge() {
-    const pool = examsFor(student.className).flatMap((ex) => ex.questions);
-    if (!pool.length) { showToast('চ্যালেঞ্জের জন্য প্রশ্ন নেই।', 'error'); return; }
-    const q = pool[Math.floor(Math.random() * pool.length)];
-    showDetail('🔥 ডেইলি চ্যালেঞ্জ', `
-      <p style="font-weight:600">${escapeHtml(q.q)}</p>
-      <div class="role-grid" style="grid-template-columns:1fr;margin-top:.5rem">
-        ${q.options.map((o, i) => `<button type="button" class="role-option" data-opt="${i}"><span>${escapeHtml(o)}</span></button>`).join('')}
-      </div>`);
-    detail.querySelector('#detail-body').addEventListener('click', (ev) => {
-      const b = ev.target.closest('[data-opt]');
-      if (!b) return;
-      addChallengeProgress(1);
-      recordStudyActivity('mcq', 1);
-      closeModal('detail-modal');
-      showToast(Number(b.dataset.opt) === q.answer ? 'সঠিক! 🔥' : 'ভুল — আবার চেষ্টা করুন।', Number(b.dataset.opt) === q.answer ? 'success' : 'warning');
-      renderHomeSafe();
-    }, { once: true });
-  }
-
-  /* ---------------- More view ---------------- */
-
-  /**
-   * The More view comes in two shapes:
-   *
-   *  - index   — bottom-nav “আরও”: the quick row plus every card;
-   *  - focused — tapping a tile/tab: ONLY the card that was asked for, with a
-   *    way back. Nothing unrelated goes on screen (the old code rendered the
-   *    whole list and scrolled, so “প্রোফাইল” also showed রুটিন, ফি, নোটিশ…).
-   *
-   * `only` is the section id (assignments, routine, fees, notices,
-   * achievements, certificates, downloads, streak, query, profile, settings,
-   * help) or null for the full index. Unknown ids fall back to the index.
-   */
+  /* ---------- More: clean menu, one panel at a time ---------- */
   function renderMore(only = null) {
     const meRow = me || {};
     const editable = db.settings.get().studentEditableFields || [];
     const badges = achievementsFor(student);
-    const myMaterials = db.materials.list().filter((m) => !m.className || m.className === student.className);
-    const downloadable = myMaterials.filter((m) => (m.type || '').includes('পিডিএফ') || m.file);
+    const downloadable = classMaterials().filter((m) => (m.type || '').includes('পিডিএফ') || m.file || m.link);
     const streak = studyStreak();
-    const queries = db.notifications.list().filter((n) => n.target === 'শিক্ষক' && n.studentId === student.id);
+    const enabled = homeFeatures();
 
-    const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
+    const row = (label, value) =>
+      `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
 
-    const quickRowHtml = `<div class="hcard"><div class="h-title">দ্রুত যায়</div>
-        <div class="quick-row">
-          ${MORE_FEATURES.filter((f) => homeFeatures().includes(f.act)).map((f) => tile(f.act, f.ico, f.label)).join('')}
-        </div>
-      </div>`;
+    const menuItems = MORE_MENU.filter((f) => {
+      // Core utilities always stay; optional extras follow admin feature flags.
+      if (['routine', 'assignments', 'fees', 'notices'].includes(f.act)) return true;
+      if (f.act === 'achievements') return enabled.includes('achievements');
+      if (f.act === 'certificates') return enabled.includes('certificates');
+      if (f.act === 'downloads') return enabled.includes('downloads');
+      if (f.act === 'streak') return enabled.includes('streak');
+      if (f.act === 'help') return enabled.includes('help');
+      return true;
+    });
 
-    /* Each card stands on its own so a focused render can pick exactly one. */
-    const cards = [
-      { id: 'assignments', html: `
+    const panels = {
+      assignments: `
       <div class="hcard" id="more-assignments"><div class="h-title">অ্যাসাইনমেন্ট</div>${
         db.assignments.list().filter((a) => a.className === student.className).map((a) => {
           const st = assignmentStatus(a, student);
           return `<div class="info-row" role="button" tabindex="0" data-asg="${escapeHtml(a.id)}" style="cursor:pointer">
             <span class="l">${escapeHtml(a.title)} <span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
             <span class="v">${escapeHtml(dueLabel(a, student))}</span></div>`;
-        }).join('') || '<p>কোনো অ্যাসাইনমেন্ট নেই।</p>'}</div>
-      ` },
-      { id: 'routine', html: `
+        }).join('') || '<p>কোনো অ্যাসাইনমেন্ট নেই।</p>'}</div>`,
+      routine: `
       <div class="hcard" id="more-routine"><div class="h-title">রুটিন</div>${
-        db.routine.list().map((r) => row(`${r.day} · ${r.subject}`, `${r.time} · ${r.room || ''}`)).join('') || '<p>রুটিন নেই।</p>'}</div>
-      ` },
-      { id: 'fees', html: `
+        db.routine.list().map((r) => row(`${r.day} · ${r.subject}`, `${r.time} · ${r.room || ''}`)).join('') || '<p>রুটিন নেই।</p>'}</div>`,
+      fees: `
       <div class="hcard" id="more-fees"><div class="h-title">ফি</div>${
         db.fees.list().filter((f) => f.studentId === student.id).map((f) =>
-          `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>
-      ` },
-      { id: 'notices', html: `
+          `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>`,
+      notices: `
       <div class="hcard" id="more-notices"><div class="h-title">নোটিশ</div>${
-        noticesFor(student).map((n) => row(n.title, formatBnDate(n.date))).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>
-      ` },
-      { id: 'achievements', html: `
+        noticesFor(student).map((n) => row(n.title, formatBnDate(n.date))).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>`,
+      achievements: `
       <div class="hcard" id="more-achievements"><div class="h-title">অর্জন</div>${
-        badges.map((b) => row(`${b.icon} ${b.name}`, '')).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
-      ` },
-      { id: 'certificates', html: `
+        badges.map((b) => row(`${b.icon} ${b.name}`, '')).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>`,
+      certificates: `
       <div class="hcard" id="more-certificates"><div class="h-title">সনদ</div>${
         badges.length
           ? `<p class="meta">প্রতিটি অর্জিত ব্যাজের জন্য একটি সনদ প্রিন্ট করা যাবে।</p>${badges.map((b, i) => `
@@ -698,34 +573,20 @@ export function initStudentHome() {
               <span class="l">${b.icon} ${escapeHtml(b.name)}</span>
               <span class="v"><button type="button" class="btn btn-small" data-cert="${i}">সনদ দেখুন</button></span>
             </div>`).join('')}`
-          : '<p>সনদের জন্য এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
-      ` },
-      { id: 'downloads', html: `
-      <div class="hcard" id="more-downloads"><div class="h-title">ডাউনলোড সেন্টার</div>${
+          : '<p>সনদের জন্য এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>`,
+      downloads: `
+      <div class="hcard" id="more-downloads"><div class="h-title">ডাউনলোড</div>${
         downloadable.length
           ? downloadable.map((m) => m.link
               ? `<a class="info-row" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="text-decoration:none"><span class="l">⬇️ ${escapeHtml(m.title)}</span><span class="v">ডাউনলোড</span></a>`
               : `<div class="info-row" role="button" tabindex="0" data-mat2="${escapeHtml(m.id)}" style="cursor:pointer"><span class="l">📄 ${escapeHtml(m.title)}</span><span class="v">${escapeHtml(m.type || '')}</span></div>`).join('')
-          : '<p>আপনার ক্লাসের জন্য ডাউনলোডযোগ্য ফাইল নেই।</p>'}</div>
-      ` },
-      { id: 'streak', html: `
+          : '<p>আপনার ক্লাসের জন্য ডাউনলোডযোগ্য ফাইল নেই।</p>'}</div>`,
+      streak: `
       <div class="hcard" id="more-streak"><div class="h-title">স্টাডি স্ট্রিক</div>
         <div class="info-row"><span class="l">🔥 ধারাবাহিক দিন</span><span class="v">${bn(streak.streak)}</span></div>
         <div class="week" style="margin-top:.5rem">${streak.week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
-        <p class="meta" style="margin-top:.5rem">প্রতিদিন পড়াশোনা বা MCQ দিলে স্ট্রিক বাড়ে।</p></div>
-      ` },
-      { id: 'query', html: `
-      <div class="hcard" id="more-query"><div class="h-title">শিক্ষক প্রশ্ন</div>
-        ${queries.length ? queries.map((q) => `
-          ${row(q.title, formatBnDate(q.date))}
-          ${q.reply ? `<div class="alert alert-success" style="margin:.25rem 0 .75rem">শিক্ষকের উত্তর: ${escapeHtml(q.reply)}</div>` : '<p class="meta" style="margin:.25rem 0 .75rem">উত্তরের অপেক্ষায়…</p>'}`).join('') : '<p>আপনি এখনো কোনো প্রশ্ন পাঠাননি।</p>'}
-        <form id="query-form" style="margin-top:.75rem">
-          <div class="form-group"><label for="query-text">আপনার প্রশ্ন</label>
-            <textarea id="query-text" class="form-input" rows="3" required placeholder="যে বিষয়ে জানতে চান লিখুন…"></textarea></div>
-          <button type="submit" class="btn btn-block">শিক্ষককে পাঠান</button>
-        </form></div>
-      ` },
-      { id: 'profile', html: `
+        <p class="meta" style="margin-top:.5rem">প্রতিদিন পড়াশোনা করলে স্ট্রিক বাড়ে।</p></div>`,
+      profile: `
       <div class="hcard" id="more-profile"><div class="h-title">প্রোফাইল</div>
         ${meRow.photo ? `<img src="${escapeHtml(meRow.photo)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:.75rem">` : ''}
         ${row('নাম', session.name)}
@@ -742,40 +603,45 @@ export function initStudentHome() {
         <form id="profile-edit-form" style="margin-top:.75rem">
           ${editable.map((f) => `<div class="form-group"><label for="pf-${escapeHtml(f)}">${escapeHtml(FIELD_BN[f] || f)} (সম্পাদনাযোগ্য)</label><input id="pf-${escapeHtml(f)}" name="${escapeHtml(f)}" class="form-input" value="${escapeHtml(meRow[f] || '')}"></div>`).join('')}
           ${editable.length ? `<button type="submit" class="btn btn-block">প্রোফাইল আপডেট করুন</button>` : `<p class="meta">প্রোফাইল সম্পাদনার অনুমতি অ্যাডমিন দেননি।</p>`}
-        </form></div>
-      ` },
-      { id: 'settings', html: `
+        </form></div>`,
+      settings: `
       <div class="hcard" id="more-settings"><div class="h-title">সেটিংস</div>
         ${row('ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)')}
         ${row('অ্যাপ ভার্সন', `v${DATA_VERSION}`)}
         <button type="button" class="btn btn-secondary btn-block" id="clear-cache" style="margin-top:.75rem">অ্যাপ ক্যাশ রিফ্রেশ করুন</button>
-      </div>
-      ` },
-      { id: 'help', html: `
+      </div>`,
+      help: `
       <div class="hcard" id="more-help"><div class="h-title">সহায়তা</div>
         ${row('প্রতিষ্ঠান', db.settings.get().orgName || 'Active Plus')}
         ${row('মোবাইল', db.settings.get().mobile || '—')}
         ${row('ইমেইল', db.settings.get().email || '—')}
-        <p class="meta" style="margin-top:.5rem">সমস্যা হলে উপরের নম্বরে যোগাযোগ করুন অথবা শিক্ষক প্রশ্ন পাঠান।</p></div>
-      ` }
-    ];
+        <p class="meta" style="margin-top:.5rem">সমস্যা হলে উপরের নম্বরে যোগাযোগ করুন।</p></div>`
+    };
 
     const moreHost = document.getElementById('more-content');
-    /* Focused only for a known section id; anything else gets the index so a
-       tab never lands on an empty screen. */
-    const focused = Boolean(only) && cards.some((c) => c.id === only);
-    moreHost.innerHTML = focused
-      ? `<button type="button" class="btn btn-secondary btn-block" id="more-back" style="margin-bottom:.75rem">← ফিরে যান</button>
-${cards.filter((c) => c.id === only).map((c) => c.html).join('\n')}`
-      : `${quickRowHtml}
+    const focused = Boolean(only) && panels[only];
 
-${cards.map((c) => c.html).join('\n')}
-
-<button type="button" class="btn btn-error btn-block" id="home-logout">লগআউট</button>`;
+    if (focused) {
+      moreHost.innerHTML = `
+        <button type="button" class="btn btn-secondary btn-block" id="more-back" style="margin-bottom:.75rem">← ফিরে যান</button>
+        ${panels[only]}`;
+    } else {
+      /* Clean menu — no dump of every card, no second shortcut row. */
+      moreHost.innerHTML = `
+        <div class="hcard" id="more-menu">
+          <div class="h-title">আরও</div>
+          <div class="more-list">
+            ${menuItems.map((f) => `
+              <button type="button" class="more-item" data-act="${f.act}">
+                <span class="ico" aria-hidden="true">${f.ico}</span>
+                <span class="label">${escapeHtml(f.label)}</span>
+                <span class="chev" aria-hidden="true">›</span>
+              </button>`).join('')}
+          </div>
+        </div>`;
+    }
 
     document.getElementById('more-back')?.addEventListener('click', () => renderMore());
-
-    document.getElementById('home-logout')?.addEventListener('click', () => signOut({ redirect: true }));
 
     document.getElementById('clear-cache')?.addEventListener('click', async () => {
       try {
@@ -791,8 +657,6 @@ ${cards.map((c) => c.html).join('\n')}
       }
     });
 
-    /* onclick (not addEventListener): renderMore re-runs on every visit, and
-       listeners would otherwise pile up on the persistent container. */
     moreHost.onclick = (e) => {
       const asg = e.target.closest('[data-asg]');
       if (asg) { openAssignment(asg.dataset.asg); return; }
@@ -802,32 +666,8 @@ ${cards.map((c) => c.html).join('\n')}
       if (cert) { openCertificate(badges[Number(cert.dataset.cert)]); return; }
       const tileEl = e.target.closest('[data-act]');
       if (!tileEl) return;
-      const act = tileEl.dataset.act;
-      if (act === 'questionbank') { openPractice(); return; }
-      if (['study', 'downloads', 'result', 'progress', 'exam'].includes(act)) switchView(
-        act === 'study' || act === 'downloads' ? 'study'
-          : act === 'result' || act === 'progress' ? 'result' : 'exam');
-      else if (act === 'notif') document.getElementById('bell').click();
-      else openMore(act);
+      openMore(tileEl.dataset.act);
     };
-
-    document.getElementById('query-form')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const text = String(document.getElementById('query-text').value || '').trim();
-      if (!text) return;
-      if (!navigator.onLine) {
-        showToast('অফলাইনে প্রশ্ন পাঠানো যাবে না।', 'error');
-        return;
-      }
-      db.notifications.add({
-        id: newId('ntf'), type: 'শিক্ষক প্রশ্ন', title: text, target: 'শিক্ষক',
-        studentId: student.id, studentName: session.name, date: todayBn(), createdAt: new Date().toISOString(), read: false
-      });
-      document.getElementById('query-text').value = '';
-      /* Re-render in place: a focused প্রশ্ন panel stays focused. */
-      renderMore(only);
-      showToast('প্রশ্ন শিক্ষকের কাছে পাঠানো হয়েছে।', 'success');
-    });
 
     const editForm = document.getElementById('profile-edit-form');
     editForm?.addEventListener('submit', (e) => {
@@ -849,19 +689,14 @@ ${cards.map((c) => c.html).join('\n')}
     });
   }
 
-  /**
-   * A tile/tab tap shows ONLY the panel it names — প্রোফাইল shows the profile
-   * card alone, রুটিন the routine alone, and so on. The bottom-nav “আরও” tab
-   * still opens the full index.
-   */
   function openMore(section) {
     switchView('more');
     if (section) renderMore(section);
   }
 
-  /* ---------------- Study / Exam / Result views ---------------- */
+  /* ---------- Study / Exam / Result ---------- */
   function renderStudy() {
-    const mats = db.materials.list().filter((m) => !m.className || m.className === student.className);
+    const mats = classMaterials();
     document.getElementById('material-list').innerHTML = mats.length
       ? mats.map((m) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(m.title)}</div><div class="li-sub">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')} · ${escapeHtml(formatBnDate(m.date))}</div></div>
         <button type="button" class="btn btn-small" data-mat="${escapeHtml(m.id)}">খুলুন</button></div>`).join('')
@@ -873,7 +708,6 @@ ${cards.map((c) => c.html).join('\n')}
     renderStudentSuggestions('#student-suggestion-list', student.className);
   }
 
-  // The Result view has its own container, so its actions need their own router.
   document.getElementById('result-content').addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
     if (!el) return;
@@ -904,11 +738,8 @@ ${cards.map((c) => c.html).join('\n')}
       ${leaderboardCard()}`;
   }
 
-  /** Class leaderboard, shown only when the admin leaves it enabled. */
   function leaderboardCard() {
     const settings = db.settings.get();
-    // The admin switch that exists in the UI is homeCards.leaderboard; an
-    // explicit settings.leaderboard still wins (older stores, tests).
     if (!(settings.leaderboard ?? settings.homeCards?.leaderboard)) return '';
     const mine = leaderboard().filter((r) => r.className === student.className);
     if (!mine.length) return '';
@@ -922,7 +753,6 @@ ${cards.map((c) => c.html).join('\n')}
       ${myRow && myRow.position > 5 ? `<div class="info-row me"><span class="l">${bn(myRow.position)}. ${escapeHtml(myRow.studentName)} (আপনি)</span><span class="v">${bn(myRow.pct)}%</span></div>` : ''}</div>`;
   }
 
-  /* ---------------- Boot with skeleton ---------------- */
   setTimeout(() => {
     document.getElementById('home-skeleton').hidden = true;
     host.hidden = false;
