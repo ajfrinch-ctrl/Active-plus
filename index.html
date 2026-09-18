@@ -162,7 +162,9 @@
              account and we route to that role's own portal. */
           const session = await signIn(identifier, secret);
           showToast(`সফলভাবে লগিন হয়েছে — ${session.name}`, 'success');
-          window.location.replace(handoffUrl(safeNext() || homeFor(session.role), session));
+          // Always land on Home first ({ home: true }) — a remembered tab or a
+          // stale ?next target must not decide where a fresh login opens.
+          window.location.replace(handoffUrl(safeNext() || homeFor(session.role), session, { home: true }));
         } catch (error) {
           console.warn('[Active Plus] Login failed:', error.code || '', error.message);
           showError(error.message || 'লগিন করা যায়নি। আবার চেষ্টা করুন।');

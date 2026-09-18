@@ -27,17 +27,24 @@
 
   <body class="home-body">
     <main class="home">
-      <!-- Header -->
-      <header class="home-header">
+      <!-- Top bar: who am I + today's date. The "অনলাইন" chip is gone — the
+           border of the bar itself turns green while the app is online (and
+           amber while offline), which is what the student is told instead. -->
+      <header class="home-header" id="home-header" data-net="online">
         <div class="avatar" id="avatar" aria-hidden="true">A</div>
         <div class="who">
           <div class="greet" id="greet">…</div>
           <div class="name" id="student-name">…</div>
           <div class="meta" id="student-meta">…</div>
         </div>
-        <button type="button" class="icon-btn" id="profile-btn" aria-label="প্রোফাইল">👤</button>
-        <span class="net-chip" id="net-chip" role="status" aria-live="polite">…</span>
-        <button type="button" class="bell" id="bell" aria-label="নোটিফিকেশন">🔔<span class="badge-dot" id="bell-count" hidden>0</span></button>
+        <div class="hh-actions">
+          <button type="button" class="icon-btn" id="profile-btn" aria-label="প্রোফাইল">👤</button>
+          <button type="button" class="bell" id="bell" aria-label="নোটিফিকেশন">🔔<span class="badge-dot" id="bell-count" hidden>0</span></button>
+        </div>
+        <div class="hh-strip">
+          <span class="hh-date" id="today-date">…</span>
+          <span class="hh-year" id="today-session">…</span>
+        </div>
       </header>
 
       <!-- HOME view -->
@@ -91,7 +98,7 @@
         <button type="button" data-view="study"><span class="ico">📚</span>স্টাডি</button>
         <button type="button" data-view="exam"><span class="ico">📝</span>পরীক্ষা</button>
         <button type="button" data-view="result"><span class="ico">🏆</span>ফলাফল</button>
-        <button type="button" data-view="more"><span class="ico">☰</span>আরও</button>
+        <button type="button" data-view="more"><span class="ico">⋯</span>আরও</button>
       </div>
     </nav>
 

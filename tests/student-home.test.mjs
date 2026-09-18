@@ -160,7 +160,10 @@ test('offline shows the indicator and blocks starting an exam', async () => {
   const { doc } = await bootHome();
   Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: false, configurable: true });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('offline'));
-  assert.equal(doc.getElementById('net-chip').classList.contains('off'), true, 'chip marked offline');
+  // The chip is gone: the top bar's own border carries the connection state.
+  assert.equal(doc.getElementById('net-chip'), null, 'no online/offline chip in the top bar');
+  assert.equal(doc.getElementById('home-header').dataset.net, 'offline', 'top bar marked offline');
+  assert.equal(doc.getElementById('home-header').classList.contains('offline'), true, 'offline styling applied');
   click(doc, '#home-content [data-act="startexam"]');
   assert.equal(doc.getElementById('view-exam').hidden, true, 'exam view not opened while offline');
 });
@@ -379,6 +382,26 @@ test('latest result card shows the class position when leaderboard is on', async
   data.setHomeCards({ leaderboard: false });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
   assert.equal(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), false, 'hidden with the leaderboard');
+});
+
+test('the Result view opens the review of a past paper', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  data.db.examResults.add({
+    id: 'res-review', examId: exam.id, studentId: student.id, studentName: student.name,
+    score: 1, total: exam.questions.length, date: data.todayBn(), autoSubmitted: false,
+    answers: exam.questions.map((q, qi) => (qi === 0 ? q.answer : null))
+  });
+
+  click(doc, '.bottom-nav button[data-view="result"]');
+  const results = doc.getElementById('result-content');
+  assert.ok(results.querySelector('[data-act="review"]'), 'a reviewable result offers the উত্তর button');
+  assert.match(results.textContent, /[০-৯]{1,2} [\u0980-\u09FF]+ [০-৯]{4}/, '');
+
+  click(doc, '#result-content [data-act="review"]');
+  assert.equal(doc.getElementById('view-exam').hidden, false, 'the review opens in the exam view');
+  assert.match(doc.getElementById('exam-player').innerHTML, /উত্তরপত্র/, 'and shows the paper');
 });
 
 test('every tile in the More quick row actually navigates (no dead buttons)', async () => {

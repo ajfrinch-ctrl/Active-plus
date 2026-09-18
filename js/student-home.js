@@ -13,6 +13,7 @@ import {
   achievementsFor, unreadNotifications, latestTip, activeBanners,
   recordStudyActivity, newId, todayBn, DAY_BN, homeCards, lastAccessedMaterial,
   examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION, subscribeRemote,
+  formatBnDate, orgInfo,
   submitAssignment, markMaterialComplete, completedMaterialIds, materialProgressFor, timeAgo,
   homeFeatures, leaderboard
 } from './data.js';
@@ -51,6 +52,11 @@ export function initStudentHome() {
   document.getElementById('student-name').textContent = session.name;
   const batch = me?.batch ? ` · ব্যাচ ${me.batch}` : '';
   document.getElementById('student-meta').textContent = me ? `${me.className}${batch} · রোল ${me.roll}` : session.detail || '';
+  // The top bar carries today's date in the one format the app uses everywhere.
+  const todayEl = document.getElementById('today-date');
+  if (todayEl) todayEl.textContent = `📅 আজ ${formatBnDate(todayBn())}`;
+  const sessionEl = document.getElementById('today-session');
+  if (sessionEl) sessionEl.textContent = `শিক্ষাবর্ষ ${orgInfo().academicYear || ''}`.trim();
   const avatar = document.getElementById('avatar');
   if (me?.photo) {
     avatar.innerHTML = `<img src="${escapeHtml(me.photo)}" alt="${escapeHtml(session.name)}">`;
@@ -81,12 +87,18 @@ export function initStudentHome() {
   subscribeRemote(() => { renderHomeSafe(); });
 
 
-  const netChip = document.getElementById('net-chip');
+  /**
+   * Connection state lives on the top bar itself: its border is green while
+   * online and amber while offline. The state is also announced to screen
+   * readers through the bar's label, so nothing is lost by dropping the chip.
+   */
+  const headerBar = document.getElementById('home-header');
   const paintNet = () => {
-    if (!netChip) return;
-    const online = navigator.onLine;
-    netChip.textContent = online ? 'অনলাইন' : 'অফলাইন';
-    netChip.classList.toggle('off', !online);
+    if (!headerBar) return;
+    const online = navigator.onLine !== false;
+    headerBar.dataset.net = online ? 'online' : 'offline';
+    headerBar.setAttribute('aria-label', online ? 'সংযোগ: অনলাইন' : 'সংযোগ: অফলাইন — কিছু কাজ করা যাবে না');
+    headerBar.classList.toggle('offline', !online);
   };
   paintNet();
   window.addEventListener('online', () => { paintNet(); renderHomeSafe(); });
@@ -114,7 +126,7 @@ export function initStudentHome() {
   document.getElementById('bell').addEventListener('click', () => {
     const rows = noticesFor(student);
     document.getElementById('notif-list').innerHTML = rows.length
-      ? rows.map((n) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(n.title)}</div><div class="li-sub">${escapeHtml(n.createdAt ? (timeAgo(n.createdAt) || n.date) : n.date)} · ${escapeHtml(n.audience || '')}</div></div></div>`).join('')
+      ? rows.map((n) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(n.title)}</div><div class="li-sub">${escapeHtml(timeAgo(n.createdAt) || formatBnDate(n.date))} · ${escapeHtml(n.audience || '')}</div></div></div>`).join('')
       : '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
     openModal('notif-center');
     db.notifications.list().filter((n) => !n.read && (n.target === 'সবাই' || n.target === 'শিক্ষার্থী'))
@@ -255,7 +267,7 @@ export function initStudentHome() {
         <div class="h-title">স্টাডি ম্যাটেরিয়াল</div>
         ${recent.map((m) => `<div class="info-row" role="button" tabindex="0" data-act="material" data-id="${escapeHtml(m.id)}" style="cursor:pointer">
           <span class="l">📖 ${escapeHtml(m.title)}<br><span class="meta">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')}</span></span>
-          <span class="v">${escapeHtml(m.date)}</span></div>`).join('')}
+          <span class="v">${escapeHtml(formatBnDate(m.date))}</span></div>`).join('')}
         <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">সব ম্যাটেরিয়াল</button>
       </div>`;
     }
@@ -270,7 +282,7 @@ export function initStudentHome() {
         <div class="h-title">আসন্ন পরীক্ষা</div>
         <div class="big">${escapeHtml(exam.title)}</div>
         <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(exam.subject)}</span></div>
-        <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(exam.date || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
+        <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(exam.date) || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
         <div class="info-row"><span class="l">সময়</span><span class="v">${bn(exam.duration || 0)} মিনিট</span></div>
         <div class="info-row"><span class="l">প্রশ্ন</span><span class="v">${bn(exam.questions.length)}</span></div>
         ${win.canStart
@@ -362,7 +374,7 @@ export function initStudentHome() {
           <span class="dot"></span>
           <div style="flex:1">
             <div style="font-weight:600">${escapeHtml(n.title)}</div>
-            <div class="meta">${escapeHtml(n.body)} · ${escapeHtml(timeAgo(n.createdAt) || n.date)}</div>
+            <div class="meta">${escapeHtml(n.body)} · ${escapeHtml(timeAgo(n.createdAt) || formatBnDate(n.date))}</div>
           </div>
         </div>`).join('')}
         <button type="button" class="btn btn-secondary btn-block" data-act="notif" style="margin-top:.5rem">সব দেখুন</button>
@@ -465,8 +477,12 @@ export function initStudentHome() {
         return;
       }
       switchView('exam');
+      // "পরীক্ষা শুরু করুন" starts the paper — and with it the countdown —
+      // instead of only opening the exam list.
+      if (act === 'startexam') refreshExams?.start?.();
     }
     else if (act === 'result' || act === 'progress') switchView('result');
+    else if (act === 'review') { switchView('exam'); refreshExams?.review?.(el.dataset.exam); }
     else if (act === 'study' || act === 'downloads') switchView('study');
     else if (['classes', 'routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'query', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
     else if (act === 'challenge') doChallenge();
@@ -489,7 +505,7 @@ export function initStudentHome() {
         <p style="margin:.5rem 0">এই সনদ প্রদান করা হলো</p>
         <div style="font-weight:700">${escapeHtml(session.name)}</div>
         <div class="meta">${escapeHtml(student.id)}${me?.className ? ` · ${escapeHtml(me.className)}` : ''}</div>
-        <div class="meta" style="margin-top:.75rem">তারিখ: ${escapeHtml(todayBn())}</div>
+        <div class="meta" style="margin-top:.75rem">তারিখ: ${escapeHtml(formatBnDate(todayBn()))}</div>
       </div>
       <button type="button" class="btn btn-block" id="print-cert" style="margin-top:.75rem">প্রিন্ট করুন</button>`);
     detail.querySelector('#print-cert')?.addEventListener('click', () => {
@@ -538,7 +554,7 @@ export function initStudentHome() {
   function openBanner(id) {
     const b = db.banners.find(id);
     if (!b) return;
-    showDetail(b.title, `<p>${escapeHtml(b.desc || '')}</p><p class="meta" style="margin-top:.5rem">${escapeHtml(b.date || '')}</p>`);
+    showDetail(b.title, `<p>${escapeHtml(b.desc || '')}</p><p class="meta" style="margin-top:.5rem">${escapeHtml(formatBnDate(b.date))}</p>`);
   }
 
   function openAssignment(id) {
@@ -581,7 +597,7 @@ export function initStudentHome() {
     recordStudyActivity('view', 1, id);
     const isDone = completedMaterialIds(student).includes(m.id);
     showDetail(m.title, `
-      <p>${escapeHtml(m.subject)} · ${escapeHtml(m.className)} · ${escapeHtml(m.date)}</p>
+      <p>${escapeHtml(m.subject)} · ${escapeHtml(m.className)} · ${escapeHtml(formatBnDate(m.date))}</p>
       <p style="white-space:pre-wrap;margin-top:.5rem">${escapeHtml(m.description || '')}</p>
       ${m.link ? `<a class="btn btn-secondary btn-block" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="margin-top:.75rem">ফাইল খুলুন / ডাউনলোড</a>` : ''}
       ${isDone
@@ -650,7 +666,7 @@ export function initStudentHome() {
           `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>
 
       <div class="hcard" id="more-notices"><div class="h-title">নোটিশ</div>${
-        noticesFor(student).map((n) => row(n.title, n.date)).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>
+        noticesFor(student).map((n) => row(n.title, formatBnDate(n.date))).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>
 
       <div class="hcard" id="more-achievements"><div class="h-title">অর্জন</div>${
         badges.map((b) => row(`${b.icon} ${b.name}`, '')).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>
@@ -678,7 +694,7 @@ export function initStudentHome() {
 
       <div class="hcard" id="more-query"><div class="h-title">শিক্ষক প্রশ্ন</div>
         ${queries.length ? queries.map((q) => `
-          ${row(q.title, q.date)}
+          ${row(q.title, formatBnDate(q.date))}
           ${q.reply ? `<div class="alert alert-success" style="margin:.25rem 0 .75rem">শিক্ষকের উত্তর: ${escapeHtml(q.reply)}</div>` : '<p class="meta" style="margin:.25rem 0 .75rem">উত্তরের অপেক্ষায়…</p>'}`).join('') : '<p>আপনি এখনো কোনো প্রশ্ন পাঠাননি।</p>'}
         <form id="query-form" style="margin-top:.75rem">
           <div class="form-group"><label for="query-text">আপনার প্রশ্ন</label>
@@ -697,7 +713,7 @@ export function initStudentHome() {
         ${row('স্কুল/কলেজ', meRow.school || '—')}
         ${row('অভিভাবক', meRow.guardian || '—')}
         ${row('অভিভাবকের মোবাইল', meRow.guardianPhone || '—')}
-        ${row('ভর্তির তারিখ', meRow.admissionDate || '—')}
+        ${row('ভর্তির তারিখ', formatBnDate(meRow.admissionDate) || '—')}
         ${row('অবস্থা', meRow.status || '—')}
         <form id="profile-edit-form" style="margin-top:.75rem">
           ${editable.map((f) => `<div class="form-group"><label for="pf-${escapeHtml(f)}">${escapeHtml(FIELD_BN[f] || f)} (সম্পাদনাযোগ্য)</label><input id="pf-${escapeHtml(f)}" name="${escapeHtml(f)}" class="form-input" value="${escapeHtml(meRow[f] || '')}"></div>`).join('')}
@@ -707,7 +723,6 @@ export function initStudentHome() {
       <div class="hcard" id="more-settings"><div class="h-title">সেটিংস</div>
         ${row('ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)')}
         ${row('অ্যাপ ভার্সন', `v${DATA_VERSION}`)}
-        ${row('সংযোগ', navigator.onLine ? 'অনলাইন' : 'অফলাইন')}
         <button type="button" class="btn btn-secondary btn-block" id="clear-cache" style="margin-top:.75rem">অ্যাপ ক্যাশ রিফ্রেশ করুন</button>
       </div>
 
@@ -801,7 +816,7 @@ export function initStudentHome() {
   function renderStudy() {
     const mats = db.materials.list().filter((m) => !m.className || m.className === student.className);
     document.getElementById('material-list').innerHTML = mats.length
-      ? mats.map((m) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(m.title)}</div><div class="li-sub">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')} · ${escapeHtml(m.date)}</div></div>
+      ? mats.map((m) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(m.title)}</div><div class="li-sub">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')} · ${escapeHtml(formatBnDate(m.date))}</div></div>
         <button type="button" class="btn btn-small" data-mat="${escapeHtml(m.id)}">খুলুন</button></div>`).join('')
       : '<div class="empty-state">কোনো ম্যাটেরিয়াল নেই।</div>';
     document.getElementById('material-list').onclick = (e) => {
@@ -810,6 +825,16 @@ export function initStudentHome() {
     };
     renderStudentSuggestions('#student-suggestion-list', student.className);
   }
+
+  // The Result view has its own container, so its actions need their own router.
+  document.getElementById('result-content').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    if (el.dataset.act === 'review') {
+      switchView('exam');
+      refreshExams?.review?.(el.dataset.exam);
+    }
+  });
 
   function renderResult() {
     const perf = performanceFor(student);
@@ -821,8 +846,14 @@ export function initStudentHome() {
         <div class="info-row"><span class="l">টেস্ট</span><span class="v">${bn(perf.tests)}</span></div>
         <div class="info-row"><span class="l">র‍্যাঙ্ক</span><span class="v">#${bn(perf.rank)}</span></div></div>` : ''}
       <div class="hcard"><div class="h-title">সব ফলাফল</div>${
-        mine.length ? mine.map((r) => { const ex = db.exams.find(r.examId); const pct = Math.round(r.score / r.total * 100);
-          return `<div class="info-row"><span class="l">${escapeHtml(ex?.title || '')}</span><span class="v">${bn(pct)}%</span></div>`; }).join('') : '<p>কোনো ফলাফল নেই।</p>'}</div>
+        mine.length ? mine.map((r) => {
+          const ex = db.exams.find(r.examId);
+          const pct = Math.round(r.score / r.total * 100);
+          const reviewable = Array.isArray(r.answers) && ex;
+          const when = formatBnDate(r.date);
+          return `<div class="info-row"><span class="l">${escapeHtml(ex?.title || '')}${when ? `<br><small class="meta">জমা: ${escapeHtml(when)}</small>` : ''}</span>
+            <span class="v">${bn(pct)}%${reviewable ? ` <button type="button" class="btn btn-small btn-secondary" data-act="review" data-exam="${escapeHtml(r.examId)}">উত্তর</button>` : ''}</span></div>`;
+        }).join('') : '<p>কোনো ফলাফল নেই।</p>'}</div>
       ${leaderboardCard()}`;
   }
 

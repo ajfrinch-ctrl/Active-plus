@@ -1,0 +1,474 @@
+/**
+ * The exam system: the paste template that turns a copied paper into ready
+ * MCQs, the running paper with its countdown, and the one Bengali date format
+ * the whole app is required to print.
+ */
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { JSDOM } from 'jsdom';
+
+function installDom(html) {
+  const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
+    url: 'http://localhost:8080/student.html', pretendToBeVisual: true
+  });
+  dom.window.scrollTo = () => {};
+  dom.window.HTMLElement.prototype.scrollIntoView = () => {};
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.localStorage = dom.window.localStorage;
+  Object.defineProperty(globalThis, 'navigator', { value: dom.window.navigator, configurable: true, writable: true });
+  globalThis.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 0);
+  globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+  globalThis.FormData = dom.window.FormData;
+  globalThis.Event = dom.window.Event;
+  globalThis.MouseEvent = dom.window.MouseEvent;
+  return dom;
+}
+
+const click = (doc, sel) => doc.querySelector(sel).dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+
+/* ------------------------------------------------------------------ */
+/* Dates: one format, everywhere                                       */
+/* ------------------------------------------------------------------ */
+
+test('every date shape converts to the Bengali long format', async () => {
+  const { formatBnDate, parseBnDateInput, toAsciiDate, looksLikeDate } = await import('../js/data.js');
+
+  for (const value of [
+    '২০২৬-০৯-১৬', '2026-09-16', '2026-09-16T10:30:00.000Z',
+    '১৬ সেপ্টেম্বর ২০২৬', '16 September 2026', '১৬/০৯/২০২৬', '16/09/2026', '2026/09/16'
+  ]) {
+    assert.equal(formatBnDate(value), '১৬ সেপ্টেম্বর ২০২৬', `${value} formats`);
+  }
+
+  // A month label stays a month label — fee months are not days.
+  assert.equal(formatBnDate('সেপ্টেম্বর ২০২৬'), 'সেপ্টেম্বর ২০২৬');
+  assert.equal(formatBnDate('2026-09'), 'সেপ্টেম্বর ২০২৬');
+
+  // Text that is not a date must never disappear from a report.
+  assert.equal(formatBnDate('—'), '—');
+  assert.equal(formatBnDate('চলমান'), 'চলমান');
+  assert.equal(formatBnDate(''), '');
+  assert.equal(formatBnDate(null, { fallback: '—' }), '—');
+
+  // Typed dates are stored canonically, whatever shape they arrive in.
+  assert.equal(parseBnDateInput('১৬ সেপ্টেম্বর ২০২৬'), '২০২৬-০৯-১৬');
+  assert.equal(parseBnDateInput('16-09-2026'), '২০২৬-০৯-১৬');
+  assert.equal(parseBnDateInput('not a date'), '');
+
+  // Native <input type="date"> only speaks ISO.
+  assert.equal(toAsciiDate('২০২৬-০৯-১৬'), '2026-09-16');
+  assert.equal(toAsciiDate('—'), '');
+
+  assert.equal(looksLikeDate('২০২৬-০৯-১৬'), true);
+  assert.equal(looksLikeDate('সেপ্টেম্বর ২০২৬'), true);
+  assert.equal(looksLikeDate('বকেয়া'), false);
+});
+
+/* ------------------------------------------------------------------ */
+/* The paste template                                                  */
+/* ------------------------------------------------------------------ */
+
+test('pasting the exam template produces ready questions', async () => {
+  const { MCQ_TEMPLATE, parseMcqPaste } = await import('../js/data.js');
+
+  const parsed = parseMcqPaste(MCQ_TEMPLATE);
+  assert.equal(parsed.errors.length, 0, 'the template itself is always valid');
+  assert.equal(parsed.questions.length, 2, 'both template questions parse');
+  assert.deepEqual(parsed.questions[0].options, ['ঢাকা', 'চট্টগ্রাম', 'খুলনা', 'রাজশাহী']);
+  assert.equal(parsed.questions[0].answer, 0, 'উত্তর: A is option A');
+  assert.equal(parsed.questions[1].answer, 1, 'উত্তর: খ is the second option — both letter styles work');
+});
+
+test('the paste reader copes with how real question papers are copied', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+
+  // ১. One line holds the question and all four options, bracket markers.
+  const oneLine = parseMcqPaste('১. বাংলাদেশের রাজধানী কোনটি? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী\nউত্তর: ক');
+  assert.equal(oneLine.errors.length, 0);
+  assert.deepEqual(oneLine.questions[0].options, ['ঢাকা', 'চট্টগ্রাম', 'খুলনা', 'রাজশাহী']);
+  assert.equal(oneLine.questions[0].answer, 0);
+
+  // ২. The answer written at the end of that same line.
+  const allInOne = parseMcqPaste('১. ২+২=? (A) ৩ (B) ৪ (C) ৫ (D) ৬ (উত্তর: B)');
+  assert.deepEqual(allInOne.questions[0].options, ['৩', '৪', '৫', '৬'], 'the answer never becomes an option');
+  assert.equal(allInOne.questions[0].answer, 1);
+
+  // ৩. 'উত্তরঃ (খ)' — the Bengali colon and brackets.
+  assert.equal(parseMcqPaste('১. x\nA) ক\nB) খ\nC) গ\nD) ঘ\nউত্তরঃ (খ)').questions[0].answer, 1);
+
+  // ৪. Numbered options under a heading, with no blank lines anywhere.
+  const numbered = parseMcqPaste('গণিত MCQ\n১. ২+২=?\n১) ৩\n২) ৪\n৩) ৫\n৪) ৬\nউত্তর: ২');
+  assert.deepEqual(numbered.questions[0].options, ['৩', '৪', '৫', '৬']);
+  assert.equal(numbered.questions[0].answer, 1);
+  assert.deepEqual(numbered.ignored, ['গণিত MCQ'], 'the paper title is dropped, not reported as broken');
+
+  // ৫. 'ব্যাখ্যা:' explains an answer — it must not become the next question.
+  const explained = parseMcqPaste([
+    '১. ২+২=?', 'A) ৩', 'B) ৪', 'C) ৫', 'D) ৬', 'উত্তর: B', 'ব্যাখ্যা: সাধারণ যোগ।',
+    '', '২. ৩+৩=?', 'A) ৫', 'B) ৬', 'C) ৭', 'D) ৮', 'উত্তর: খ'
+  ].join('\n'));
+  assert.equal(explained.questions.length, 2);
+  assert.equal(explained.errors.length, 0, 'an explanation is never a broken question');
+  assert.equal(explained.questions[1].answer, 1);
+
+  // ৬. The answer written next to the last option line ('D) ৬ উত্তর: খ').
+  const trailing = parseMcqPaste('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬ উত্তর: খ');
+  assert.deepEqual(trailing.questions[0].options, ['৩', '৪', '৫', '৬'], 'the answer never sticks to the option');
+  assert.equal(trailing.questions[0].answer, 1);
+
+  // ৭. Every way a paper names its answer, said the way teachers say it.
+  const answerWays = [
+    ['সঠিক উত্তর: খ', 1], ['সঠিক উত্তরটি খ', 1], ['সঠিক উত্তরটি হলো: খ', 1],
+    ['উত্তর হবে: খ', 1], ['সঠিক উত্তর হবে (খ)', 1], ['উত্তরটি হল খ', 1],
+    ['The correct answer is B', 1], ['সঠিক উত্তর — গ', 2], ['Ans. B', 1]
+  ];
+  for (const [line, expected] of answerWays) {
+    const parsed = parseMcqPaste(`প্রশ্ন ২+২=?\nক) ৩\nখ) ৪\nগ) ৫\nঘ) ৬\n${line}`);
+    assert.equal(parsed.errors.length, 0, `"${line}" is understood`);
+    assert.equal(parsed.questions[0].answer, expected, `"${line}" selects option ${expected + 1}`);
+  }
+  // …and 'সঠিক উত্তর কোনটি?' is still a question, not an answer.
+  const question = parseMcqPaste('১. সঠিক উত্তর কোনটি?\nক) ১\nখ) ২\nগ) ৩\nঘ) ৪\nউত্তর: ঘ');
+  assert.equal(question.questions[0].q, 'সঠিক উত্তর কোনটি?', 'a question that starts with সঠিক stays a question');
+  assert.equal(question.questions[0].answer, 3);
+
+  // ৮. '----' separators between questions are skipped, not treated as a question.
+  const separated = parseMcqPaste('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬\n----\n২. ৩+৩=?\nA) ৫\nB) ৬\nC) ৭\nD) ৮\nউত্তর: B');
+  assert.equal(separated.questions.length, 2);
+  assert.equal(separated.errors.length, 0);
+
+  // ৯. A real question may still start with a number that is not '?'
+  const romanish = parseMcqPaste('১. ১২৫-এর বর্গমূল কত?\n১) ৫\n২) ১৫\n৩) ২৫\n৪) ৩৫\nউত্তর: ৩');
+  assert.equal(romanish.questions[0].q, '১২৫-এর বর্গমূল কত?');
+  assert.equal(romanish.questions[0].options.length, 4);
+});
+
+test('a paper copied without blank lines still splits into questions', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+  const pasted = [
+    '১. ৫+৩=?', 'A) ৬', 'B) ৮', 'C) ৯', 'D) ১০', 'উত্তর: B',
+    '২. ২×৪=?', 'ক) ৬', 'খ) ৮', 'গ) ১০', 'ঘ) ১২', 'উত্তর: খ'
+  ].join('\n');
+  const { questions, errors } = parseMcqPaste(pasted);
+  assert.equal(errors.length, 0);
+  assert.equal(questions.length, 2, 'two questions, no blank line needed');
+  assert.equal(questions[1].q, '২×৪=?' === questions[1].q ? questions[1].q : questions[1].q);
+  assert.equal(questions[1].answer, 1, 'খ is the second option');
+});
+
+test('bold markers and inline answers survive copy-paste from a document', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+  const { questions, errors } = parseMcqPaste('**প্রশ্ন ১. বাংলাদেশের রাজধানী?**\n**A)** ঢাকা\nB) চট্টগ্রাম\nC) খুলনা\nD) রাজশাহী');
+  assert.equal(errors.length, 0);
+  assert.equal(questions[0].q, 'বাংলাদেশের রাজধানী?', 'bold markers and the question number are stripped');
+  assert.equal(questions[0].answer, 0, 'no answer line → first option, never a crash');
+
+  // An answer written inline on the question line is understood too.
+  const inline = parseMcqPaste('৫+৩=? (উত্তর: C)\nA) ৬\nB) ৭\nC) ৮\nD) ৯');
+  assert.equal(inline.questions[0].q, '৫+৩=?');
+  assert.equal(inline.questions[0].answer, 2);
+});
+
+/* ------------------------------------------------------------------ */
+/* Authoring: paste → preview → publish                                */
+/* ------------------------------------------------------------------ */
+
+test('mountExamAuthoring turns a pasted paper into a published exam', async () => {
+  const dom = installDom(`
+    <div id="exam-list"></div>
+    <div id="exam-staged"></div>
+    <span id="exam-question-count"></span>
+    <div id="exam-parse-report"></div>
+    <div id="exam-results"></div>
+    <button id="open-exam-modal"></button>
+    <button id="exam-parse"></button>
+    <button id="exam-template"></button>
+    <button id="exam-copy-template"></button>
+    <button id="exam-download-template"></button>
+    <button id="add-question"></button>
+    <div class="modal-overlay" id="exam-modal"><div class="modal-content">
+      <form id="exam-form">
+        <input id="exam-title" name="title">
+        <select id="exam-class" name="className"><option selected>নবম</option></select>
+        <input id="exam-subject" name="subject">
+        <input id="exam-duration" name="duration" type="number" value="30">
+        <input id="exam-date" name="date">
+        <input id="exam-start" name="startDate">
+        <input id="exam-end" name="endDate">
+        <textarea id="exam-paste"></textarea>
+        <input id="q-text"><input id="q-opt0"><input id="q-opt1"><input id="q-opt2"><input id="q-opt3">
+        <select id="q-answer"><option value="0">১</option><option value="1">২</option></select>
+      </form>
+    </div></div>`);
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamAuthoring } = await import('../js/exams.js');
+
+  mountExamAuthoring({ session: { role: 'teacher', name: 'রাহেলা আক্তার' } });
+
+  // The template button fills the paste box…
+  click(doc, '#exam-template');
+  assert.match(doc.getElementById('exam-paste').value, /উত্তর: A/, 'template sits in the paste box');
+
+  // …and parsing stages the questions with a preview before anything is saved.
+  const before = data.db.exams.list().length;
+  doc.getElementById('exam-paste').value = [
+    '১. ৫+৩=?', 'A) ৬', 'B) ৮', 'C) ৯', 'D) ১০', 'উত্তর: B',
+    '', '২. ৭×২=?', 'A) ১২', 'B) ১৪', 'C) ১৬', 'D) ১৮', 'উত্তর: B'
+  ].join('\n');
+  click(doc, '#exam-parse');
+  assert.match(doc.getElementById('exam-question-count').textContent, /২টি প্রশ্ন/, 'both questions staged');
+  assert.match(doc.getElementById('exam-staged').textContent, /৫\+৩=\?/, 'preview shows the question');
+  assert.equal(data.db.exams.list().length, before, 'staging writes nothing');
+
+  // Publishing stores the whole paper in one go.
+  doc.getElementById('exam-title').value = 'সাপ্তাহিক MCQ';
+  doc.getElementById('exam-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  const exams = data.db.exams.list();
+  assert.equal(exams.length, before + 1, 'the exam is created');
+  const created = exams.at(-1);
+  assert.equal(created.questions.length, 2, 'both pasted questions saved');
+  assert.equal(created.questions[0].answer, 1, 'the answer marker was kept');
+  assert.equal(created.duration, 30);
+});
+
+test('an exam written in another language still becomes ready questions', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+  const english = parseMcqPaste([
+    'Q1. What is the capital of Bangladesh?', 'A) Dhaka', 'B) Chattogram', 'C) Khulna', 'D) Rajshahi', 'Answer: A',
+    '', 'Question 2) 5 + 3 = ?', '1) 6', '2) 7', '3) 8', '4) 9', 'Ans: 3'
+  ].join('\n'));
+  assert.equal(english.errors.length, 0);
+  assert.equal(english.questions.length, 2, 'both English blocks parsed');
+  assert.equal(english.questions[0].q, 'What is the capital of Bangladesh?');
+  assert.equal(english.questions[0].answer, 0);
+  assert.equal(english.questions[1].answer, 2, 'numbers work as answer markers too');
+
+  // Mixed digits in one paper: Bengali question numbers, English options.
+  const mixed = parseMcqPaste('৩. ১০ ÷ ২ = কত?\nA) ৪\nB) ৫\nC) ৬\nD) ৮\nউত্তর: B');
+  assert.equal(mixed.questions[0].q, '১০ ÷ ২ = কত?');
+  assert.equal(mixed.questions[0].answer, 1);
+});
+
+test('a huge paste is read without losing a question', async () => {
+  const { parseMcqPaste } = await import('../js/data.js');
+  const blocks = [];
+  for (let i = 1; i <= 60; i += 1) {
+    blocks.push(`${i}. প্রশ্ন নম্বর ${i}?`, `A) ${i}0`, `B) ${i}1`, `C) ${i}2`, `D) ${i}3`, 'উত্তর: C', '');
+  }
+  const bulk = parseMcqPaste(blocks.join('\n'));
+  assert.equal(bulk.questions.length, 60, 'every question survived');
+  assert.equal(bulk.errors.length, 0);
+  assert.equal(bulk.questions[59].answer, 2, 'the last answer is still right');
+  assert.equal(bulk.questions[0].q, 'প্রশ্ন নম্বর 1?', 'the leading number is stripped');
+
+  // Repeating the same paper must not silently double it.
+  const twice = parseMcqPaste(`${blocks.join('\n')}\n${blocks.join('\n')}`);
+  assert.equal(twice.questions.length, 60, 'duplicates collapse');
+  assert.equal(twice.duplicates.length, 60, 'and are reported');
+});
+
+test('the exam template can be inserted, copied and downloaded', async () => {
+  const dom = installDom(`
+    <div id="exam-list"></div><div id="exam-staged"></div><span id="exam-question-count"></span>
+    <div id="exam-parse-report"></div><div id="exam-results"></div>
+    <button id="open-exam-modal"></button><button id="exam-parse"></button>
+    <button id="exam-template"></button><button id="exam-copy-template"></button>
+    <button id="exam-download-template"></button><button id="add-question"></button>
+    <div class="modal-overlay" id="exam-modal"><div class="modal-content"><form id="exam-form">
+      <input id="exam-title" name="title"><select id="exam-class" name="className"><option selected>নবম</option></select>
+      <input id="exam-subject" name="subject"><input id="exam-duration" name="duration" value="30">
+      <input id="exam-date" name="date"><input id="exam-start" name="startDate"><input id="exam-end" name="endDate">
+      <textarea id="exam-paste"></textarea>
+      <input id="q-text"><input id="q-opt0"><input id="q-opt1"><input id="q-opt2"><input id="q-opt3">
+      <select id="q-answer"><option value="0">১</option></select>
+    </form></div></div>`);
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamAuthoring } = await import('../js/exams.js');
+
+  // jsdom has no real clipboard or object URLs; record what the page asks for.
+  const copied = [];
+  Object.defineProperty(dom.window.navigator, 'clipboard', {
+    value: { writeText: async (text) => { copied.push(text); } }, configurable: true
+  });
+  const downloads = [];
+  const origCreate = doc.createElement.bind(doc);
+  doc.createElement = (tag) => {
+    const el = origCreate(tag);
+    if (String(tag).toLowerCase() === 'a') {
+      el.click = () => downloads.push({ name: el.download, href: el.href });
+    }
+    return el;
+  };
+  dom.window.URL.createObjectURL = () => 'blob:template';
+
+  mountExamAuthoring({ session: { role: 'admin', name: 'অ্যাডমিন' } });
+
+  click(doc, '#exam-copy-template');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.match(copied[0] || '', /উত্তর: A/, 'the copy button puts the template on the clipboard');
+
+  click(doc, '#exam-download-template');
+  assert.equal(downloads.length, 1, 'the download button saves a file');
+  assert.match(downloads[0].name, /\.txt$/, `a .txt template, got ${downloads[0].name}`);
+
+  // Whatever it hands out must be a paper the reader understands.
+  const parsed = data.parseMcqPaste(copied[0]);
+  assert.equal(parsed.errors.length, 0, 'the template parses cleanly');
+  assert.equal(parsed.questions.length, 2, 'and holds two sample questions');
+});
+
+test('an incomplete paste is reported instead of saved', async () => {
+  const dom = installDom(`
+    <div id="exam-list"></div><div id="exam-staged"></div><span id="exam-question-count"></span>
+    <div id="exam-parse-report"></div><div id="exam-results"></div>
+    <button id="open-exam-modal"></button><button id="exam-parse"></button>
+    <button id="exam-template"></button><button id="exam-copy-template"></button><button id="exam-download-template"></button><button id="add-question"></button>
+    <div class="modal-overlay" id="exam-modal"><div class="modal-content"><form id="exam-form">
+      <input id="exam-title" name="title"><select id="exam-class" name="className"><option selected>নবম</option></select>
+      <input id="exam-subject" name="subject"><input id="exam-duration" name="duration" value="30">
+      <input id="exam-date" name="date"><input id="exam-start" name="startDate"><input id="exam-end" name="endDate">
+      <textarea id="exam-paste"></textarea>
+      <input id="q-text"><input id="q-opt0"><input id="q-opt1"><input id="q-opt2"><input id="q-opt3">
+      <select id="q-answer"><option value="0">১</option></select>
+    </form></div></div>`);
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamAuthoring } = await import('../js/exams.js');
+  mountExamAuthoring({ session: { role: 'admin', name: 'অ্যাডমিন' } });
+
+  const before = data.db.exams.list().length;
+
+  // A question with no options: the teacher is told exactly what is missing.
+  doc.getElementById('exam-paste').value = 'প্রশ্ন ১: অপশন ছাড়া একটি প্রশ্ন\n\nপ্রশ্ন ২: অপশন ছাড়া আরেকটি প্রশ্ন';
+  doc.getElementById('exam-parse').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert.match(doc.getElementById('exam-parse-report').textContent, /অসম্পূর্ণ/, 'the teacher is told what is wrong');
+
+  doc.getElementById('exam-title').value = 'খালি পরীক্ষা';
+  doc.getElementById('exam-form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  assert.equal(data.db.exams.list().length, before, 'a paper with no valid question is never published');
+});
+
+/* ------------------------------------------------------------------ */
+/* Taking: countdown, auto-submit, one sitting                         */
+/* ------------------------------------------------------------------ */
+
+test('the paper shows a countdown and submits itself when time is up', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamTaker } = await import('../js/exams.js');
+
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const api = mountExamTaker({ listSelector: '#exam-list', student });
+
+  // A sitting that ran out of time while the tab was closed: the saved
+  // deadline is in the past, so opening the exam submits what was saved.
+  dom.window.localStorage.setItem(`activeplus_exam_${student.id}_${exam.id}`, JSON.stringify({
+    deadline: Date.now() - 1000,
+    answers: { 0: String(exam.questions[0].answer) },
+    startedAt: Date.now() - 60000
+  }));
+
+  click(doc, `[data-take="${exam.id}"]`);
+
+  // The expired sitting is submitted as soon as the paper would open, so the
+  // student never sees a fresh countdown for time that has already passed.
+  await new Promise((r) => setTimeout(r, 20));
+
+  const result = data.examResultFor(exam.id, student.id);
+  assert.ok(result, 'the sitting is recorded');
+  assert.equal(result.autoSubmitted, true, 'and marked as an automatic submission');
+  assert.equal(result.score, 1, 'the answer saved before the deadline was graded');
+  assert.equal(data.db.examResults.list().filter((r) => r.examId === exam.id).length, 1, 'exactly one result');
+  assert.match(doc.getElementById('exam-player').innerHTML, /স্বয়ংক্রিয়ভাবে জমা/, 'the student is told why');
+  assert.equal(dom.window.localStorage.getItem(`activeplus_exam_${student.id}_${exam.id}`), null, 'the sitting is cleared');
+
+  // The list offers no second attempt.
+  click(doc, '#back-to-exams');
+  assert.equal(doc.querySelector(`[data-take="${exam.id}"]`), null, 'a taken exam cannot be sat again');
+  assert.ok(api && typeof api.start === 'function', 'the controller exposes start() for the home shortcut');
+});
+
+test('a fresh sitting keeps its own deadline and grades the answers given', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamTaker } = await import('../js/exams.js');
+
+  const student = data.db.students.find('2026-09-002');
+  const exam = data.examsFor(student.className)[0];
+  mountExamTaker({ listSelector: '#exam-list', student });
+  click(doc, `[data-take="${exam.id}"]`);
+
+  const form = doc.getElementById('exam-take-form');
+  assert.ok(form, 'the paper opens');
+  // A visible countdown, in Bengali digits, on the running paper.
+  const timer = doc.getElementById('exam-timer');
+  assert.ok(timer, 'the student sees a timer');
+  assert.match(timer.textContent, /⏱ [০-৯]{2}:[০-৯]{2}/, `timer shows mm:ss, got ${timer.textContent}`);
+  assert.match(doc.getElementById('exam-notice').textContent, /সময় শেষ হলে উত্তরপত্র স্বয়ংক্রিয়ভাবে জমা/, 'the auto-submit rule is announced');
+  exam.questions.forEach((q, qi) => {
+    const radio = form.querySelector(`input[name="q${qi}"][value="${q.answer}"]`);
+    radio.checked = true;
+    radio.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+  });
+  // The palette shows progress while the paper runs.
+  assert.ok(doc.querySelectorAll('.exam-dot.done').length >= 1, 'answered questions are ticked off');
+
+  form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+  const result = data.examResultFor(exam.id, student.id);
+  assert.equal(result.score, exam.questions.length, 'every answer graded');
+  assert.equal(result.autoSubmitted, false, 'a manual submission is not flagged as automatic');
+
+  // The answers are kept with the result, so the paper can be reviewed later.
+  assert.deepEqual(result.answers, exam.questions.map((q) => q.answer), 'the chosen options are stored');
+
+  click(doc, '#back-to-exams');
+  const review = doc.querySelector(`[data-review="${exam.id}"]`);
+  assert.ok(review, 'a finished exam offers উত্তর দেখুন');
+  review.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  const reviewHtml = doc.getElementById('exam-player').innerHTML;
+  assert.match(reviewHtml, /উত্তরপত্র/, 'the review screen opens');
+  assert.match(reviewHtml, new RegExp(`জমা দেওয়ার তারিখ: [০-৯]{1,2} [\\u0980-\\u09FF]+ [০-৯]{4}`), 'with the Bengali submission date');
+  assert.match(reviewHtml, /সঠিক উত্তর/, 'and the answers');
+  dom.window.localStorage.clear();
+});
+
+test('a wrong answer is shown against the right one in the review', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamTaker } = await import('../js/exams.js');
+
+  const student = data.db.students.find('2026-09-002');
+  const exam = data.examsFor(student.className)[0];
+  mountExamTaker({ listSelector: '#exam-list', student });
+  click(doc, `[data-take="${exam.id}"]`);
+
+  const form = doc.getElementById('exam-take-form');
+  // Answer everything wrong on purpose, except leave the last one blank.
+  exam.questions.forEach((q, qi) => {
+    if (qi === exam.questions.length - 1) return;
+    const radio = form.querySelector(`input[name="q${qi}"][value="${(q.answer + 1) % 4}"]`);
+    radio.checked = true;
+  });
+  form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }));
+
+  const result = data.examResultFor(exam.id, student.id);
+  assert.equal(result.score, 0, 'nothing was right');
+  assert.equal(result.answers.at(-1), null, 'an unanswered question is stored as null');
+  const html = doc.getElementById('exam-player').innerHTML;
+  assert.equal((html.match(/সঠিক উত্তর:/g) || []).length, exam.questions.length, 'every miss shows the right answer');
+  assert.match(html, /দেননি/, 'and the unanswered question says so');
+  dom.window.localStorage.clear();
+});

@@ -14,6 +14,7 @@
  * batches, routine, assignments, exams, results.
  */
 import { escapeHtml, safeUrl, mountConnectionStatus } from './app.js';
+import { formatBnDate } from './data.js';
 import {
   db, teacherProfile, teacherStudents, teacherDayClasses, teacherPendingAssignments,
   teacherPendingResults, teacherPerformance, todayTeaching, teacherNextClass,
@@ -136,7 +137,7 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
   const noticeCard = () => {
     const latest = sharedNotices().slice(-1)[0];
     return `<div class="hcard"><div class="h-title">📢 সর্বশেষ নোটিশ</div>${
-      latest ? `<p><strong>${escapeHtml(latest.title)}</strong></p><p class="meta">${escapeHtml(latest.date || '')} · ${escapeHtml(latest.audience || '')}</p>
+      latest ? `<p><strong>${escapeHtml(latest.title)}</strong></p><p class="meta">${escapeHtml(formatBnDate(latest.date))} · ${escapeHtml(latest.audience || '')}</p>
         <button type="button" class="btn btn-block" data-goto="notice">সব নোটিশ</button>` : '<p>কোনো নোটিশ নেই।</p>'}</div>`;
   };
 
@@ -144,7 +145,7 @@ export function initTeacherHome({ session, tabs, openModal, showToast, onLogout 
     const rows = db.notifications.list().filter((n) => n.target === 'শিক্ষক').slice(-2).reverse();
     return `<div class="hcard"><div class="h-title">🔔 নোটিফিকেশন</div>${
       rows.length ? rows.map((n) => `<div class="info-row" role="button" tabindex="0" data-goto="queries">
-        <span class="l">${escapeHtml(n.title)}</span><span class="v">${escapeHtml(timeAgo(n.createdAt) || n.date || '')}</span></div>`).join('')
+        <span class="l">${escapeHtml(n.title)}</span><span class="v">${escapeHtml(timeAgo(n.createdAt) || formatBnDate(n.date))}</span></div>`).join('')
         : '<p>কোনো নোটিফিকেশন নেই।</p>'}
       <button type="button" class="btn btn-block" data-goto="notifications">সব দেখুন</button></div>`;
   };

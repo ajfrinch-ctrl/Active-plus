@@ -17,7 +17,7 @@
  * Neither output contains any application UI.
  */
 
-import { db, CLASS_TO_NUMBER, ALL_CLASSES } from './data.js';
+import { db, CLASS_TO_NUMBER, ALL_CLASSES, formatBnDate, todayBn } from './data.js';
 import { absUrl, downloadBlob, canvasToPngBlob, logoDataUrl, assetDataUrl, loadImage, makeCanvas, wrapText, clearLogoCache } from './pdf.js';
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({
@@ -68,20 +68,23 @@ function resolveOrg(settingsOrOpts) {
   };
 }
 
+/**
+ * Documents print the same Bengali long date as the rest of the app
+ * (১৬ সেপ্টেম্বর ২০২৬) — derived from todayBn() so a receipt made at 11pm
+ * carries the same date the app is showing.
+ */
 function formatGenDate() {
-  try {
-    return new Date().toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
-  } catch (e) {
-    return new Date().toLocaleDateString();
-  }
+  return formatBnDate(todayBn());
 }
 
 function formatGenDateTime() {
-  try {
-    return `${new Date().toLocaleDateString('bn-BD')} ${new Date().toLocaleTimeString('bn-BD')}`;
-  } catch (e) {
-    return new Date().toLocaleString();
-  }
+  const time = (() => {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    return `${bn(hh)}:${bn(mm)}`;
+  })();
+  return `${formatGenDate()} · ${time}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -102,7 +105,7 @@ function receiptRows(pay, { student }) {
   const { previousDue, paidAmount, remainingDue } = receiptSummary(pay);
   const rows = [
     ['রিসিট নম্বর', pay.receiptNo || pay.id],
-    ['তারিখ', pay.date || '—'],
+    ['তারিখ', formatBnDate(pay.date) || '—'],
     ['শিক্ষার্থীর নাম', student?.name || pay.studentId],
     ['ইউনিক আইডি', pay.studentId],
     ['শ্রেণি', student?.className || '—'],
@@ -861,7 +864,7 @@ export async function renderIdCardCanvas(student, opts = {}) {
       ['আইডি', student?.id],
       ['শ্রেণি', student?.className],
       ['রোল', student?.roll],
-      ['সেশন', student?.admissionDate || org?.academicYear || '—']
+      ['সেশন', formatBnDate(student?.admissionDate) || org?.academicYear || '—']
     ];
     const labelW = Math.round(inner * 0.38);
     const valueW = inner - labelW - 26;
@@ -939,11 +942,11 @@ export async function renderLedgerCanvases(student, opts = {}) {
   const rows = [];
   for (const f of fees) {
     debit += Number(f.amount || 0);
-    rows.push({ date: f.date || '—', desc: `${f.month} ফি`, debit: taka(f.amount), credit: '', balance: taka(debit - credit) });
+    rows.push({ date: formatBnDate(f.date) || '—', desc: `${f.month} ফি`, debit: taka(f.amount), credit: '', balance: taka(debit - credit) });
   }
   for (const p of payments) {
     credit += Number(p.amount || 0);
-    rows.push({ date: p.date || '—', desc: `পেমেন্ট (${p.month})`, debit: '', credit: taka(p.amount), balance: taka(debit - credit) });
+    rows.push({ date: formatBnDate(p.date) || '—', desc: `পেমেন্ট (${p.month})`, debit: '', credit: taka(p.amount), balance: taka(debit - credit) });
   }
   const org = resolveOrg(opts.settings || opts);
   return renderReportCanvases({
@@ -979,7 +982,7 @@ export async function renderAdmissionFormCanvases(student, opts = {}) {
     ['স্কুল / কলেজ', student.school],
     ['অভিভাবকের নাম', student.guardian],
     ['অভিভাবকের মোবাইল', student.guardianPhone || student.phone],
-    ['ভর্তির তারিখ', student.admissionDate]
+    ['ভর্তির তারিখ', formatBnDate(student.admissionDate)]
   ];
   return renderReportCanvases({
     settings: org,
@@ -1066,7 +1069,7 @@ export async function renderFinanceReportCanvases({ from, to, payments, summary 
   const rows = pays.map((p) => {
     const st = db.students.find(p.studentId);
     return {
-      date: p.date || '—',
+      date: formatBnDate(p.date) || '—',
       student: st?.name || p.studentId,
       type: p.month || '—',
       amount: taka(p.amount),
@@ -1148,7 +1151,7 @@ export async function renderNoticeCanvases(notices, opts = {}) {
       title: n.title || '—',
       className: n.className || 'সব',
       audience: n.audience || 'সবাই',
-      date: n.date || '—'
+      date: formatBnDate(n.date) || '—'
     })),
     summary: [{ label: 'মোট নোটিশ', value: bn(list.length) }],
     generatedBy: opts.generatedBy || null
@@ -1260,6 +1263,208 @@ export async function renderBrandedImageCanvas({ title, subtitle, lines = [], or
   ctx.fillRect(0, 0, width, height);
   pass(ctx, true);
   return canvas;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* MCQ question paper + answer key                                     */
+/* ------------------------------------------------------------------ */
+
+/** 'ক', 'খ', 'গ', 'ঘ' — the option markers a printed paper uses. */
+const OPTION_LETTERS = ['ক', 'খ', 'গ', 'ঘ'];
+
+/** '১. প্রশ্ন' / the option lines, wrapped to the column width. */
+function questionLines(ctx, question, number, inner) {
+  setFont(ctx, BODY + 3, 600);
+  const text = wrapText(ctx, `${bn(number)}. ${question.q || ''}`, inner - 12);
+  setFont(ctx, BODY, 400);
+  const options = (question.options || []).filter(Boolean)
+    .map((opt, oi) => `${OPTION_LETTERS[oi] || bn(oi + 1)}) ${opt}`);
+  const half = (inner - 16) / 2;
+  return { text, options, optionLines: options.map((o) => wrapText(ctx, o, half - 12)) };
+}
+
+/** Height of one question block, measured with the very same rules. */
+function questionHeight(ctx, question, number, inner) {
+  const { text, options, optionLines } = questionLines(ctx, question, number, inner);
+  return text.length * (BODY + 9)
+    + Math.ceil(options.length / 2) * (BODY + 12)
+    + 16;
+}
+
+/** Paints one question block (number, text, two option columns). */
+function paintQuestion(ctx, question, number, x, y, inner) {
+  const { text, optionLines } = questionLines(ctx, question, number, inner);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = INK;
+  setFont(ctx, BODY + 3, 600);
+  text.forEach((line, i) => ctx.fillText(line, x, y + i * (BODY + 9)));
+  let cursor = y + text.length * (BODY + 9) + 4;
+
+  const half = (inner - 16) / 2;
+  optionLines.forEach((lines, oi) => {
+    const col = oi % 2;
+    const row = Math.floor(oi / 2);
+    setFont(ctx, BODY, 400);
+    ctx.fillStyle = INK;
+    lines.forEach((line, li) => ctx.fillText(
+      line, x + col * half, cursor + row * (BODY + 12) + li * (BODY + 6)
+    ));
+  });
+  return cursor + Math.ceil(optionLines.length / 2) * (BODY + 12) + 12;
+}
+
+/**
+ * Builds the printable MCQ paper for an exam: institution pad, the exam heading
+ * (class · subject · time · marks · date) and every question with its options,
+ * flowing across A4 pages. With `withAnswers` a final key page is appended —
+ * the teacher's copy, marked "শিক্ষকের জন্য".
+ *
+ * @returns {Promise<HTMLCanvasElement[]>} one canvas per page, ready for buildPdf.
+ */
+export async function renderQuestionPaperCanvases(exam, { settings, withAnswers = false, generatedBy = null } = {}) {
+  await warmFonts();
+  const org = resolveOrg(settings || {});
+  const logoImg = await loadLogo(org.orgLogo || settings?.orgLogo || null);
+  const { width, height } = PAGE;
+  const pad = PAD;
+  const inner = width - pad * 2;
+  const pageLimit = height - (pad + 90);
+
+  const questions = (exam?.questions || []).filter((q) => q && q.q);
+  const heading = [
+    exam?.className ? `শ্রেণি: ${exam.className}` : '',
+    exam?.subject ? `বিষয়: ${exam.subject}` : '',
+    exam?.duration ? `সময়: ${bn(exam.duration)} মিনিট` : '',
+    questions.length ? `পূর্ণমান: ${bn(questions.length)}` : '',
+    exam?.date ? `তারিখ: ${formatBnDate(exam.date)}` : ''
+  ].filter(Boolean).join('   ·   ');
+
+  const opts = {
+    settings: org,
+    title: exam?.title || 'MCQ পরীক্ষা',
+    subtitle: 'বহুনির্বাচনি প্রশ্নপত্র',
+    logoImg,
+    generatedBy
+  };
+
+  const probe = makeCanvas(width, 4);
+  const pctx = probe.getContext('2d');
+  pctx.textBaseline = 'top';
+  const headerH = reportHeaderPass(pctx, width, pad, opts, false);
+  const firstTop = headerH + 6 + (heading ? LH + 8 : 0) + LH + 10;
+  const nextTop = headerH + 6 + LH + 4;
+
+  // Split the questions into pages of what fits (the first page carries the
+  // heading and the instruction line).
+  const pages = [];
+  let current = [];
+  let y = firstTop;
+  questions.forEach((question, index) => {
+    const h = questionHeight(pctx, question, index + 1, inner);
+    if (current.length && y + h > pageLimit) {
+      pages.push(current);
+      current = [];
+      y = nextTop;
+    }
+    current.push({ question, number: index + 1, y });
+    y += h;
+  });
+  pages.push(current);
+  if (!questions.length) pages[0] = [];
+
+  const totalPages = pages.length + (withAnswers ? 1 : 0);
+
+  const canvases = pages.map((page, index) => {
+    const canvas = makeCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'top';
+    const top = reportHeaderPass(ctx, width, pad, opts, true);
+    let y = top + 6;
+
+    ctx.textAlign = 'center';
+    if (index === 0) {
+      if (heading) {
+        setFont(ctx, 20, 600);
+        ctx.fillStyle = INK;
+        ctx.fillText(heading, width / 2, y);
+        y += LH + 8;
+      }
+      setFont(ctx, 18, 400);
+      ctx.fillStyle = MUTED;
+      ctx.fillText('নিচের প্রতিটি প্রশ্নের সঠিক উত্তরে টিক (✓) দিন।', width / 2, y);
+      y += LH + 10;
+    } else {
+      setFont(ctx, 16, 400);
+      ctx.fillStyle = MUTED;
+      ctx.fillText(`${exam?.title || ''} · পৃষ্ঠা ${bn(index + 1)}`, width / 2, y);
+      y += LH + 4;
+    }
+
+    if (!page.length) {
+      setFont(ctx, BODY, 400);
+      ctx.fillStyle = MUTED;
+      ctx.fillText('এই পরীক্ষায় এখনো কোনো প্রশ্ন যোগ করা হয়নি।', width / 2, firstTop);
+    }
+    page.forEach(({ question, number, y: lineY }) => {
+      paintQuestion(ctx, question, number, pad + 6, lineY, inner);
+    });
+
+    paintPageFooter(ctx, width, height, pad, org, index + 1, totalPages, generatedBy, true);
+    return canvas;
+  });
+
+  if (withAnswers) {
+    const canvas = makeCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.textBaseline = 'top';
+    const top = reportHeaderPass(ctx, width, pad, { ...opts, subtitle: 'সঠিক উত্তরপত্র — শিক্ষকের জন্য' }, true);
+    let y = top + 10;
+
+    setFont(ctx, 18, 400);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = MUTED;
+    ctx.fillText(`${exam?.className || ''}${exam?.subject ? ` · ${exam.subject}` : ''} · মোট প্রশ্ন: ${bn(questions.length)}`, width / 2, y);
+    y += LH + 16;
+
+    const cols = 4;
+    const colW = inner / cols;
+    const rowH = LH + 8;
+    const maxRows = Math.max(1, Math.floor((pageLimit - y) / rowH));
+    questions.slice(0, cols * maxRows).forEach((question, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const lineY = y + row * rowH;
+      setFont(ctx, BODY + 2, 700);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = INK;
+      ctx.fillText(`${bn(index + 1)}.`, pad + col * colW, lineY);
+      ctx.fillStyle = ACCENT;
+      ctx.fillText(`${OPTION_LETTERS[question.answer] ?? ''}`, pad + col * colW + 60, lineY);
+    });
+    y += Math.min(questions.length, cols * maxRows) === 0 ? 0 : Math.ceil(Math.min(questions.length, cols * maxRows) / cols) * rowH + 16;
+    if (questions.length > cols * maxRows) {
+      setFont(ctx, 16, 400);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = MUTED;
+      ctx.fillText(`বাকি ${bn(questions.length - cols * maxRows)}টি উত্তর পরের পৃষ্ঠায়`, width / 2, y);
+      y += LH;
+    }
+
+    setFont(ctx, 15, 400);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = FAINT;
+    ctx.fillText('এই পৃষ্ঠাটি শিক্ষকের জন্য — শিক্ষার্থীদের দেওয়ার আগে সরিয়ে নিন।', width / 2, Math.min(y + 10, pageLimit));
+
+    paintPageFooter(ctx, width, height, pad, org, totalPages, totalPages, generatedBy, true);
+    canvases.push(canvas);
+  }
+
+  return canvases;
 }
 
 export function receiptPdfFileName(pay) {

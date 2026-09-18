@@ -169,10 +169,45 @@ export function adoptSessionFromLocation() {
   return session;
 }
 
-/** Builds `page.html#s=<token>` so the next page can pick the session up. */
-export function handoffUrl(page, session) {
+/**
+ * Builds `page.html#s=<token>` so the next page can pick the session up.
+ *
+ * `home: true` (what a sign-in always uses) adds `&home=1`, which tells the
+ * portal to open on its Home screen instead of whatever tab was last visited.
+ */
+export function handoffUrl(page, session, { home = false } = {}) {
   const token = encodeSessionToken(session);
-  return token ? `${page}#s=${encodeURIComponent(token)}` : page;
+  if (!token) return page;
+  return `${page}#s=${encodeURIComponent(token)}${home ? '&home=1' : ''}`;
+}
+
+/**
+ * True when this page was opened straight from the login handoff.
+ *
+ * Read once, while the URL still has the handoff fragment: the portals use it
+ * to land on Home after a sign-in (the fragment is cleaned up as soon as the
+ * session is adopted).
+ */
+const ENTRY_HOME = (() => {
+  try {
+    const hash = (typeof window !== 'undefined' && window.location && window.location.hash) || '';
+    return /(?:^#|[#&])home=1/.test(hash);
+  } catch (e) {
+    return false;
+  }
+})();
+
+export function enteredFromLogin() {
+  return ENTRY_HOME;
+}
+
+/** The tab a page remembers is not carried across a fresh sign-in. */
+function forgetRememberedTabs() {
+  try {
+    const keys = [];
+    for (let i = 0; i < window.localStorage.length; i += 1) keys.push(window.localStorage.key(i));
+    keys.filter((k) => k && k.startsWith('activeplus_tab:')).forEach((k) => window.localStorage.removeItem(k));
+  } catch (e) { /* storage blocked — nothing was remembered anyway */ }
 }
 
 /* ------------------------------------------------------------------ */
@@ -337,6 +372,7 @@ export async function signIn(identifier, password, hint) {
   }
 
   const session = await localSignIn(id, pass);
+  forgetRememberedTabs();
   addActivityLog('login', 'auth');
   return session;
 }
@@ -420,7 +456,7 @@ export function requireRole(...roles) {
   }
   if (allowed.length && !allowed.includes(session.role)) {
     showToast('এই পেজটি দেখার অনুমতি আপনার নেই।', 'error');
-    window.location.replace(handoffUrl(homeFor(session.role), session));
+    window.location.replace(handoffUrl(homeFor(session.role), session, { home: true }));
     return null;
   }
   return session;

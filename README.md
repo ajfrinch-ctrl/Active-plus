@@ -50,6 +50,108 @@ portal (শিক্ষার্থী → `student.html`, শিক্ষক �
   two digits of the mobile number, e.g. `রাহেলা আক্তার` + mobile ending `১১`
   → `রাহেলা১১`. If that would collide, a numeric suffix is appended.
 
+## Dates — one format, everywhere
+
+Every date the app *shows* reads **১৬ সেপ্টেম্বর ২০২৬** (Bengali day + Bengali
+month name + Bengali year) — on cards, tables, reports, receipts, ledgers, ID
+cards, print letterheads and exam lists alike. `formatBnDate()` in `js/data.js`
+is the single place that renders a date; `formatBnDateTime()` appends a Bengali
+clock (`১৮ সেপ্টেম্বর ২০২৬ · ০৯:১২`) when the record really carries a time.
+
+Dates are **stored** as canonical Bengali ISO (`২০২৬-০৯-১৬`) and **typed in**
+however the user likes: `১৬ সেপ্টেম্বর ২০২৬`, `16 September 2026`,
+`2026-09-16`, `১৬/০৯/২০২৬` all mean the same day (`parseBnDateInput()`). A date
+field is a text box with the `১৬ সেপ্টেম্বর ২০২৬` placeholder and a hint under
+it; an unreadable date is refused with a Bengali message instead of being saved
+as garbage. Test coverage: `tests/date-format.test.mjs` walks every student /
+teacher / admin view and fails on any leftover raw date.
+
+## MCQ exams — paste a paper, get ready questions
+
+The exam builder no longer needs a question typed field by field. The teacher
+(or admin) copies a whole paper and pastes it into **📋 প্রশ্ন পেস্ট করুন**; the
+questions appear ready to review and publish. The template is printed right
+above the paste box (with *টেমপ্লেট বসান* / *টেমপ্লেট কপি* buttons):
+
+```
+১. বাংলাদেশের রাজধানী কোনটি?
+A) ঢাকা
+B) চট্টগ্রাম
+C) খুলনা
+D) রাজশাহী
+উত্তর: A
+
+২. ৫ + ৩ × ২ = কত?
+ক) ১০
+খ) ১১
+গ) ১৬
+ঘ) ২০
+উত্তর: খ
+```
+
+The parser (`parseMcqPaste()`) is deliberately forgiving about how the text was
+copied:
+
+| Copied as | Understood |
+| --------- | ---------- |
+| `A) x` · `A. x` · `(ক) x` · `[খ] x` · `১) x` | option markers, Bengali or English, any bracket style |
+| `উত্তর: B` · `সঠিক: খ` · `Answer: d` · `উত্তরঃ (গ)` · `সঠিক উত্তর - ঘ` | the correct answer |
+| `১. প্রশ্ন? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী` | one line holding the question *and* its options |
+| `… (উত্তর: B)` at the end of the question or option line | inline answer |
+| `**প্রশ্ন ১. …**`, `# শিরোনাম`, bullet dashes | Word/Docs paste noise |
+| `৭. প্রশ্ন?` then `৭) ৩` | a question number and option numbers side by side |
+| `D) ৬ উত্তর: খ` | an answer written beside the last option |
+| `ব্যাখ্যা: …` | an explanation line, skipped (never a new question) |
+| `----` between questions | a separator, skipped |
+| a paper title on the first line | dropped with a note, not reported as broken |
+| no blank lines anywhere | questions still split correctly |
+
+The template can be inserted into the box, copied to the clipboard, or
+**downloaded as a `.txt` file** (`mcq-prashner-template.txt`) to fill in
+offline and paste back.
+
+Duplicate and incomplete questions are reported before anything is saved —
+nothing is written until *পরীক্ষা প্রকাশ করুন*. Incomplete blocks name the
+question number so the teacher knows exactly which one to fix.
+
+Taking an exam: the timer starts the moment the paper opens and is always
+visible (`⏱ ২৯:৫৮`, turning amber under a minute and red under 30 seconds),
+with one toast at five minutes and another at one minute left.
+The sitting is remembered per student + exam, so a reload or a closed tab
+resumes the *same* deadline — reopening can never buy extra time. When the
+countdown reaches zero the paper **submits itself**, is graded, and the student
+sees “⏰ সময় শেষ — স্বয়ংক্রিয়ভাবে জমা হয়েছে” with the full answer review. A
+background tab cannot stretch the deadline either: coming back re-checks the
+clock at once, because the countdown is computed from the absolute deadline
+rather than from elapsed ticks. A student who leaves mid-paper finds the exam
+card marked **চলছে · আর ০১:৩০ বাকি** with a *চালিয়ে যান* button, and their saved
+answers waiting. One attempt per exam.
+
+### প্রশ্নপত্র ও উত্তরপত্র (print)
+
+Every exam in the teacher/admin list offers two documents built from the pasted
+questions:
+
+- **📄 প্রশ্নপত্র** — the printable paper: institution pad, `শ্রেণি · বিষয় · সময় ·
+  পূর্ণমান · তারিখ` (Bengali long date), an instruction line, then every question
+  with its options laid out in two columns under ক/খ/গ/ঘ markers. Long papers
+  flow across A4 pages, each carrying the same pad and footer.
+- **🗝️ উত্তরপত্র** — the teacher's copy: a final sheet listing the correct option
+  for every question, headed *সঠিক উত্তরপত্র — শিক্ষকের জন্য* and footed with
+  *“এই পৃষ্ঠাটি শিক্ষকের জন্য — শিক্ষার্থীদের দেওয়ার আগে সরিয়ে নিন।”* The
+  student's paper never contains an answer.
+
+Both open in the shared document preview (teacher portal included) and download
+as PDFs — no browser print dialog anywhere.
+
+### Reviewing a finished paper
+
+The chosen answers travel with the result, so a finished paper offers
+**উত্তর দেখুন** (question-by-question, with the right answer against a wrong
+one) long after the sitting ended — from the exam list or straight from **ফলাফল** in
+the Result view, where each result row now carries its submission date. The
+teacher's result list says which question numbers each student missed.
+
 ## Structure
 
 ```
@@ -115,6 +217,16 @@ student's own records — no hard-coded statistics anywhere:
 
 Every card answers with the student's own rows only; the data layer filters by
 class/batch before anything reaches the UI.
+
+The Home **top bar** is a single rounded card: avatar, greeting, name and
+class/roll, the profile and notification buttons, and a strip with today's date
+and the academic session. It carries the connection state itself — the border
+(and the ring around the avatar) is **green while online** and amber while
+offline, so the old “অনলাইন” chip is gone. Signing in always lands on **Home
+first** (`?home=1` on the login handoff, plus the remembered-tab store being
+cleared on sign-in); reopening the portal later restores the tab the device was
+left on. There is **no ☰ button in any top bar** — the admin's extra features
+live behind the **সব ফিচার** tile on the admin home.
 
 > **Security status (read before using real data).** Those filters run *in the
 > browser*, and so does the whole database: everything lives in `localStorage` on
@@ -255,13 +367,18 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 189 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 226 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
 filtering), the payment and receipt flow, notification badges, lazy table
 pagination, error boundaries with Retry, role-based routing guards, and the full
-login → home handoff.
+login → home handoff. The newest files cover the Bengali date format on every
+rendered portal view *and* in the generated documents (receipts, reports, ID
+cards — the canvases are read back and scanned), the paste-template exam flow
+end to end (paste → publish → sit → countdown → auto-submit → review), and the
+top bar / entry-home rules, and the printed question paper with its answer key
+(the painted sheets are read back string by string).
 
 ## Configuring Firebase (optional)
 

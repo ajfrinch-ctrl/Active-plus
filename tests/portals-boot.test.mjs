@@ -1013,15 +1013,19 @@ test('a teacher cannot author exams or suggestions for a class they do not teach
   const sugOpts = [...doc.getElementById('sug-class').options].map((o) => o.value || o.textContent);
   assert.ok(!sugOpts.includes('দশম'), `suggestion class picker offers only assigned classes, got ${sugOpts}`);
 
+  const pastePaper = (text = '১. ১+১=?\nA) ১\nB) ২\nC) ৩\nD) ৪\nউত্তর: B') => {
+    doc.getElementById('exam-paste').value = text;
+    doc.getElementById('exam-parse').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  };
+
   // Defence in depth: a hand-edited select must still be refused by the handler.
   const examsBefore = data.db.exams.list().length;
   const examSel = doc.getElementById('exam-class');
   examSel.innerHTML = '<option value="দশম">দশম</option>';
   examSel.value = 'দশম';
   doc.getElementById('exam-title').value = 'অনুমোদিত নয় পরীক্ষা';
-  doc.getElementById('q-text').value = '১+১=?';
-  ['২', '৩', '৪', '৫'].forEach((v, i) => { doc.getElementById(`q-opt${i}`).value = v; });
-  doc.getElementById('add-question').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  pastePaper();
+  assert.match(doc.getElementById('exam-question-count').textContent, /১টি প্রশ্ন/, 'the pasted question is staged');
   doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
   assert.equal(data.db.exams.list().length, examsBefore,
     'no exam is written for a class outside the teacher assignment');
@@ -1040,9 +1044,7 @@ test('a teacher cannot author exams or suggestions for a class they do not teach
   examSel.innerHTML = '<option value="নবম">নবম</option>';
   examSel.value = 'নবম';
   doc.getElementById('exam-title').value = 'অনুমোদিত পরীক্ষা';
-  doc.getElementById('q-text').value = '২+২=?';
-  ['৩', '৪', '৫', '৬'].forEach((v, i) => { doc.getElementById(`q-opt${i}`).value = v; });
-  doc.getElementById('add-question').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  pastePaper('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬\nউত্তর: B');
   doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
   assert.equal(data.db.exams.list().length, examsBefore + 1, 'an exam for their own class is still created');
   assert.equal(data.db.exams.list().at(-1).className, 'নবম');
@@ -1132,6 +1134,106 @@ test('teacher assignment and material publishing write, notify and stay scoped',
     'a নবম student can see the material their teacher published');
   assert.ok(!visibleTo('দশম').some((m) => m.title === 'গতি অধ্যায়ের নোট'),
     'a দশম student cannot see material scoped to another class');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('the admin sees which questions each student missed', async () => {
+  const out = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'examresults'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  const exam = data.db.exams.list()[0];
+  const student = data.db.students.list().find((s) => s.className === exam.className);
+  // Two right, one deliberately wrong, one left blank.
+  data.db.examResults.add({
+    id: 'res-test', examId: exam.id, studentId: student.id, studentName: student.name,
+    score: 2, total: 4, date: data.todayBn(), autoSubmitted: false,
+    answers: [exam.questions[0].answer, exam.questions[1].answer, (exam.questions[2].answer + 1) % 4, null]
+  });
+  data.db.exams.update(exam.id, { questions: [...exam.questions,
+    { q: 'চতুর্থ প্রশ্ন?', options: ['১', '২', '৩', '৪'], answer: 0 }
+  ] });
+
+  doc.querySelector(`[data-results="${exam.id}"]`)?.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const list = doc.getElementById('exam-results');
+  assert.match(list.textContent, new RegExp(student.name), 'the student is listed');
+  assert.match(list.textContent, /ভুল হয়েছে: ৩, ৪/, `the missed question numbers are shown, got: ${list.textContent.slice(0, 200)}`);
+  assert.match(list.textContent, /[০-৯]{1,2} [\u0980-\u09FF]+ [০-৯]{4}/, 'with the Bengali long date');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('the admin builds an exam by pasting a paper into the template', async () => {
+  const out = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'adminexam'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  doc.getElementById('open-exam-modal').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+
+  // The template is on screen and can be dropped into the paste box in one tap.
+  const shown = doc.getElementById('exam-template-view');
+  assert.match(shown.textContent, /উত্তর: A/, 'the paste template is shown');
+  doc.getElementById('exam-template').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.match(doc.getElementById('exam-paste').value, /বাংলাদেশের রাজধানী/, 'the template fills the paste box');
+
+  const before = data.db.exams.list().length;
+  doc.getElementById('exam-paste').value = [
+    '১. ৭+৫=?', 'A) ১০', 'B) ১১', 'C) ১২', 'D) ১৩', 'উত্তর: C',
+    '', '২. ৯×২=?', 'A) ১৬', 'B) ১৮', 'C) ২০', 'D) ২২', 'উত্তর: B'
+  ].join('\n');
+  doc.getElementById('exam-parse').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(data.db.exams.list().length, before, 'parsing alone writes nothing');
+  assert.match(doc.getElementById('exam-question-count').textContent, /২টি প্রশ্ন/, 'both questions staged');
+  assert.match(doc.getElementById('exam-staged').textContent, /৭\+৫=\?/, 'the staged paper is previewed');
+
+  doc.getElementById('exam-title').value = 'পেস্ট করা পরীক্ষা';
+  doc.getElementById('exam-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  const created = data.db.exams.list().at(-1);
+  assert.equal(data.db.exams.list().length, before + 1, 'the paper is published');
+  assert.equal(created.questions.length, 2, 'both pasted questions are stored');
+  assert.equal(created.questions[0].answer, 2, 'the উত্তর marker became the right option');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
+test('the teacher prints a question paper and an answer key from the exam list', async () => {
+  const out = await bootPage('teacher.html', {
+    username: 'teacher@activeplus.edu', password: 'Teacher@123', role: 'teacher', nonce: 'qpaper'
+  });
+  const { doc, errors } = out;
+  const win = out.dom.window;
+  const data = await import('../js/data.js');
+
+  const exam = data.db.exams.list()[0];
+  const paperBtn = doc.querySelector(`[data-paper="${exam.id}"]`);
+  const keyBtn = doc.querySelector(`[data-key="${exam.id}"]`);
+  assert.ok(paperBtn, 'every exam offers প্রশ্নপত্র');
+  assert.ok(keyBtn, 'and the answer key');
+
+  paperBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 120));
+  const modal = doc.getElementById('document-preview-modal');
+  assert.equal(modal.getAttribute('aria-hidden'), 'false', 'the preview opens');
+  assert.equal(doc.getElementById('document-preview-title').textContent, 'প্রশ্নপত্র');
+  assert.match(doc.getElementById('document-preview-meta').textContent, /নবম/, 'the meta names the class');
+  assert.match(doc.getElementById('document-preview-meta').textContent, /[০-৯]{1,2} [\u0980-\u09FF]+ [০-৯]{4}/, 'and the Bengali date');
+  assert.ok(doc.querySelectorAll('#document-preview-body .doc-page').length >= 1, 'the sheet is shown');
+  assert.equal(doc.getElementById('document-preview-download').hidden, false, 'PDF download offered');
+
+  // The answer key is a separate document, so a printed paper never carries it.
+  keyBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(doc.getElementById('document-preview-title').textContent, 'সঠিক উত্তরপত্র');
 
   const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
