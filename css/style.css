@@ -470,7 +470,10 @@ a { color: var(--accent); }
   text-align: center; font-size: 0.6875rem; color: #666; padding: 0.3rem 0; background: #fff;
 }
 .doc-preview-actions { display: grid; gap: 0.5rem; margin-top: 0.875rem; }
-@media (min-width: 640px) { .doc-preview-actions { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 640px) { .doc-preview-actions { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+/* PDF / Excel / Share are toggled with `hidden`, which has to win over .btn's
+   inline-flex or a report would offer an image share it cannot honour. */
+.doc-preview-actions .btn[hidden] { display: none; }
 
 .spinner {
   width: 16px; height: 16px; flex: 0 0 auto;

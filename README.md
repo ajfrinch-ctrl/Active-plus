@@ -67,7 +67,7 @@ admin.html          admin panel — app-style Home (institute overview, recent
                     activity) plus full CRUD for students, teachers, classes,
                     batches, subjects, exams, question bank, materials,
                     assignments, submissions, routine, results, fees &
-                    payments, notices, notifications, reports, analytics,
+                    payments, notices, notifications, the report centre,
                     users & permissions, activity log, institute profile
                     settings, backup/restore
 css/style.css       single mobile-first stylesheet
@@ -83,7 +83,7 @@ js/teacher-home.js  the teacher Home: today's teaching hero, feature grid,
                     quick actions, today's classes, next class
 js/admin-home.js    the admin Home: institute overview, feature grid, quick
                     actions, recent activity
-js/admin-modules.js admin widgets: question bank, report centre, analytics,
+js/admin-modules.js admin widgets: question bank, report centre,
                     users + permission matrix, activity log, backup
 js/crud.js          generic CRUD panel builder shared by every collection
 js/exams.js         shared suggestion/MCQ authoring + exam-taking UI
@@ -158,19 +158,28 @@ Beyond CRUD for every collection, the panel includes:
 - **Fees & finance** — collect a due through a payment sheet that captures
   amount, date, method, reference and remarks, generates a receipt number and
   opens a printable receipt. Totals, discounts, paid and due are derived.
-- **Report Centre** — 17 reports (students, teachers, classes, batches, exams,
-  results, merit, performance, assignments, materials, daily, monthly, due,
-  payments, ledger, discounts, activity), each printable and exportable to CSV.
-- **Analytics** — admission, collection and due trends, pass rate, class-wise
-  and subject-wise performance, rendered as accessible charts.
+- **Report Centre** — deliberately small: three groups of icon cards and eight
+  documents, no duplicates.
+  - *Finance Reports* — Collection (month-wise আদায় summary), Due / Outstanding,
+    Student-wise Finance (billed / paid / due per student), Payment History
+    (every transaction, newest first).
+  - *Student Reports* — Student List, Class-wise List, Active / Inactive List.
+  - *Notice Reports* — Notice History.
+
+  One class filter drives all of them. A tap on a card builds the branded
+  document and opens the shared preview, which downloads a **PDF** or an
+  **Excel (CSV, UTF-8 BOM)** file — the browser print dialog is never opened.
+  The exam, result, merit, performance, assignment, material, routine, batch,
+  teacher, discount and activity reports, the duplicate due/finance variants and
+  the whole analytics chart dashboard were removed on purpose.
 - **Student profile sheet** — ID card, fee ledger and results, printable.
 - **Printable admission form (PDF)** — the \"ভর্তি সম্পন্ন\" confirmation and the
   student profile sheet both offer an \"এডমিশন ফরম PDF\" button. It renders an
   admission form with the institution logo and full name (from Settings) plus
   the student's details (name, unique ID, class/section/roll/batch, school,
   guardian, mobile, admission date, status) and a signature area, then opens
-  the browser print dialog so the admin can save it as a PDF. Print reuses the
-  shared letterhead; the logo prints once.
+  the shared document preview so the admin downloads it as a PDF. The document
+  reuses the shared letterhead; the logo is drawn once.
 - **WhatsApp admission** — after admitting a student the admin gets a
   "ভর্তি সম্পন্ন" confirmation with a one-tap button that opens WhatsApp
   pre-filled with the admission details including the auto-generated unique
@@ -246,12 +255,13 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 129 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 189 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
-teacher portals, all 17 reports, the analytics charts, the payment and receipt
-flow, notification badges, lazy table pagination, error boundaries with Retry,
-role-based routing guards, and the full login → home handoff.
+teacher portals, every report card (preview, PDF and Excel download, class
+filtering), the payment and receipt flow, notification badges, lazy table
+pagination, error boundaries with Retry, role-based routing guards, and the full
+login → home handoff.
 
 ## Configuring Firebase (optional)
 

@@ -596,6 +596,21 @@ export function isThisMonth(bnDate) {
   return value.length >= 7 && value.slice(0, 7) === todayBn().slice(0, 7);
 }
 
+/**
+ * '২০২৬-০৯' or '২০২৬-০৯-১২' → 'সেপ্টেম্বর ২০২৬'.
+ *
+ * Anything that is not a recognisable Bengali ISO month is returned unchanged,
+ * so a report grouping payments by month never prints "undefined" for a date
+ * somebody typed by hand.
+ */
+export function bnMonthLabel(bnDate) {
+  const value = String(bnDate || '').trim();
+  const [year, month] = value.split('-');
+  const index = Number(String(month || '').replace(/[০-৯]/g, (d) => String(SEED_DIGITS.indexOf(d))));
+  if (!year || !BN_MONTHS[index - 1]) return value;
+  return `${BN_MONTHS[index - 1]} ${year}`;
+}
+
 /** Exam percentage, guarded: a zero-question paper must not produce NaN/Infinity. */
 export function resultPercent(result) {
   const total = Number(result?.total) || 0;
