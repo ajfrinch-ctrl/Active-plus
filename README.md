@@ -100,9 +100,15 @@ copied:
 | `… (উত্তর: B)` at the end of the question or option line | inline answer |
 | `**প্রশ্ন ১. …**`, `# শিরোনাম`, bullet dashes | Word/Docs paste noise |
 | `৭. প্রশ্ন?` then `৭) ৩` | a question number and option numbers side by side |
+| `D) ৬ উত্তর: খ` | an answer written beside the last option |
 | `ব্যাখ্যা: …` | an explanation line, skipped (never a new question) |
+| `----` between questions | a separator, skipped |
 | a paper title on the first line | dropped with a note, not reported as broken |
 | no blank lines anywhere | questions still split correctly |
+
+The template can be inserted into the box, copied to the clipboard, or
+**downloaded as a `.txt` file** (`mcq-prashner-template.txt`) to fill in
+offline and paste back.
 
 Duplicate and incomplete questions are reported before anything is saved —
 nothing is written until *পরীক্ষা প্রকাশ করুন*. Incomplete blocks name the
@@ -334,7 +340,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 212 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 213 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class

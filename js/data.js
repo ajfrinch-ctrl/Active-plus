@@ -1152,6 +1152,7 @@ function cleanLine(line) {
     .replace(/^[\s•·◦‣]+/, '')
     .replace(/^#{1,6}\s*/, '')          // markdown headings
     .replace(/^\s*[-–—]\s+/, '')        // bullet dashes
+    .replace(/[-–—_=*~.]{3,}$/, '')     // '----' / '====' separators between questions
     .replace(/[_\s]+$/, '')
     .trim();
 }
@@ -1203,7 +1204,8 @@ function splitInlineOptions(line) {
  * a whole question with its options on one line
  * ('১. প্রশ্ন? (ক) ঢাকা (খ) চট্টগ্রাম (গ) খুলনা (ঘ) রাজশাহী'), numbered options,
  * and answers written as 'সঠিক: B', 'উত্তর: ৩', 'Answer: d', 'উত্তরঃ (খ)' or
- * inline '(উত্তর: B)' at the end of the question or of the option line.
+ * inline '(উত্তর: B)' at the end of the question or of the option line
+ * ('D) ৬ উত্তর: খ'). Line separators ('----') between questions are ignored.
  *
  * @returns {{questions: Array<{q: string, options: string[], answer: number}>,
  *            errors: string[], duplicates: string[], ignored: string[]}}
@@ -1288,16 +1290,18 @@ export function parseMcqPaste(text) {
       continue;
     }
 
-    const optionMatch = clean.match(OPTION_LINE);
+    const optionMatch = optionLine.match(OPTION_LINE);
     if (optionMatch && current) {
       current.options.push(cleanLine(optionMatch[2]));
+      if (lineAnswer !== -1) current.answer = lineAnswer;
       continue;
     }
 
-    const numbered = clean.match(NUMBERED_LINE);
+    const numbered = optionLine.match(NUMBERED_LINE);
     if (numbered) {
       const label = asciiNumber(numbered[1]);
       const text = cleanLine(numbered[2]);
+      if (lineAnswer !== -1 && current) current.answer = lineAnswer;
       if (!current || !current.q.trim()) { start(stripQuestionPrefix(text)); continue; }
       // A numbered line that asks something is the next question; a numbered
       // line that just carries a value ('১) ১০') is the next option — the
@@ -1310,7 +1314,9 @@ export function parseMcqPaste(text) {
 
     // Plain text: continues a question that has no options yet, otherwise it
     // is the beginning of the next question (no blank line needed).
-    appendToQuestion(clean);
+    appendToQuestion(lineAnswer === -1 ? clean : optionLine);
+    // The answer belonged to this new line ('৫+৩=? (উত্তর: C)').
+    if (lineAnswer !== -1 && current) current.answer = lineAnswer;
 
     // An inline answer on the question line — '৫+৩=? (উত্তর: B)'.
     const inlineAnswer = current.q.match(ANSWER_TAIL);

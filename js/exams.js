@@ -7,7 +7,7 @@
 import {
   db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor,
   examsFor, recordStudyActivity, examWindow, getDbStatus, assertCan, teacherCanAccessClass,
-  parseMcqPaste, parseBnDateInput, formatBnDate, MCQ_TEMPLATE, MCQ_PASTE_RULES
+  parseMcqPaste, parseBnDateInput, formatBnDate, MCQ_TEMPLATE, MCQ_PASTE_RULES, downloadText
 } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 
@@ -244,6 +244,13 @@ export function mountExamAuthoring({ session = null } = {}) {
     pasteBox.value = MCQ_TEMPLATE;
     pasteBox.focus();
     showToast('টেমপ্লেট বসানো হয়েছে — নিজের প্রশ্ন দিয়ে বদলে নিন।', 'info');
+  });
+
+  // A teacher can also keep the template as a file and paste questions into it
+  // offline, then paste the whole thing back.
+  document.getElementById('exam-download-template')?.addEventListener('click', () => {
+    downloadText('mcq-prashner-template.txt', `${MCQ_TEMPLATE}\n`);
+    showToast('টেমপ্লেট ফাইল ডাউনলোড হয়েছে — এতে প্রশ্ন বসিয়ে আবার পেস্ট করুন।', 'success');
   });
 
   document.getElementById('exam-copy-template')?.addEventListener('click', async () => {

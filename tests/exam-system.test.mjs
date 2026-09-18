@@ -112,7 +112,17 @@ test('the paste reader copes with how real question papers are copied', async ()
   assert.equal(explained.errors.length, 0, 'an explanation is never a broken question');
   assert.equal(explained.questions[1].answer, 1);
 
-  // ৬. A real question may still start with a number that is not '?'
+  // ৬. The answer written next to the last option line ('D) ৬ উত্তর: খ').
+  const trailing = parseMcqPaste('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬ উত্তর: খ');
+  assert.deepEqual(trailing.questions[0].options, ['৩', '৪', '৫', '৬'], 'the answer never sticks to the option');
+  assert.equal(trailing.questions[0].answer, 1);
+
+  // ৭. '----' separators between questions are skipped, not treated as a question.
+  const separated = parseMcqPaste('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬\n----\n২. ৩+৩=?\nA) ৫\nB) ৬\nC) ৭\nD) ৮\nউত্তর: B');
+  assert.equal(separated.questions.length, 2);
+  assert.equal(separated.errors.length, 0);
+
+  // ৮. A real question may still start with a number that is not '?'
   const romanish = parseMcqPaste('১. ১২৫-এর বর্গমূল কত?\n১) ৫\n২) ১৫\n৩) ২৫\n৪) ৩৫\nউত্তর: ৩');
   assert.equal(romanish.questions[0].q, '১২৫-এর বর্গমূল কত?');
   assert.equal(romanish.questions[0].options.length, 4);
@@ -159,6 +169,7 @@ test('mountExamAuthoring turns a pasted paper into a published exam', async () =
     <button id="exam-parse"></button>
     <button id="exam-template"></button>
     <button id="exam-copy-template"></button>
+    <button id="exam-download-template"></button>
     <button id="add-question"></button>
     <div class="modal-overlay" id="exam-modal"><div class="modal-content">
       <form id="exam-form">
@@ -243,12 +254,64 @@ test('a huge paste is read without losing a question', async () => {
   assert.equal(twice.duplicates.length, 60, 'and are reported');
 });
 
+test('the exam template can be inserted, copied and downloaded', async () => {
+  const dom = installDom(`
+    <div id="exam-list"></div><div id="exam-staged"></div><span id="exam-question-count"></span>
+    <div id="exam-parse-report"></div><div id="exam-results"></div>
+    <button id="open-exam-modal"></button><button id="exam-parse"></button>
+    <button id="exam-template"></button><button id="exam-copy-template"></button>
+    <button id="exam-download-template"></button><button id="add-question"></button>
+    <div class="modal-overlay" id="exam-modal"><div class="modal-content"><form id="exam-form">
+      <input id="exam-title" name="title"><select id="exam-class" name="className"><option selected>নবম</option></select>
+      <input id="exam-subject" name="subject"><input id="exam-duration" name="duration" value="30">
+      <input id="exam-date" name="date"><input id="exam-start" name="startDate"><input id="exam-end" name="endDate">
+      <textarea id="exam-paste"></textarea>
+      <input id="q-text"><input id="q-opt0"><input id="q-opt1"><input id="q-opt2"><input id="q-opt3">
+      <select id="q-answer"><option value="0">১</option></select>
+    </form></div></div>`);
+  const doc = dom.window.document;
+  (await import('../js/store.js'))._clearMemoryStore();
+  const data = await import('../js/data.js');
+  const { mountExamAuthoring } = await import('../js/exams.js');
+
+  // jsdom has no real clipboard or object URLs; record what the page asks for.
+  const copied = [];
+  Object.defineProperty(dom.window.navigator, 'clipboard', {
+    value: { writeText: async (text) => { copied.push(text); } }, configurable: true
+  });
+  const downloads = [];
+  const origCreate = doc.createElement.bind(doc);
+  doc.createElement = (tag) => {
+    const el = origCreate(tag);
+    if (String(tag).toLowerCase() === 'a') {
+      el.click = () => downloads.push({ name: el.download, href: el.href });
+    }
+    return el;
+  };
+  dom.window.URL.createObjectURL = () => 'blob:template';
+
+  mountExamAuthoring({ session: { role: 'admin', name: 'অ্যাডমিন' } });
+
+  click(doc, '#exam-copy-template');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.match(copied[0] || '', /উত্তর: A/, 'the copy button puts the template on the clipboard');
+
+  click(doc, '#exam-download-template');
+  assert.equal(downloads.length, 1, 'the download button saves a file');
+  assert.match(downloads[0].name, /\.txt$/, `a .txt template, got ${downloads[0].name}`);
+
+  // Whatever it hands out must be a paper the reader understands.
+  const parsed = data.parseMcqPaste(copied[0]);
+  assert.equal(parsed.errors.length, 0, 'the template parses cleanly');
+  assert.equal(parsed.questions.length, 2, 'and holds two sample questions');
+});
+
 test('an incomplete paste is reported instead of saved', async () => {
   const dom = installDom(`
     <div id="exam-list"></div><div id="exam-staged"></div><span id="exam-question-count"></span>
     <div id="exam-parse-report"></div><div id="exam-results"></div>
     <button id="open-exam-modal"></button><button id="exam-parse"></button>
-    <button id="exam-template"></button><button id="exam-copy-template"></button><button id="add-question"></button>
+    <button id="exam-template"></button><button id="exam-copy-template"></button><button id="exam-download-template"></button><button id="add-question"></button>
     <div class="modal-overlay" id="exam-modal"><div class="modal-content"><form id="exam-form">
       <input id="exam-title" name="title"><select id="exam-class" name="className"><option selected>নবম</option></select>
       <input id="exam-subject" name="subject"><input id="exam-duration" name="duration" value="30">
