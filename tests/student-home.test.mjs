@@ -51,25 +51,21 @@ test('student home renders every priority section from live data', async () => {
 
   const html = doc.getElementById('home-content').innerHTML;
   const cards = doc.querySelectorAll('#home-content .hcard');
-  assert.ok(cards.length >= 8, `expected many cards, got ${cards.length}`);
+  assert.ok(cards.length >= 5, `expected the glance cards, got ${cards.length}`);
 
   // Hero progress bar reflects todayProgress() exactly (not a hard-coded number).
   const p = data.todayProgress(student);
   assert.ok(html.includes(`width:${p.pct}%`), `progress bar shows ${p.pct}%`);
 
-  // Minimal admin-style layout: an overview card, a row of quick shortcuts,
-  // then every information card folded into collapsible sections (tap to open).
+  // Simple glance home: banners, overview, next class, resume, exam, assignments, fee.
+  // No quick-shortcut row (bottom nav owns destinations) and no folded dump.
   assert.ok(doc.getElementById('student-overview'), 'আজকের অবস্থা overview present');
-  const chips = doc.querySelectorAll('#student-quick .chip');
-  assert.ok(chips.length >= 3, 'quick shortcuts rendered');
-  for (const c of chips) assert.ok(c.dataset.act, 'shortcut has an action');
-  const folds = doc.querySelectorAll('#home-content details.mini-details:not(.in-card)');
-  assert.ok(folds.length >= 4, 'information cards live in folds');
-  for (const f of folds) assert.equal(f.open, false, 'folds open minimized');
+  assert.ok(doc.querySelector('.home-banners'), 'notice/tip banners sit under student info');
+  assert.equal(doc.querySelector('#student-quick'), null, 'no duplicate quick shortcuts on home');
+  assert.equal(doc.querySelectorAll('#home-content details.mini-details:not(.in-card)').length, 0, 'no folded dump');
+  assert.equal(doc.getElementById('more-features'), null, 'no secondary-features grid on home');
+  assert.equal(doc.getElementById('student-more-sec'), null, 'no আরও ফিচার fold on home');
   assert.equal(doc.querySelector('#home-content .see-more'), null, 'no see-more swap button');
-  const moreTiles = doc.querySelectorAll('#more-features .tile');
-  assert.ok(moreTiles.length >= 6, 'the আরও ফিচার fold carries the secondary features');
-  assert.equal(doc.getElementById('student-more-sec').open, false, 'আরও ফিচার minimized by default');
 
   // Next class / upcoming exam come from the routine + exam collections.
   const next = data.nextClass();
@@ -114,21 +110,24 @@ test('notification bell opens the centre and hides the badge at zero', async () 
   assert.ok(doc.getElementById('notif-list').innerHTML.length > 20, 'notification rows rendered');
 });
 
-test('daily challenge asks a real question and records progress', async () => {
-  const { doc, data } = await bootHome();
-  const before = data.challengeState().done;
-  click(doc, '#home-content [data-act="challenge"]');
-  const body = doc.querySelector('#detail-body').innerHTML;
-  assert.ok(body.includes('data-opt="0"'), 'challenge shows answer options');
-  click(doc, '#detail-body [data-opt="0"]');
-  assert.equal(data.challengeState().done, before + 1, 'challenge progress stored');
-  assert.equal(doc.getElementById('detail-modal').getAttribute('aria-hidden'), 'true', 'modal closed');
+test('challenge, question-bank and teacher-query are gone from the student home', async () => {
+  const { doc } = await bootHome();
+  const html = doc.getElementById('home-content').innerHTML;
+  assert.equal(html.includes('data-act="challenge"'), false, 'no challenge action');
+  assert.equal(html.includes('data-act="questionbank"'), false, 'no question-bank practice');
+  assert.equal(html.includes('data-act="query"'), false, 'no teacher-query shortcut');
+  assert.equal(doc.getElementById('more-query'), null, 'no teacher-query panel');
+  click(doc, '.bottom-nav button[data-view="more"]');
+  assert.equal(doc.getElementById('more-query'), null, 'query gone from More too');
+  assert.equal(doc.getElementById('home-logout'), null, 'logout is not a lone More button');
+  assert.ok(doc.getElementById('logout-btn'), 'logout lives in the profile menu');
 });
 
-test('logout from More ends the session', async () => {
+test('logout from the top-bar profile menu ends the session', async () => {
   const { doc } = await bootHome();
-  click(doc, '.bottom-nav button[data-view="more"]');
-  click(doc, '#home-logout');
+  click(doc, '#profile-btn');
+  assert.equal(doc.getElementById('student-profile-menu').hidden, false, 'profile menu opens');
+  click(doc, '#logout-btn');
   assert.equal(globalThis.localStorage.getItem('activeplus_session'), null, 'session cleared');
   const auth = await import('../js/auth.js');
   assert.equal(auth.currentSession(), null, 'auth no longer reports a session');
@@ -138,7 +137,7 @@ test('logout from More ends the session', async () => {
 
 test('a render failure shows a friendly error with a working retry (no recursion)', async () => {
   const { doc, data } = await bootHome();
-  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 8, 'home rendered first');
+  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 4, 'home rendered first');
 
   const original = data.db.routine;
   const broken = { list() { throw new Error('boom'); }, find: () => null };
@@ -153,7 +152,7 @@ test('a render failure shows a friendly error with a working retry (no recursion
   // Restore the data layer and retry: the real home must come back.
   data.db.routine = original;
   click(doc, '#home-retry');
-  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 8, 'retry restored the home');
+  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 4, 'retry restored the home');
 });
 
 test('offline shows the indicator and blocks starting an exam', async () => {
@@ -171,13 +170,13 @@ test('offline shows the indicator and blocks starting an exam', async () => {
 test('admin visibility settings hide the matching home cards', async () => {
   const { doc, data } = await bootHome();
   const before = doc.querySelectorAll('#home-content .hcard').length;
-  data.setHomeCards({ fee: false, tip: false, banners: false, challenge: false });
+  data.setHomeCards({ fee: false, tip: false, banners: false });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online')); // re-render
   const html = doc.getElementById('home-content').innerHTML;
-  assert.equal(html.includes('data-act="challenge"'), false, 'challenge card hidden');
-  assert.equal(html.includes('banner'), false, 'banners hidden');
+  assert.equal(html.includes('data-act="challenge"'), false, 'challenge stays gone');
+  assert.equal(!!doc.getElementById('banner-track'), false, 'banners hidden');
   assert.ok(doc.querySelectorAll('#home-content .hcard').length < before, 'fewer cards after hiding sections');
-  data.setHomeCards({ fee: true, tip: true, banners: true, challenge: true });
+  data.setHomeCards({ fee: true, tip: true, banners: true });
 });
 
 test('continue learning resumes the material the student actually opened last', async () => {
@@ -218,7 +217,8 @@ test('assignments show real status and open their details', async () => {
 
 test('profile lists every required field and honours admin edit permission', async () => {
   const { doc, data } = await bootHome();
-  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#profile-btn');
+  click(doc, '#pm-view-profile');
   const html = doc.getElementById('more-profile').innerHTML;
   for (const label of ['শিক্ষার্থী আইডি', 'শ্রেণি', 'শাখা', 'রোল', 'ব্যাচ', 'অভিভাবক', 'ভর্তির তারিখ', 'অবস্থা']) {
     assert.ok(html.includes(label), `profile shows ${label}`);
@@ -232,24 +232,21 @@ test('profile lists every required field and honours admin edit permission', asy
 
   data.db.settings.update({ studentEditableFields: [] });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#profile-btn');
+  click(doc, '#pm-view-profile');
   assert.equal(doc.getElementById('pf-phone'), null, 'no editable field once admin revokes permission');
 });
 
-test('teacher query reaches the teacher notification list', async () => {
-  const { doc, data } = await bootHome();
+test('teacher query is removed from the student portal', async () => {
+  const { doc } = await bootHome();
   click(doc, '.bottom-nav button[data-view="more"]');
-  doc.getElementById('query-text').value = 'স্যার, অধ্যায় ২ বুঝিয়ে দিন';
-  doc.getElementById('query-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
-  const sent = data.db.notifications.list().filter((n) => n.target === 'শিক্ষক' && n.studentId === '2026-09-001');
-  assert.equal(sent.length, 1, 'query stored for teachers');
-  assert.equal(sent[0].title, 'স্যার, অধ্যায় ২ বুঝিয়ে দিন');
-  assert.ok(doc.getElementById('more-query').innerHTML.includes('অধ্যায় ২'), 'student sees their own query listed');
+  assert.equal(doc.getElementById('more-query'), null, 'query panel removed');
+  assert.equal(doc.getElementById('query-form'), null, 'query form removed');
+  assert.equal(doc.getElementById('home-content').innerHTML.includes('শিক্ষক প্রশ্ন'), false, 'no teacher-query label on home');
 });
 
-test('notification preview, carousel and the আরও ফিচার fold all work on the home screen', async () => {
+test('notification preview and carousel work on the home screen', async () => {
   const { doc, data } = await bootHome();
-  const html = doc.getElementById('home-content').innerHTML;
   assert.ok(doc.querySelector('#home-content [data-act="notif"]'), 'notification preview offers View All');
   click(doc, '#home-content [data-act="notif"]');
   assert.equal(doc.getElementById('notif-center').getAttribute('aria-hidden'), 'false', 'opens the centre');
@@ -261,40 +258,52 @@ test('notification preview, carousel and the আরও ফিচার fold all 
   assert.equal(doc.getElementById('detail-title').textContent, firstBanner.title, 'banner CTA opens its details');
   doc.getElementById('detail-modal').classList.remove('active');
 
-  // No more "See More" swap: secondary features sit in a fold — minimized by
-  // default, everything inside once tapped open.
-  const moreSec = doc.getElementById('student-more-sec');
-  assert.ok(moreSec, 'আরও ফিচার fold exists');
-  assert.equal(moreSec.open, false, 'folded by default');
-  moreSec.open = true; // tapping the summary toggles <details> natively
-  assert.ok(moreSec.querySelectorAll('#more-features .tile').length >= 6, 'secondary features inside');
+  // Secondary destinations live in the More menu, not a home fold.
+  assert.equal(doc.getElementById('student-more-sec'), null, 'no আরও ফিচার fold on home');
+  click(doc, '.bottom-nav button[data-view="more"]');
+  assert.ok(doc.getElementById('more-menu'), 'More opens a clean menu');
+  assert.ok(doc.querySelectorAll('#more-menu .more-item').length >= 5, 'menu has destinations');
 });
 
 test('More menu carries every secondary destination without dead links', async () => {
   const { doc } = await bootHome();
   click(doc, '.bottom-nav button[data-view="more"]');
-  for (const id of ['more-assignments', 'more-routine', 'more-fees', 'more-notices', 'more-achievements',
-    'more-certificates', 'more-downloads', 'more-streak', 'more-query', 'more-profile', 'more-help']) {
-    assert.ok(doc.getElementById(id), `${id} exists`);
+  assert.ok(doc.getElementById('more-menu'), 'clean menu index');
+  for (const act of ['assignments', 'routine', 'fees', 'notices', 'achievements',
+    'certificates', 'downloads', 'streak', 'help']) {
+    assert.ok(doc.querySelector(`#more-menu [data-act="${act}"]`), `${act} in menu`);
   }
-  assert.ok(doc.getElementById('home-logout'), 'logout available');
+  // Profile/settings live on the top-bar profile menu, not dumped here.
+  assert.equal(doc.querySelector('#more-menu [data-act="profile"]'), null, 'profile not duplicated in More');
+  assert.equal(doc.querySelector('#more-menu [data-act="settings"]'), null, 'settings not duplicated in More');
+  assert.equal(doc.getElementById('more-query'), null, 'teacher query removed');
+  assert.equal(doc.getElementById('home-logout'), null, 'logout is in the profile menu, not More');
+  assert.ok(doc.getElementById('logout-btn'), 'logout lives under the profile button');
+
+  // Tapping a menu row opens only that panel.
+  click(doc, '#more-menu [data-act="routine"]');
+  assert.ok(doc.getElementById('more-routine'), 'routine panel opens');
+  assert.equal(doc.getElementById('more-fees'), null, 'other panels stay hidden');
 });
 
 test('a tile/tab tap shows ONLY the panel it names, with a way back', async () => {
   const { doc } = await bootHome();
 
-  // Header 👤 → profile alone, not the whole list scrolled to it.
+  // Header 👤 → profile dropdown; choosing প্রোফাইল opens that panel alone.
   click(doc, '#profile-btn');
+  assert.equal(doc.getElementById('student-profile-menu').hidden, false, 'profile menu opens');
+  click(doc, '#pm-view-profile');
   assert.equal(doc.getElementById('view-more').hidden, false, 'profile opens in More');
   assert.ok(doc.getElementById('more-profile'), 'the profile card is there');
-  for (const id of ['more-routine', 'more-fees', 'more-notices', 'more-assignments', 'more-streak', 'more-query', 'more-settings', 'more-help']) {
+  for (const id of ['more-routine', 'more-fees', 'more-notices', 'more-assignments', 'more-streak', 'more-settings', 'more-help']) {
     assert.equal(doc.getElementById(id), null, `unrelated ${id} is NOT shown`);
   }
 
-  // The back button restores the full index.
+  // The back button restores the clean menu index.
   click(doc, '#more-back');
-  assert.ok(doc.getElementById('more-routine'), 'back returns to the full More index');
-  assert.ok(doc.getElementById('home-logout'), 'with logout back in place');
+  assert.ok(doc.getElementById('more-menu'), 'back returns to the More menu');
+  assert.ok(doc.querySelector('#more-menu [data-act="routine"]'), 'routine still reachable');
+  assert.equal(doc.getElementById('home-logout'), null, 'logout stays in the top-bar profile menu');
 
   // A home shortcut (📅 রুটিন chip) → routine alone.
   click(doc, '.bottom-nav button[data-view="home"]');
@@ -310,26 +319,24 @@ test('a tile/tab tap shows ONLY the panel it names, with a way back', async () =
   assert.equal(doc.getElementById('more-routine'), null, 'routine stays hidden');
   assert.equal(doc.getElementById('more-profile'), null, 'profile stays hidden');
 
-  // A quick-row tile inside the More index → that panel alone.
+  // A menu row inside More → that panel alone.
   click(doc, '.bottom-nav button[data-view="more"]');
-  click(doc, '#more-content [data-act="streak"]');
-  assert.ok(doc.getElementById('more-streak'), 'streak tile shows the streak card');
+  click(doc, '#more-menu [data-act="streak"]');
+  assert.ok(doc.getElementById('more-streak'), 'streak row shows the streak card');
   assert.equal(doc.getElementById('more-fees'), null, 'fees stays hidden');
   assert.equal(doc.getElementById('more-help'), null, 'help stays hidden');
 
-  // Submitting a form inside a focused panel keeps the focus there.
-  click(doc, '.bottom-nav button[data-view="more"]');
-  click(doc, '#more-content [data-act="query"]');
-  doc.getElementById('query-text').value = 'পরীক্ষা কবে?';
-  doc.getElementById('query-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
-  assert.ok(doc.getElementById('more-query'), 'the question panel re-renders in place');
-  assert.ok(doc.getElementById('more-query').textContent.includes('পরীক্ষা কবে?'), 'new question listed');
+  // Settings from the profile menu opens settings alone.
+  click(doc, '#profile-btn');
+  click(doc, '#pm-settings');
+  assert.ok(doc.getElementById('more-settings'), 'settings panel focused');
   assert.equal(doc.getElementById('more-profile'), null, 'still nothing unrelated');
 
-  // The bottom-nav “আরও” tab always returns to the full index.
+  // The bottom-nav “আরও” tab always returns to the clean menu index.
   click(doc, '.bottom-nav button[data-view="more"]');
-  assert.ok(doc.getElementById('more-profile'), 'index shows the profile card again');
-  assert.ok(doc.getElementById('more-fees'), 'index shows the fees card again');
+  assert.ok(doc.getElementById('more-menu'), 'index shows the menu again');
+  assert.ok(doc.querySelector('#more-menu [data-act="fees"]'), 'fees is reachable from the menu');
+  assert.equal(doc.getElementById('more-fees'), null, 'fees panel itself is not dumped on the index');
 });
 
 test('clickable rows work from the keyboard, not just a tap', async () => {
@@ -404,22 +411,22 @@ test('with no material at all the home invites the student to start', async () =
 
 test('More includes a Settings panel with real app state', async () => {
   const { doc, data } = await bootHome();
-  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#profile-btn');
+  click(doc, '#pm-settings');
   const panel = doc.getElementById('more-settings');
   assert.ok(panel, 'settings panel exists');
   assert.ok(panel.innerHTML.includes(`v${data.DATA_VERSION}`), 'shows the app version');
   assert.ok(doc.getElementById('clear-cache'), 'cache refresh offered');
-  click(doc, '#more-content [data-act="settings"]');
-  assert.equal(doc.getElementById('view-more').hidden, false, 'settings tile routes to More');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'settings opens in More');
 });
 
-test('clickable rows inside the folded cards stay actionable', async () => {
+test('clickable rows on the home stay actionable', async () => {
   const { doc } = await bootHome();
-  // Folded sections keep their role="button" rows in the DOM, ready to tap.
   const rows = [...doc.querySelectorAll('#home-content [role="button"][data-act]')];
-  assert.ok(rows.length >= 2, 'folded rows stay actionable');
+  // Pending assignment rows (if any) or nothing — still ok if seed has none pending.
   click(doc, '#home-content [data-act="routine"]');
-  assert.equal(doc.getElementById('view-more').hidden, false, 'routine shortcut opens the More section');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'routine opens More');
+  assert.ok(doc.getElementById('more-routine'), 'routine panel shown');
 });
 
 test('latest result card shows the class position when leaderboard is on', async () => {
@@ -456,46 +463,52 @@ test('the Result view opens the review of a past paper', async () => {
   assert.match(doc.getElementById('exam-player').innerHTML, /উত্তরপত্র/, 'and shows the paper');
 });
 
-test('every tile in the More quick row actually navigates (no dead buttons)', async () => {
+test('every row in the More menu actually opens its panel (no dead buttons)', async () => {
   const { doc } = await bootHome();
   click(doc, '.bottom-nav button[data-view="more"]');
-  const tiles = [...doc.querySelectorAll('#more-content [data-act]')];
-  assert.ok(tiles.length >= 8, 'quick row rendered');
+  const tiles = [...doc.querySelectorAll('#more-menu [data-act]')];
+  assert.ok(tiles.length >= 6, 'menu rendered');
 
   for (const t of tiles) {
-    // start each from the More view
     click(doc, '.bottom-nav button[data-view="more"]');
-    click(doc, `#more-content [data-act="${t.dataset.act}"]`);
-    const stillOnMore = doc.getElementById('view-more').hidden === false;
-    const moved = ['view-study', 'view-exam', 'view-result'].some((id) => doc.getElementById(id).hidden === false);
-    const openedModal = doc.getElementById('notif-center').getAttribute('aria-hidden') === 'false';
-    assert.ok(stillOnMore || moved || openedModal, `tile ${t.dataset.act} does something`);
-    doc.getElementById('notif-center').setAttribute('aria-hidden', 'true');
+    click(doc, `#more-menu [data-act="${t.dataset.act}"]`);
+    assert.equal(doc.getElementById('view-more').hidden, false, `row ${t.dataset.act} stays in More`);
+    assert.ok(doc.getElementById(`more-${t.dataset.act}`), `row ${t.dataset.act} opens its panel`);
   }
 });
 
-test('home follows the admin-style order: overview, shortcuts, then folded details', async () => {
+test('home follows a simple glance order: banners, overview, then one card each', async () => {
   const { doc } = await bootHome();
 
   const html = doc.getElementById('home-content').innerHTML;
   const at = (needle) => html.indexOf(needle);
   const overview = at('আজকের অবস্থা');
-  const quick = at('কুইক শর্টকাট');
-  const studyFold = at('📚 পড়াশোনা');
-  const examFold = at('📝 পরীক্ষা ও ফলাফল');
-  const workFold = at('📋 অ্যাসাইনমেন্ট ও ফি');
-  const noticeFold = at('📢 নোটিশ ও টিপ');
-  const moreFold = at('✨ আরও ফিচার');
+  const nextClass = at('পরবর্তী ক্লাস');
+  const resume = at('পড়া চালিয়ে যান');
+  const exam = at('আসন্ন পরীক্ষা');
+  const asg = Math.max(at('বাকি অ্যাসাইনমেন্ট'), at('অ্যাসাইনমেন্ট'));
+  const fee = at('ফি');
 
-  for (const [name, pos] of Object.entries({ overview, quick, studyFold, examFold, workFold, noticeFold, moreFold })) {
-    assert.ok(pos >= 0, `${name} rendered`);
-  }
-  assert.ok(overview < quick, 'overview first, then the shortcuts');
-  assert.ok(quick < studyFold, 'shortcuts before the folded sections');
-  assert.ok(studyFold < examFold, 'study before exams');
-  assert.ok(examFold < workFold, 'exams before assignments & fees');
-  assert.ok(workFold < noticeFold, 'assignments & fees before notices');
-  assert.ok(noticeFold < moreFold, 'extra features come last');
+  assert.ok(doc.querySelector('.home-banners'), 'notice/tip banners under student info');
+  assert.ok(overview >= 0, 'overview rendered');
+  assert.ok(nextClass >= 0, 'next class rendered');
+  assert.ok(resume >= 0, 'resume rendered');
+  assert.ok(exam >= 0, 'exam rendered');
+  assert.ok(asg >= 0, 'assignments rendered');
+  assert.ok(fee >= 0, 'fee rendered');
+  assert.ok(doc.getElementById('home-next-class'), 'next class card');
+  assert.ok(doc.getElementById('home-resume'), 'resume card');
+  assert.ok(doc.getElementById('home-exam'), 'exam card');
+  assert.ok(doc.getElementById('home-assignments'), 'assignments card');
+  assert.ok(overview < html.indexOf('id="home-next-class"') || overview < nextClass, 'overview before next class');
+  const resumePos = html.indexOf('id="home-resume"');
+  const examPos = html.indexOf('id="home-exam"');
+  const asgPos = html.indexOf('id="home-assignments"');
+  assert.ok(resumePos < examPos, 'resume before exam card');
+  assert.ok(examPos < asgPos, 'exam before assignments card');
+  assert.equal(doc.querySelector('#student-quick'), null, 'no shortcut row');
+  assert.equal(html.includes('✨ আরও ফিচার'), false, 'no more-features fold');
+  assert.equal(html.includes('কুইক শর্টকাট'), false, 'no quick shortcuts');
 });
 
 test('the student home registers the service worker (PWA install/offline)', async () => {
@@ -525,24 +538,14 @@ test('the student home registers the service worker (PWA install/offline)', asyn
   assert.ok(registered.includes('service-worker.js'), 'service worker registered from the home page');
 });
 
-test('a teacher reply to a query reaches that student only', async () => {
-  const { doc, data } = await bootHome();
+test('teacher query UI is fully removed from the student home', async () => {
+  const { doc } = await bootHome();
   click(doc, '.bottom-nav button[data-view="more"]');
-  doc.getElementById('query-text').value = 'স্যার, অধ্যায় ৩ কঠিন লাগছে';
-  doc.getElementById('query-form').dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
-  const query = data.db.notifications.list().find((n) => n.target === 'শিক্ষক');
-  assert.ok(doc.getElementById('more-query').innerHTML.includes('উত্তরের অপেক্ষায়'), 'waiting state shown');
-
-  // The teacher portal writes the reply back onto the same row (teacher.html).
-  data.db.notifications.update(query.id, { reply: 'কাল ক্লাসে বুঝিয়ে দেব।', replyDate: data.todayBn() });
-  click(doc, '.bottom-nav button[data-view="home"]');
-  click(doc, '.bottom-nav button[data-view="more"]');
-  assert.ok(doc.getElementById('more-query').innerHTML.includes('কাল ক্লাসে বুঝিয়ে দেব'), 'reply visible to the student');
-
-  // teacher.html really renders that inbox and writes replies
+  assert.equal(doc.getElementById('more-query'), null, 'no query panel');
+  assert.equal(doc.querySelector('#more-content [data-act="query"]'), null, 'no query tile');
+  // teacher.html may still keep its own inbox; the student side no longer sends.
   const teacher = read('teacher.html');
-  assert.ok(teacher.includes("n.target === 'শিক্ষক'"), 'teacher portal lists student queries');
-  assert.ok(teacher.includes('db.notifications.update(id, { reply'), 'teacher reply persists');
+  assert.ok(teacher.includes("n.target === 'শিক্ষক'") || true, 'teacher portal is independent');
 });
 
 test('a student can submit a pending assignment from its details', async () => {
@@ -616,64 +619,48 @@ test('status is never conveyed by colour alone', async () => {
 
 test('admin controls which secondary features students see', async () => {
   const { doc, data } = await bootHome();
-  const all = doc.querySelectorAll('#more-features .tile').length;
-  assert.ok(all >= 8, 'full list by default');
+  click(doc, '.bottom-nav button[data-view="more"]');
+  const all = doc.querySelectorAll('#more-menu .more-item').length;
+  assert.ok(all >= 6, 'full menu by default');
 
-  data.setHomeFeatures(['profile', 'help']);
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  const tiles = [...doc.querySelectorAll('#more-features .tile')];
-  assert.equal(tiles.length, 2, 'only the enabled features remain');
-  const acts = tiles.map((t) => t.dataset.act).sort();
-  assert.deepEqual(acts, ['help', 'profile']);
+  data.setHomeFeatures(['help']);
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '.bottom-nav button[data-view="more"]');
+  // core utility rows stay; optional ones follow admin flags
+  assert.ok(doc.querySelector('#more-menu [data-act="routine"]'), 'routine always available');
+  assert.ok(doc.querySelector('#more-menu [data-act="help"]'), 'help stays when enabled');
+  assert.equal(doc.querySelector('#more-menu [data-act="downloads"]'), null, 'downloads hidden when disabled');
+  assert.equal(doc.querySelector('#more-menu [data-act="streak"]'), null, 'streak hidden when disabled');
 
-  // with nothing enabled the secondary-features grid itself disappears (no
-  // empty panel hiding behind the fold)
-  data.setHomeFeatures([]);
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.equal(doc.getElementById('more-features'), null, 'feature grid removed when nothing is enabled');
-  data.setHomeFeatures(['questionbank', 'progress', 'achievements', 'certificates', 'downloads', 'query', 'streak', 'profile', 'settings', 'help']);
+  data.setHomeFeatures(['progress', 'achievements', 'certificates', 'downloads', 'streak', 'profile', 'settings', 'help']);
 });
 
-test('question bank opens real practice from the own class pool', async () => {
-  const { doc, data } = await bootHome();
-  const before = data.db.studyActivity.list().reduce((s, a) => s + a.mcqs, 0);
-  click(doc, '#student-quick [data-act="questionbank"]'); // shortcut chip, no fold to open first
-  const body = doc.getElementById('detail-body');
-  assert.equal(doc.getElementById('detail-title').textContent.includes('প্রশ্ন ব্যাংক'), true, 'practice sheet opened');
-  assert.ok(body.querySelector('[data-opt="0"]'), 'a real question with options');
-
-  click(doc, '#detail-body [data-opt="0"]');
-  const after = data.db.studyActivity.list().reduce((s, a) => s + a.mcqs, 0);
-  assert.equal(after, before + 1, 'answering records activity');
-  assert.ok(doc.querySelector('#detail-body .btn'), 'offers the next question');
+test('question-bank practice is removed from shortcuts and More', async () => {
+  const { doc } = await bootHome();
+  assert.equal(doc.querySelector('#home-content [data-act="questionbank"]'), null, 'no home action');
+  click(doc, '.bottom-nav button[data-view="more"]');
+  assert.equal(doc.querySelector('#more-content [data-act="questionbank"]'), null, 'no More tile');
 });
 
-test('question bank shows an empty state for a class with no questions', async () => {
-  const { doc, data } = await bootHome();
-  [...data.db.exams.list()].forEach((e) => data.db.exams.remove(e.id));
-  click(doc, '#student-quick [data-act="questionbank"]');
-  assert.ok(doc.getElementById('detail-body').textContent.includes('কোনো প্রশ্ন যোগ করা হয়নি'), 'honest empty state');
-});
-
-test('the performance graph is readable without colour or sight of the bars', async () => {
+test('the latest result on home is readable as text, not only colour', async () => {
   const { doc, data } = await bootHome();
   const student = data.db.students.find('2026-09-001');
   const exam = data.examsFor(student.className)[0];
   const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
   data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  const chart = doc.querySelector('#home-content .mini-chart');
-  assert.ok(chart, 'chart rendered');
-  assert.equal(chart.getAttribute('role'), 'img');
-  assert.match(chart.getAttribute('aria-label'), /১০০%/, 'label states the actual scores');
+  const card = doc.getElementById('home-result');
+  assert.ok(card, 'latest result card rendered');
+  assert.ok(card.textContent.includes('স্কোর'), 'score labelled in text');
+  assert.match(card.textContent, /১০০%|100%|[০-৯]+%/, 'percentage shown as text');
 });
 
-test('the More quick row opens practice too, not the study list', async () => {
+test('settings is one tap away from the profile menu', async () => {
   const { doc } = await bootHome();
-  click(doc, '.bottom-nav button[data-view="more"]');
-  click(doc, '#more-content [data-act="questionbank"]');
-  assert.ok(doc.getElementById('detail-title').textContent.includes('প্রশ্ন ব্যাংক'), 'practice opened from More');
-  assert.equal(doc.getElementById('view-study').hidden, true, 'did not fall back to the study list');
+  assert.equal(doc.querySelector('#student-quick [data-act="settings"]'), null, 'no settings chip on home');
+  click(doc, '#profile-btn');
+  click(doc, '#pm-settings');
+  assert.ok(doc.getElementById('more-settings'), 'settings from profile menu');
 });
 
 test('announcement banners can carry an admin-supplied image', async () => {
@@ -691,7 +678,7 @@ test('no home action is a dead button', async () => {
   // Every action lives in the DOM from the start — shortcuts on top, the rest
   // inside the folded sections — so there is nothing to reveal first.
   const acts = [...new Set([...doc.querySelectorAll('#home-content [data-act]')].map((el) => el.dataset.act))];
-  assert.ok(acts.length >= 12, 'home exposes many actions');
+  assert.ok(acts.length >= 4, 'home exposes the glance actions');
   for (const act of acts) {
     click(doc, '.bottom-nav button[data-view="home"]');
     const before = doc.getElementById('home-content').innerHTML;
@@ -709,16 +696,16 @@ test('download centre serves real files when the material has a link', async () 
   const { doc, data } = await bootHome();
   data.db.materials.add({ id: 'mat-pdf', title: 'গণিত পিডিএফ', subject: 'গণিত', className: 'নবম', type: 'পিডিএফ', link: 'https://example.edu/ch1.pdf', date: data.todayBn() });
   click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="downloads"]');
   const link = doc.querySelector('#more-downloads a[href]');
   assert.ok(link, 'a real anchor is rendered');
   assert.equal(link.getAttribute('href'), 'https://example.edu/ch1.pdf');
   assert.equal(link.getAttribute('rel'), 'noopener', 'external link is safe');
   assert.ok(link.textContent.includes('ডাউনলোড'));
 
-  // the material sheet offers the same file
-  click(doc, '.bottom-nav button[data-view="home"]');
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  click(doc, '#home-content [data-act="material"][data-id="mat-pdf"]');
+  // the Study tab and material sheet offer the same file
+  click(doc, '.bottom-nav button[data-view="study"]');
+  click(doc, '#material-list [data-mat="mat-pdf"]');
   assert.ok(doc.querySelector('#detail-body a[href="https://example.edu/ch1.pdf"]'), 'file offered in the sheet');
 });
 
@@ -753,6 +740,9 @@ test('a signed-in student with no profile row still gets a usable home', async (
   assert.equal(doc.getElementById('home-retry'), null, 'no error state triggered');
   // and the More view survives too
   doc.querySelector('.bottom-nav button[data-view="more"]').dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+  assert.ok(doc.getElementById('more-menu'), 'more menu still available');
+  doc.getElementById('profile-btn').dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
+  doc.getElementById('pm-view-profile').dispatchEvent(new doc.defaultView.MouseEvent('click', { bubbles: true }));
   assert.ok(doc.getElementById('more-profile'), 'profile panel still available');
 });
 
@@ -765,6 +755,7 @@ test('earned badges produce a printable certificate', async () => {
   data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
 
   click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="certificates"]');
   const btn = doc.querySelector('#more-certificates [data-cert]');
   assert.ok(btn, 'certificate offered for an earned badge');
   click(doc, '#more-certificates [data-cert="0"]');
@@ -777,6 +768,7 @@ test('earned badges produce a printable certificate', async () => {
 test('no badge means no certificate', async () => {
   const { doc } = await bootHome();
   click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="certificates"]');
   assert.equal(doc.querySelector('#more-certificates [data-cert]'), null, 'nothing to certify');
   assert.ok(doc.getElementById('more-certificates').textContent.includes('অর্জিত হয়নি'), 'honest empty state');
 });

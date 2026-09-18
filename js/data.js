@@ -83,15 +83,15 @@ const SEED = {
     defaultExamDuration: 30,
     passMark: 40,
     dailyChallengeTarget: 10,
-    homeFeatures: ['questionbank', 'progress', 'achievements', 'certificates', 'downloads',
-      'query', 'streak', 'profile', 'settings', 'help'],
+    homeFeatures: ['progress', 'achievements', 'certificates', 'downloads',
+      'streak', 'profile', 'settings', 'help'],
     studentEditableFields: ['phone'],
     negativeMarking: 0,
     leaderboardEnabled: true,
     autoPublishResult: false,
     notificationsEnabled: true,
     homeCards: {
-      progress: true, nextClass: true, exam: true, challenge: true, materials: true,
+      progress: true, nextClass: true, exam: true, challenge: false, materials: true,
       assignments: true, performance: true, achievements: true, fee: true,
       banners: true, tip: true, notices: true, leaderboard: true
     }

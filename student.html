@@ -30,7 +30,7 @@
       <!-- Top bar: who am I + today's date. The "অনলাইন" chip is gone — the
            border of the bar itself turns green while the app is online (and
            amber while offline), which is what the student is told instead. -->
-      <header class="home-header" id="home-header" data-net="online">
+      <header class="home-header home-header-fixed" id="home-header" data-net="online">
         <div class="avatar" id="avatar" aria-hidden="true">A</div>
         <div class="who">
           <div class="greet" id="greet">…</div>
@@ -38,8 +38,17 @@
           <div class="meta" id="student-meta">…</div>
         </div>
         <div class="hh-actions">
-          <button type="button" class="icon-btn" id="profile-btn" aria-label="প্রোফাইল">👤</button>
           <button type="button" class="bell" id="bell" aria-label="নোটিফিকেশন">🔔<span class="badge-dot" id="bell-count" hidden>0</span></button>
+          <button type="button" class="icon-btn" id="profile-btn" aria-label="প্রোফাইল" aria-haspopup="true" aria-expanded="false" title="প্রোফাইল">👤</button>
+          <div class="profile-menu" id="student-profile-menu" hidden>
+            <div class="pm-head">
+              <div class="pm-avatar" id="pm-avatar" aria-hidden="true">👤</div>
+              <div class="pm-id"><strong id="pm-name">শিক্ষার্থী</strong><small id="pm-detail">—</small></div>
+            </div>
+            <button type="button" class="pm-item" id="pm-view-profile"><span aria-hidden="true">👤</span> প্রোফাইল</button>
+            <button type="button" class="pm-item" id="pm-settings"><span aria-hidden="true">⚙️</span> সেটিংস</button>
+            <button type="button" class="pm-item pm-danger" id="logout-btn"><span aria-hidden="true">🚪</span> লগআউট</button>
+          </div>
         </div>
         <div class="hh-strip">
           <span class="hh-date" id="today-date">…</span>
