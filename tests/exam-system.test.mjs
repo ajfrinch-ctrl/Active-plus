@@ -117,12 +117,28 @@ test('the paste reader copes with how real question papers are copied', async ()
   assert.deepEqual(trailing.questions[0].options, ['৩', '৪', '৫', '৬'], 'the answer never sticks to the option');
   assert.equal(trailing.questions[0].answer, 1);
 
-  // ৭. '----' separators between questions are skipped, not treated as a question.
+  // ৭. Every way a paper names its answer, said the way teachers say it.
+  const answerWays = [
+    ['সঠিক উত্তর: খ', 1], ['সঠিক উত্তরটি খ', 1], ['সঠিক উত্তরটি হলো: খ', 1],
+    ['উত্তর হবে: খ', 1], ['সঠিক উত্তর হবে (খ)', 1], ['উত্তরটি হল খ', 1],
+    ['The correct answer is B', 1], ['সঠিক উত্তর — গ', 2], ['Ans. B', 1]
+  ];
+  for (const [line, expected] of answerWays) {
+    const parsed = parseMcqPaste(`প্রশ্ন ২+২=?\nক) ৩\nখ) ৪\nগ) ৫\nঘ) ৬\n${line}`);
+    assert.equal(parsed.errors.length, 0, `"${line}" is understood`);
+    assert.equal(parsed.questions[0].answer, expected, `"${line}" selects option ${expected + 1}`);
+  }
+  // …and 'সঠিক উত্তর কোনটি?' is still a question, not an answer.
+  const question = parseMcqPaste('১. সঠিক উত্তর কোনটি?\nক) ১\nখ) ২\nগ) ৩\nঘ) ৪\nউত্তর: ঘ');
+  assert.equal(question.questions[0].q, 'সঠিক উত্তর কোনটি?', 'a question that starts with সঠিক stays a question');
+  assert.equal(question.questions[0].answer, 3);
+
+  // ৮. '----' separators between questions are skipped, not treated as a question.
   const separated = parseMcqPaste('১. ২+২=?\nA) ৩\nB) ৪\nC) ৫\nD) ৬\n----\n২. ৩+৩=?\nA) ৫\nB) ৬\nC) ৭\nD) ৮\nউত্তর: B');
   assert.equal(separated.questions.length, 2);
   assert.equal(separated.errors.length, 0);
 
-  // ৮. A real question may still start with a number that is not '?'
+  // ৯. A real question may still start with a number that is not '?'
   const romanish = parseMcqPaste('১. ১২৫-এর বর্গমূল কত?\n১) ৫\n২) ১৫\n৩) ২৫\n৪) ৩৫\nউত্তর: ৩');
   assert.equal(romanish.questions[0].q, '১২৫-এর বর্গমূল কত?');
   assert.equal(romanish.questions[0].options.length, 4);

@@ -1126,12 +1126,21 @@ function markerIndex(marker) {
   return at === -1 ? -1 : at % 4;
 }
 
-/* An answer line: 'উত্তর: B', 'সঠিক উত্তর - খ', 'উত্তরঃ (গ)', 'Answer: d'.
-   The line must END after the letter, so an option that happens to start with
-   'A' is never mistaken for the answer. */
-const ANSWER_LINE = /^(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Correct\s*Answer|Correct|Answer|Ans)\s*[:.)\-ঃ।]?\s*[([{]?\s*([A-Da-dক-ঘ১-৪1-4])\s*[)\]}]?\s*[.।]?\s*$/i;
-/* The same marker sitting at the end of a longer line: '… (উত্তর: B)'. */
-const ANSWER_TAIL = /[([]?\s*(?:সঠিক\s*উত্তর|সঠিক|উত্তর|Answer)\s*[:.)\-]\s*([A-Da-dক-ঘ১-৪1-4])\s*[)\]]?\s*$/i;
+/* How a paper names the correct answer, said every way a teacher says it:
+   'উত্তর: B', 'সঠিক উত্তর - খ', 'উত্তরঃ (গ)', 'সঠিক উত্তরটি হলো: খ',
+   'উত্তর হবে: খ', 'The correct answer is B', 'Answer: d'. */
+const ANSWER_WORDS = '(?:the\\s+)?(?:(?:সঠিক\\s*উত্তর|সঠিক|উত্তর)\\s*(?:টি|টা)?|Correct\\s*Answer|Correct|Answer|Ans)';
+/* '… হলো/হবে/is' — the words that sit between the label and the letter. */
+const ANSWER_LINK = '(?:\\s*(?:হলো|হলে|হল|হবে|হয়|হয়েছে|is|are|was|will\\s+be))?';
+const ANSWER_SEP = "\\s*[:.)\\-–—ঃ।,]?\\s*";
+const ANSWER_MARK = '([A-Da-dক-ঘ১-৪1-4])';
+/* The line must END after the letter, so an option that happens to start with
+   'A' is never mistaken for the answer, and a question like 'সঠিক উত্তর কোনটি?'
+   is still a question. */
+const ANSWER_LINE = new RegExp(`^${ANSWER_WORDS}${ANSWER_LINK}${ANSWER_SEP}[([{]?\\s*${ANSWER_MARK}\\s*[)\\]}]?\\s*[.।]?\\s*$`, 'i');
+/* The same marker at the end of a longer line, where a separator is required
+   so ordinary words are never read as an answer: '… (উত্তর: B)'. */
+const ANSWER_TAIL = new RegExp(`[([]?\\s*(?:the\\s+)?(?:(?:সঠিক\\s*উত্তর|সঠিক|উত্তর)\\s*(?:টি|টা)?|Correct\\s*Answer|Correct|Answer|Ans)${ANSWER_LINK}\\s*[:.)\\-–—]\\s*${ANSWER_MARK}\\s*[)\\]]?\\s*$`, 'i');
 /* 'A) x', 'A. x', '(ক) x', '[খ] x' — copy-paste brings every bracket style. */
 const OPTION_LINE = /^[([{]?\s*([A-Da-dক-ঘ])\s*[)\]}.\u0964:\-]?\s+(.+)$/;
 const NUMBERED_LINE = /^([০-৯\d]{1,2})\s*[).।:\-]?\s+(.+)$/;
