@@ -20,9 +20,13 @@ import {
   activeBanners, timeAgo, getDbStatus, sharedNotices
 } from './data.js';
 
-/* Minimal shortcuts — only the most common actions. */
+/* One tap from the home for every action a teacher takes most often.
+   Each `act` is handled by the click router below. */
 const QUICK_SHORTCUTS = [
+  { act: 'new-exam', icon: '＋', label: 'পরীক্ষা তৈরি' },
+  { act: 'add-mcq', icon: '＋', label: 'MCQ যোগ' },
   { act: 'give-assignment', icon: '＋', label: 'অ্যাসাইনমেন্ট' },
+  { act: 'upload-material', icon: '＋', label: 'ম্যাটেরিয়াল' },
   { act: 'publish-notice', icon: '＋', label: 'নোটিশ' },
   { act: 'enter-result', icon: '＋', label: 'ফলাফল' }
 ];
