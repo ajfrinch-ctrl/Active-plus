@@ -22,35 +22,59 @@ import {
 const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
 
-/* Minimal home: only the essentials on the landing screen.
-   Full navigation lives in the top/bottom tabs. */
+/* Every feature, folded away behind a tap. Duplicate routes are removed:
+   শিক্ষার্থী/পেমেন্ট additions live on the bottom-nav ＋ button, প্রোফাইল and
+   লগআউট live on the top-bar profile menu. */
 const GROUPS = [
   {
-    title: 'মূল মেনু',
+    title: '🎓 একাডেমিক',
     tiles: [
       { key: 'students', icon: '👨‍🎓', label: 'শিক্ষার্থী' },
+      { key: 'classes', icon: '🏫', label: 'ক্লাস' },
       { key: 'teachers', icon: '👨‍🏫', label: 'শিক্ষক' },
+      { key: 'exam', icon: '📝', label: 'পরীক্ষা' },
+      { key: 'results', icon: '🏆', label: 'ফলাফল' }
+    ]
+  },
+  {
+    title: '💰 ফিন্যান্স',
+    tiles: [
       { key: 'dues', icon: '🧾', label: 'বকেয়া ও পেমেন্ট' },
-      { key: 'reports', icon: '📊', label: 'রিপোর্ট' },
+      { key: 'reports', icon: '📊', label: 'রিপোর্ট' }
+    ]
+  },
+  {
+    title: '🗂️ ম্যানেজমেন্ট',
+    tiles: [
       { key: 'notices', icon: '📢', label: 'নোটিশ' },
+      { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
+      { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি' },
+      { key: 'activity', icon: '🕘', label: 'কার্যক্রম' },
       { key: 'settings', icon: '⚙️', label: 'সেটিংস' }
     ]
   }
 ];
 
+/* The ＋ in the bottom navigation already admits students and takes payments,
+   so the shortcut row holds only what it does not. */
 const QUICK_SHORTCUTS = [
   { act: 'add-teacher', icon: '＋', label: 'শিক্ষক' },
+  { act: 'create-exam', icon: '＋', label: 'পরীক্ষা' },
+  { act: 'add-question', icon: '＋', label: 'প্রশ্ন' },
   { act: 'create-notice', icon: '＋', label: 'নোটিশ' }
 ];
 
 const MORE_ITEMS = [
-  { key: 'classes', icon: '🏫', label: 'ক্লাস' },
-  { key: 'exam', icon: '📝', label: 'পরীক্ষা' },
-  { key: 'results', icon: '🏆', label: 'ফলাফল' },
   { key: 'subjects', icon: '📖', label: 'বিষয়' },
+  { key: 'questionbank', icon: '❓', label: 'প্রশ্ন ব্যাংক' },
   { key: 'materials', icon: '📚', label: 'ম্যাটেরিয়াল' },
   { key: 'assignments', icon: '📋', label: 'অ্যাসাইনমেন্ট' },
+  { key: 'submissions', icon: '✅', label: 'জমাকৃত কাজ' },
   { key: 'routine', icon: '📅', label: 'রুটিন' },
+  { key: 'suggestion', icon: '📝', label: 'সাজেশন' },
+  { key: 'batches', icon: '📚', label: 'ব্যাচ' },
+  { key: 'banners', icon: '🖼️', label: 'ব্যানার' },
+  { key: 'tips', icon: '💡', label: 'টিপ' },
   { key: 'backup', icon: '💾', label: 'ব্যাকআপ' }
 ];
 
