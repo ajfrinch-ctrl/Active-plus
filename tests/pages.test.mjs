@@ -63,6 +63,7 @@ test('module imports resolve to real exported names', () => {
     './js/exams.js': read('js/exams.js'),
     './js/crud.js': read('js/crud.js'),
     './js/admin-modules.js': read('js/admin-modules.js'),
+    './js/admin/boot.js': read('js/admin/boot.js'),
     './js/pdf.js': read('js/pdf.js'),
     './js/docs.js': read('js/docs.js'),
     './js/preview.js': read('js/preview.js'),

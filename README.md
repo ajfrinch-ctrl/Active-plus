@@ -173,13 +173,17 @@ teacher.html        teacher portal — app-style Home (today's teaching, next
                     class, pending work) plus My Classes, Students, Tasks,
                     Materials, Results, Question Bank, Routine, Batches,
                     Attendance, Notices, Query inbox, Notifications, Profile
-admin.html          admin panel — app-style Home (institute overview, recent
-                    activity) plus full CRUD for students, teachers, classes,
-                    batches, subjects, exams, question bank, materials,
-                    assignments, submissions, routine, results, fees &
-                    payments, notices, notifications, the report centre,
-                    users & permissions, activity log, institute profile
-                    settings, backup/restore
+admin.html          admin panel (v2) — light-themed dashboard (quick actions,
+                    overview, dues alert) plus full CRUD for students,
+                    teachers, classes, batches, subjects, exams, question
+                    bank, materials, assignments, submissions, routine,
+                    results, fees & payments, notices, notifications, the
+                    report centre, users & permissions, activity log,
+                    institute profile settings, backup/restore (incl.
+                    scheduled auto-backup). Hybrid navigation: grouped
+                    bilingual sidebar on desktop, bottom nav on mobile
+css/admin-panel.css admin-only light theme, hybrid layout, global search,
+                    responsive card tables
 css/style.css       single mobile-first stylesheet
 js/firebase.js      Firebase integration + offline fallback + toasts
 js/auth.js          local sign-in, sessions, route guards
@@ -191,10 +195,23 @@ js/data.js          persistent data layer (versioned CRUD collections +
 js/student-home.js  the student Home: sections, bottom navigation, detail views
 js/teacher-home.js  the teacher Home: today's teaching hero, feature grid,
                     quick actions, today's classes, next class
-js/admin-home.js    the admin Home: institute overview, feature grid, quick
-                    actions, recent activity
+js/admin-home.js    the admin dashboard: quick actions first, overview,
+                    dues alert, institute card, feature folds
 js/admin-modules.js admin widgets: question bank, report centre,
-                    users + permission matrix, activity log, backup
+                    users + permission matrix, activity log, backup;
+                    re-exports bootAdminPanel for the page shell
+js/admin/           Admin Panel v2 components:
+                      boot.js      the page's complete wiring (extracted
+                                   inline script) — bootAdminPanel()
+                      registry.js  every section once: group, bilingual
+                                   label, icon, required permission
+                      layout.js    grouped sidebar (desktop) kept in sync
+                                   with the tab router and the bottom nav
+                      search.js    global top-bar search across students,
+                                   teachers, batches and panel sections
+                      autobackup.js scheduled automatic backup (daily/weekly)
+                      export-csv.js one-tap CSV exports (students, dues,
+                                   payments)
 js/crud.js          generic CRUD panel builder shared by every collection
 js/exams.js         shared suggestion/MCQ authoring + exam-taking UI
 js/store.js         layered storage (localStorage + in-memory fallback)
@@ -277,6 +294,34 @@ Institute Overview is built from `analytics()` and `dueFees()` — total and
 active students, teachers, batches, today's and monthly collection, total due,
 inactive students, subjects, upcoming exams, pending assignments, published
 results — with no hard-coded numbers anywhere.
+
+### Admin Panel v2 restructure (2026-09)
+
+The panel was restructured around a short product questionnaire. What changed:
+
+- **Hybrid navigation** — a grouped sidebar (একাডেমিক / পরীক্ষা / ফাইন্যান্স /
+  যোগাযোগ / সিস্টেম) on desktop, the familiar bottom nav on phones. Both are
+  rendered from one registry (`js/admin/registry.js`) and stay in sync with the
+  tab router.
+- **Bilingual labels** — Bengali primary with English alongside in the sidebar,
+  dashboard and every section title.
+- **Light theme** — `css/admin-panel.css` scopes a light palette to
+  `body.admin-portal`; the student/teacher portals keep the dark look.
+- **Dashboard-first home** — quick actions (ভর্তি / পেমেন্ট / হাজিরা / শিক্ষক /
+  পরীক্ষা / নোটিশ) lead the screen, followed by the overview numbers, a dues
+  alert and the institute card.
+- **Global search** — the top-bar box finds students, teachers, batches and
+  panel sections; picking a student isolates and flashes their row.
+- **Student quick search + filters** on the student list itself.
+- **Role-aware sections** — the registry gates each section on the permission
+  matrix, so narrowing a role hides its sections automatically.
+- **One-tap exports** — CSV downloads for students, dues and payments; the
+  report centre keeps its branded PDF/Excel documents.
+- **Scheduled auto-backup** — daily/weekly cadence in the Backup section; the
+  backup file downloads automatically when due.
+- **Component modules** — the page's giant inline script now lives in
+  `js/admin/boot.js` with the layout, search, backup and export components
+  beside it; `admin.html` keeps a tiny importer.
 
 Beyond CRUD for every collection, the panel includes:
 
