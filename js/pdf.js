@@ -251,15 +251,31 @@ export function buildPdf(images, { widthPt = 595, heightPt = 842 } = {}) {
 }
 
 /**
- * Render one or more canvases (A4 aspect) into a single PDF and download it.
+ * Render one or more canvases into a single PDF and download it.
+ *
+ * Each canvas is fitted onto a true A4 page (595×842 pt, rasterised at 2×)
+ * keeping its aspect ratio and centred on a white page. The downloaded PDF
+ * therefore contains exactly the document — the app page behind it can never
+ * leak in, and a tall receipt is centred with margins instead of squashed.
  */
-export async function canvasesToPdf(canvases, filename, { quality = 0.92 } = {}) {
-  const images = canvases.map((c) => ({
-    w: c.width,
-    h: c.height,
-    bytes: dataUrlToBytes(c.toDataURL('image/jpeg', quality))
-  }));
-  const pdf = buildPdf(images);
+export async function canvasesToPdf(canvases, filename, { quality = 0.92, widthPt = 595, heightPt = 842 } = {}) {
+  const raster = 2; // 2× the point size keeps text sharp without huge JPEGs
+  const images = canvases.map((canvas) => {
+    const page = makeCanvas(widthPt * raster, heightPt * raster);
+    const ctx = page.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, page.width, page.height);
+    const fit = Math.min(page.width / canvas.width, page.height / canvas.height);
+    const dw = Math.round(canvas.width * fit);
+    const dh = Math.round(canvas.height * fit);
+    ctx.drawImage(canvas, Math.round((page.width - dw) / 2), Math.round((page.height - dh) / 2), dw, dh);
+    return {
+      w: page.width,
+      h: page.height,
+      bytes: dataUrlToBytes(page.toDataURL('image/jpeg', quality))
+    };
+  });
+  const pdf = buildPdf(images, { widthPt, heightPt });
   downloadBlob(new Blob([pdf], { type: 'application/pdf' }), filename);
 }
 

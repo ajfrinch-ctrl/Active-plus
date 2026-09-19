@@ -20,6 +20,8 @@ import {
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
 import { getPrefs, setPref, applyPrefs } from './student-prefs.js';
+import { receiptPreviewDoc } from './docs.js';
+import { previewDocument, mountDocumentPreview } from './preview.js';
 
 /**
  * More-menu items that are not already on the bottom nav or profile menu.
@@ -49,6 +51,10 @@ export function initStudentHome() {
 
   /* Settings → সংখ্যা / সাউন্ড / লেখার আকার applied before anything renders. */
   applyPrefs();
+
+  /* Shared document preview (রিসিট → প্রিভিউ → PDF ডাউনলোড / ছবি শেয়ার):
+     the modal shell is static in student.html, this wires its buttons once. */
+  mountDocumentPreview();
 
   const me = db.students.find(session.username) || null;
   const student = { id: me?.id || session.username, name: session.name, className: me?.className };
@@ -477,35 +483,25 @@ export function initStudentHome() {
     });
   }
 
-  /** Official-looking fee receipt for one recorded payment. */
-  function openReceipt(payment) {
+  /** Official fee receipt for one recorded payment.
+   *
+   * Same centralized flow as the admin portal: the receipt is painted on a
+   * clean canvas (institution pad, no app UI), the shared preview modal
+   * shows it, and its "PDF ডাউনলোড" button saves that receipt — and nothing
+   * else. A browser print dialog is never opened, so the whole page can
+   * never leak into what the student downloads.
+   */
+  async function openReceipt(payment) {
     if (!payment) return;
-    const org = db.settings.get().orgName || 'Active Plus';
-    showDetail('🧾 পেমেন্ট রসিদ', `
-      <div class="receipt-sheet" id="receipt-sheet">
-        <div class="r-head">
-          <img src="assets/logo.png" alt="">
-          <div>
-            <div class="r-org">${escapeHtml(org)}</div>
-            <div class="r-title">মানি রসিদ · Money Receipt</div>
-          </div>
-        </div>
-        <div class="r-line"></div>
-        <div class="info-row"><span class="l">রসিদ নং</span><span class="v">${escapeHtml(payment.receiptNo || payment.id || '—')}</span></div>
-        <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(payment.date) || payment.date || '—')}</span></div>
-        <div class="info-row"><span class="l">শিক্ষার্থী</span><span class="v">${escapeHtml(session.name)}</span></div>
-        <div class="info-row"><span class="l">আইডি</span><span class="v">${escapeHtml(student.id)}</span></div>
-        <div class="info-row"><span class="l">মাস</span><span class="v">${escapeHtml(payment.month || '—')}</span></div>
-        <div class="r-amount">৳${bn(payment.amount || 0)}</div>
-        <div class="r-paid">✓ পরিশোধিত</div>
-        <div class="r-line"></div>
-        <div class="info-row"><span class="l">গ্রহণকারী</span><span class="v">${escapeHtml(payment.receivedBy || db.settings.get().orgName || 'Active Plus')}</span></div>
-      </div>
-      <button type="button" class="btn btn-block" id="print-receipt" style="margin-top:.75rem">🖨️ রসিদ প্রিন্ট করুন</button>`);
-    detail.querySelector('#print-receipt')?.addEventListener('click', () => {
-      if (typeof window.print === 'function') window.print();
-      else showToast('এই ব্রাউজারে প্রিন্ট করা যায়নি।', 'warning');
-    });
+    try {
+      const doc = await receiptPreviewDoc(payment, {
+        student,
+        settings: db.settings.get()
+      });
+      await previewDocument(doc);
+    } catch (e) {
+      showToast('রিসিট প্রিভিউ করা যায়নি।', 'error');
+    }
   }
 
   function openBanner(id) {
@@ -793,7 +789,7 @@ export function initStudentHome() {
         </details>
         <details class="faq-item">
           <summary>ফি বকেয়া আছে কি না কীভাবে জানব?</summary>
-          <p>আরও → 💰 ফি-তে মাসভিত্তিক অবস্থা, মোট পরিশোধ/বকেয়া এবং প্রতিটি পেমেন্টের রসিদ দেখতে ও প্রিন্ট করতে পারবেন।</p>
+          <p>আরও → 💰 ফি-তে মাসভিত্তিক অবস্থা, মোট পরিশোধ/বকেয়া এবং প্রতিটি পেমেন্টের রসিদ প্রিভিউ দেখে PDF ডাউনলোড করতে পারবেন।</p>
         </details>
         <details class="faq-item">
           <summary>প্রোফাইলের নম্বর বা ছবি বদলাতে চাই?</summary>
