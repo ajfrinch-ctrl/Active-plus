@@ -7,7 +7,8 @@
 import {
   db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor,
   examsFor, recordStudyActivity, examWindow, getDbStatus, assertCan, teacherCanAccessClass,
-  parseMcqPaste, parseBnDateInput, formatBnDate, MCQ_TEMPLATE, MCQ_PASTE_RULES, downloadText
+  parseMcqPaste, parseBnDateInput, formatBnDate, MCQ_TEMPLATE, MCQ_PASTE_RULES, downloadText,
+  examFullMarks
 } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 import { previewDocument } from './preview.js';
@@ -456,17 +457,21 @@ export function mountExamTaker({ listSelector, student }) {
         const done = examResultFor(exam.id, student.id);
         const win = examWindow(exam);
         const running = done ? '' : remainingLabel(exam);
+        const marks = examFullMarks(exam);
+        const donePct = done && done.total ? Math.round((done.score / done.total) * 100) : 0;
         return `
         <div class="list-item">
           <div class="li-main">
             <div class="li-title">${escapeHtml(exam.title)}</div>
-            <div class="li-sub">${escapeHtml(exam.subject)} · ${bn(exam.questions.length)}টি প্রশ্ন · ⏱ ${bn(exam.duration || 30)} মিনিট · ${escapeHtml(exam.author)}</div>
+            <div class="li-sub">${escapeHtml(exam.subject)} · ⏱ ${bn(exam.duration || 30)} মিনিট · ${escapeHtml(exam.author)}</div>
+            <div class="li-sub">📝 ${bn(marks)}টি প্রশ্ন · পূর্ণমান ${bn(marks)}${db.settings.get().negativeMarking ? ` · নেগেটিভ ${bn(db.settings.get().negativeMarking)}` : ''}</div>
             <div class="li-sub">📅 ${escapeHtml(formatBnDate(exam.date))}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}${win && win.state === 'active' ? '' : ` · ${escapeHtml(win ? win.label : '')}`}</div>
+            ${done ? `<div class="li-sub exam-done">✅ আপনার আগের চেষ্টা: ${bn(done.score)}/${bn(done.total)} (${bn(donePct)}%)${done.date ? ` · ${escapeHtml(formatBnDate(done.date))}` : ''}${done.pendingSync ? ' · অফলাইনে জমা, সিঙ্ক বাকি' : ''}</div>` : ''}
             ${running ? `<div class="li-sub exam-running">⏱ ${running === 'সময় শেষ' ? 'সময় শেষ — খুললেই জমা হবে' : `চলছে · আর ${escapeHtml(running)} বাকি`}</div>` : ''}
           </div>
           ${done
             ? `<span class="row-actions">
-                 <span class="badge ${done.score / done.total >= 0.5 ? 'success' : 'warning'}">${bn(done.score)}/${bn(done.total)}</span>
+                 <span class="badge ${donePct >= 50 ? 'success' : 'warning'}">${bn(done.score)}/${bn(done.total)}</span>
                  ${Array.isArray(done.answers) ? `<button type="button" class="btn btn-small btn-secondary" data-review="${escapeHtml(exam.id)}">উত্তর দেখুন</button>` : ''}
                </span>`
             : (win && win.canStart
@@ -492,7 +497,7 @@ export function mountExamTaker({ listSelector, student }) {
         <div class="h-title" style="justify-content:center">📝 উত্তরপত্র — ${escapeHtml(exam.title)}</div>
         <div class="exam-score">${bn(result.score)}/${bn(result.total)}</div>
         <div class="exam-pct">${bn(pct)}%</div>
-        <p class="meta">জমা দেওয়ার তারিখ: ${escapeHtml(formatBnDate(result.date))}${result.autoSubmitted ? ' · স্বয়ংক্রিয়ভাবে জমা' : ''}</p>
+        <p class="meta">জমা দেওয়ার তারিখ: ${escapeHtml(formatBnDate(result.date))}${result.autoSubmitted ? ' · স্বয়ংক্রিয়ভাবে জমা' : ''}${result.pendingSync ? ' · অফলাইনে জমা, সিঙ্ক বাকি' : ''}</p>
       </div>
       ${answers ? `<details class="mini-details" open><summary>📝 সঠিক উত্তর দেখুন</summary>
         <div class="mini-body">${reviewHtml(exam, answers)}</div></details>`
@@ -514,10 +519,15 @@ export function mountExamTaker({ listSelector, student }) {
     const given = chosen ? chosen[qi] : null;
     const answered = given !== null && given !== undefined && given !== '';
     const right = answered && Number(given) === Number(q.answer);
+    const correct = q.options[q.answer] || '';
+    // The verdict is written out, never carried by colour alone (a red row
+    // means nothing to a colour-blind student or a screen reader).
+    const verdict = right ? '✓ সঠিক' : (answered ? '✗ ভুল' : '— উত্তর দেননি');
     return `<div class="exam-review ${right ? 'ok' : 'bad'}">
       <div class="li-title">${bn(qi + 1)}. ${escapeHtml(q.q)}</div>
+      <div class="exam-verdict ${right ? 'ok' : 'bad'}">${verdict}</div>
       <div class="li-sub">আপনার উত্তর: ${answered ? escapeHtml(q.options[Number(given)] || '') : '<i>দেননি</i>'}</div>
-      ${right ? '' : `<div class="li-sub">সঠিক উত্তর: <b>${escapeHtml(q.options[q.answer] || '')}</b></div>`}
+      <div class="li-sub">সঠিক উত্তর: <b>${escapeHtml(correct)}</b></div>
     </div>`;
   }).join('');
 
@@ -550,6 +560,8 @@ export function mountExamTaker({ listSelector, student }) {
         <span class="exam-timer" id="exam-timer" role="timer" aria-label="বাকি সময়">⏱ --:--</span>
         <span class="exam-count" id="exam-count">প্রশ্ন ${bn(1)} / ${bn(total)}</span>
       </div>
+      <div class="exam-timebar" id="exam-timebar" role="progressbar" aria-label="সময়ের অগ্রগতি"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="exam-time-fill" style="width:100%"></i></div>
       <div class="exam-bar" aria-hidden="true"><i id="exam-bar-fill" style="width:0%"></i></div>
       <div class="alert alert-info" id="exam-notice">${exam.questions.length}টি প্রশ্ন · সময় ${bn(exam.duration || 30)} মিনিট। সময় শেষ হলে উত্তরপত্র স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</div>
       <form id="exam-take-form" novalidate>
@@ -635,7 +647,8 @@ export function mountExamTaker({ listSelector, student }) {
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      if (!onlineFor('উত্তরপত্র জমা')) return;
+      // A paper is graded and stored locally either way, so an offline student
+      // is never blocked: the result is queued and mirrored when the net is back.
       submit(false);
     });
 
@@ -651,11 +664,14 @@ export function mountExamTaker({ listSelector, student }) {
         chosen[qi] = input ? input.value : null;
       });
       const { score, total: max } = scoreExam(exam, chosen);
+      const offline = navigator.onLine === false;
       recordStudyActivity('mcq', exam.questions.length); // feeds streak + achievements
       if (!examResultFor(examId, student.id)) {
         db.examResults.add({
           id: newId('res'), examId, studentId: student.id, studentName: student.name,
           score, total: max, date: todayBn(), autoSubmitted: Boolean(auto),
+          // Offline papers wait for the network instead of being refused.
+          pendingSync: offline,
           // Kept so the paper can be reviewed later — by the student, and by
           // the teacher who wants to see which questions went wrong.
           answers: exam.questions.map((_, qi) => (chosen[qi] === null || chosen[qi] === '' ? null : Number(chosen[qi])))
@@ -675,6 +691,7 @@ export function mountExamTaker({ listSelector, student }) {
           <div class="info-row"><span class="l">উত্তর দেননি</span><span class="v">${bn(max - answered)}</span></div>
           <div class="info-row"><span class="l">সময় লেগেছে</span><span class="v">${bn(Math.max(1, Math.round((Date.now() - (deadline - durationMs(exam))) / 60000)))} মিনিট</span></div>
         </div>
+        ${offline ? '<div class="alert alert-warning">📶 অফলাইনে জমা হয়েছে — এই ডিভাইসে সংরক্ষিত আছে। ইন্টারনেট ফিরলে স্বয়ংক্রিয়ভাবে সিঙ্ক হয়ে যাবে।</div>' : ''}
         <details class="mini-details" open>
           <summary>📝 সঠিক উত্তর দেখুন</summary>
           <div class="mini-body">${reviewHtml(exam, chosen)}</div>
@@ -688,9 +705,23 @@ export function mountExamTaker({ listSelector, student }) {
     };
 
     const warned = { five: false, one: false };
+    /** Paints the time left as a bar as well as a clock (spec: টাইমার প্রগ্রেস বার). */
+    const paintTimeLeft = (left) => {
+      const pctLeft = Math.max(0, Math.min(100, (left / durationMs(exam)) * 100));
+      const fill = player.querySelector('#exam-time-fill');
+      if (fill) fill.style.width = `${pctLeft}%`;
+      const bar = player.querySelector('#exam-timebar');
+      if (bar) {
+        bar.setAttribute('aria-valuenow', String(Math.round(pctLeft)));
+        bar.classList.toggle('warn', pctLeft <= 25);
+        bar.classList.toggle('danger', pctLeft <= 10);
+      }
+    };
+
     const tick = () => {
       const left = deadline - Date.now();
       if (left <= 0) {
+        paintTimeLeft(0);
         timerEl.textContent = '⏱ ০০:০০';
         submit(true);                 // time up → auto submit
         return;
@@ -701,6 +732,7 @@ export function mountExamTaker({ listSelector, student }) {
       timerEl.textContent = `⏱ ${bn(mins)}:${bn(secs)}`;
       timerEl.classList.toggle('warn', left <= 60000);
       timerEl.classList.toggle('danger', left <= 30000);
+      paintTimeLeft(left);
       // Warn once on the way down, so the ending is never a surprise.
       if (!warned.five && left <= 300000) { warned.five = true; showToast('⏰ আর ৫ মিনিট বাকি।', 'info'); }
       if (!warned.one && left <= 60000) { warned.one = true; showToast('⏰ আর ১ মিনিট বাকি — উত্তরপত্র জমা দিন।', 'warning'); }

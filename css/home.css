@@ -570,3 +570,126 @@ body.home-body {
 .exam-review { border-left: 3px solid var(--border); padding: .5rem .75rem; margin-bottom: .5rem; }
 .exam-review.ok { border-color: var(--success); }
 .exam-review.bad { border-color: var(--danger); }
+
+/* ==========================================================================
+   Student home, rearranged (20 answers → one compact, visual screen)
+   Hero slides, the calendar, the time bar, the subject graph and the
+   payment ledger all live here.
+   ========================================================================== */
+
+/* ---------- Hero: pictures first, then the four action cards ---------- */
+.home-hero { margin-bottom: 1rem; }
+.hero-slide {
+  flex: 0 0 86%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 128px;
+  padding: 1rem 1.05rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  /* Artwork on the right, dark space on the left, so the words always win.
+     An admin-supplied banner image replaces it through an inline style. */
+  background-image:
+    linear-gradient(180deg, rgba(5, 8, 14, 0.32), rgba(5, 8, 14, 0.92)),
+    url('../assets/hero-default.jpg');
+  background-size: cover;
+  background-position: center right;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+}
+/* Admin-supplied artwork rides behind the text, dimmed so the words stay legible. */
+.hero-slide.has-image {
+  background-size: cover;
+  background-position: center;
+  justify-content: flex-end;
+}
+.hero-slide .hero-kicker {
+  font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700;
+}
+.hero-slide h3 { margin: 0; font-size: 1.125rem; line-height: 1.35; }
+.hero-slide p { margin: 0; font-size: 0.875rem; line-height: 1.6; color: var(--text-light); }
+.hero-slide .btn { align-self: flex-start; margin-top: 0.5rem; }
+.carousel-track .hero-slide { flex: 0 0 86%; }
+
+/* ---------- One small door to everything the compact home no longer repeats ---------- */
+.home-more-link {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  min-height: 48px; padding: 0.75rem 1rem; margin-bottom: 0.875rem;
+  background: var(--surface); color: var(--text-light);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-lg);
+  font-size: 0.875rem; font-weight: 600; cursor: pointer;
+}
+.home-more-link .chev { margin-left: auto; color: var(--text-muted); font-size: 1.25rem; }
+.home-more-link:active { transform: scale(0.99); }
+
+/* ---------- Card accents: each of the four cards owns a colour ---------- */
+.hcard-exam { border-left: 3px solid var(--accent); }
+.hcard-study { border-left: 3px solid var(--success); }
+.hcard-fee { border-left: 3px solid var(--warning); }
+.overview-card { background: linear-gradient(135deg, rgba(76, 159, 254, 0.10), transparent 70%), var(--surface); }
+
+/* ---------- Timer progress bar (time left, above the answered bar) ---------- */
+.exam-timebar {
+  height: 10px; margin: 0.5rem 0 0.25rem;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.08);
+  overflow: hidden; border: 1px solid var(--border);
+}
+.exam-timebar i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  transition: width 1s linear;
+}
+.exam-timebar.warn i { background: linear-gradient(90deg, var(--warning), var(--accent)); }
+.exam-timebar.danger i { background: linear-gradient(90deg, var(--error-fill), var(--danger)); }
+@media (prefers-reduced-motion: reduce) { .exam-timebar i { transition: none; } }
+
+/* ---------- Answer review: verdict written out, never colour-only ---------- */
+.exam-verdict {
+  display: inline-block; margin: 0.2rem 0 0.35rem;
+  font-size: 0.8125rem; font-weight: 700;
+  padding: 0.1rem 0.5rem; border-radius: 999px;
+}
+.exam-verdict.ok { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.exam-verdict.bad { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.exam-done { color: var(--success); font-weight: 600; }
+
+/* ---------- Subject-wise results ---------- */
+.subject-row { padding: 0.35rem 0; }
+.subject-row .l { color: var(--text-light); font-size: 0.875rem; }
+.subject-row .v { float: right; font-weight: 700; font-size: 0.875rem; }
+.subject-bar {
+  display: block; clear: both; height: 8px; margin-top: 0.3rem;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden;
+}
+.subject-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-fill), var(--accent)); }
+
+/* ---------- Notification centre rows ---------- */
+.notif-row { border-left: 3px solid var(--border-strong); }
+.notif-row[data-kind="fee"] { border-left-color: var(--warning); }
+.notif-row[data-kind="exam"] { border-left-color: var(--accent); }
+.notif-row[data-kind="result"] { border-left-color: var(--success); }
+.notif-row[data-kind="assignment"] { border-left-color: var(--danger); }
+
+/* ---------- Calendar ---------- */
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+.cal-head strong { font-size: 1rem; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.25rem; }
+.cal-week span { text-align: center; font-size: 0.6875rem; color: var(--text-muted); padding-bottom: 0.2rem; }
+.cal-day {
+  position: relative; min-height: 42px; padding: 0.25rem 0.2rem 0.9rem;
+  background: rgba(255, 255, 255, 0.03); color: var(--text-light);
+  border: 1px solid var(--border); border-radius: 10px;
+  font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+}
+.cal-day.blank { background: transparent; border-color: transparent; cursor: default; }
+.cal-day.has-event { border-color: var(--border-strong); background: rgba(76, 159, 254, 0.10); }
+.cal-day.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-day .mk {
+  position: absolute; left: 0; right: 0; bottom: 2px;
+  display: flex; justify-content: center; gap: 2px; font-size: 0.6rem; font-weight: 400;
+}
+.cal-day .mk.exam { color: var(--accent); }
+.cal-day .mk.class { color: var(--success); }
+.cal-day .mk.due { color: var(--warning); }

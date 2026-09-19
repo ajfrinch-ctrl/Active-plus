@@ -51,26 +51,25 @@ test('student home renders every priority section from live data', async () => {
 
   const html = doc.getElementById('home-content').innerHTML;
   const cards = doc.querySelectorAll('#home-content .hcard');
-  assert.ok(cards.length >= 5, `expected the glance cards, got ${cards.length}`);
+  assert.ok(cards.length >= 4, `expected the four action cards, got ${cards.length}`);
 
   // Hero progress bar reflects todayProgress() exactly (not a hard-coded number).
   const p = data.todayProgress(student);
   assert.ok(html.includes(`width:${p.pct}%`), `progress bar shows ${p.pct}%`);
 
-  // Simple glance home: banners, overview, next class, resume, exam, assignments, fee.
-  // No quick-shortcut row (bottom nav owns destinations) and no folded dump.
+  // Compact home: visual hero, আজকের অবস্থা, then one card each for exam,
+  // study and fee — everything else moved to আরও.
+  assert.ok(doc.querySelector('.home-hero'), 'visual hero sits under the student info');
   assert.ok(doc.getElementById('student-overview'), 'আজকের অবস্থা overview present');
-  assert.ok(doc.querySelector('.home-banners'), 'notice/tip banners sit under student info');
-  assert.equal(doc.querySelector('#student-quick'), null, 'no duplicate quick shortcuts on home');
-  assert.equal(doc.querySelectorAll('#home-content details.mini-details:not(.in-card)').length, 0, 'no folded dump');
-  assert.equal(doc.getElementById('more-features'), null, 'no secondary-features grid on home');
-  assert.equal(doc.getElementById('student-more-sec'), null, 'no আরও ফিচার fold on home');
-  assert.equal(doc.querySelector('#home-content .see-more'), null, 'no see-more swap button');
+  assert.ok(doc.getElementById('home-exam'), 'the exam card');
+  assert.ok(doc.getElementById('home-resume'), 'the continue-learning card');
+  assert.ok(doc.getElementById('home-fee'), 'the fee card');
+  assert.ok(doc.querySelector('#home-content [data-act="more"]'), 'one door to everything else');
+  for (const gone of ['home-next-class', 'home-assignments', 'home-result', 'home-notice-banner', 'home-tip-banner']) {
+    assert.equal(doc.getElementById(gone), null, `${gone} is not duplicated on the compact home`);
+  }
 
-  // Next class / upcoming exam come from the routine + exam collections.
-  const next = data.nextClass();
-  assert.ok(next, 'routine yields a next class');
-  assert.ok(html.includes(next.item.subject), `next class card shows ${next.item.subject}`);
+  // The exam card comes from the exam collection, not a hard-coded title.
   const exam = data.upcomingExam(student.className);
   assert.ok(exam && html.includes(exam.title), 'upcoming exam card shows the real exam title');
 
@@ -95,9 +94,13 @@ test('home shortcuts route to the right view / panel', async () => {
   // The seed exam window is open, so its card offers the Start action.
   click(doc, '#home-content [data-act="startexam"]');
   assert.equal(doc.getElementById('view-exam').hidden, false, 'exam shortcut opens the exam view');
+
   click(doc, '.bottom-nav button[data-view="home"]');
-  click(doc, '#home-content [data-act="routine"]');
-  assert.equal(doc.getElementById('view-more').hidden, false, 'routine shortcut opens More');
+  click(doc, '#home-content [data-act="more"]');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'the home door opens More');
+  assert.ok(doc.getElementById('more-menu'), 'and lands on the menu index');
+
+  click(doc, '#more-menu [data-act="routine"]');
   assert.ok(doc.getElementById('more-routine'), 'routine panel exists');
 });
 
@@ -155,7 +158,7 @@ test('a render failure shows a friendly error with a working retry (no recursion
   assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 4, 'retry restored the home');
 });
 
-test('offline shows the indicator and blocks starting an exam', async () => {
+test('offline shows the indicator and still lets the paper be sat', async () => {
   const { doc } = await bootHome();
   Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: false, configurable: true });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('offline'));
@@ -163,8 +166,12 @@ test('offline shows the indicator and blocks starting an exam', async () => {
   assert.equal(doc.getElementById('net-chip'), null, 'no online/offline chip in the top bar');
   assert.equal(doc.getElementById('home-header').dataset.net, 'offline', 'top bar marked offline');
   assert.equal(doc.getElementById('home-header').classList.contains('offline'), true, 'offline styling applied');
+
+  // Offline is no longer a wall: the paper opens and is graded on the device.
   click(doc, '#home-content [data-act="startexam"]');
-  assert.equal(doc.getElementById('view-exam').hidden, true, 'exam view not opened while offline');
+  assert.equal(doc.getElementById('view-exam').hidden, false, 'the exam view opens offline');
+  assert.ok(doc.getElementById('exam-take-form'), 'the paper itself is on screen');
+  Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: true, configurable: true });
 });
 
 test('admin visibility settings hide the matching home cards', async () => {
@@ -207,10 +214,14 @@ test('exam card follows the exam window: Start only while open', async () => {
 test('assignments show real status and open their details', async () => {
   const { doc, data } = await bootHome();
   const asg = data.db.assignments.list()[0];
-  const html = doc.getElementById('home-content').innerHTML;
-  assert.ok(html.includes(`data-id="${asg.id}"`), 'assignment row is clickable');
-  assert.ok(html.includes('জমা হয়েছে'), 'status reflects the stored submission');
-  click(doc, `#home-content [data-act="assignment"][data-id="${asg.id}"]`);
+
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="assignments"]');
+  const panel = doc.getElementById('more-assignments');
+  assert.ok(panel.innerHTML.includes(`data-asg="${asg.id}"`), 'assignment row is clickable');
+  assert.ok(panel.innerHTML.includes('জমা হয়েছে'), 'status reflects the stored submission');
+
+  click(doc, `#more-assignments [data-asg="${asg.id}"]`);
   assert.equal(doc.getElementById('detail-modal').getAttribute('aria-hidden'), 'false', 'details modal opened');
   assert.ok(doc.getElementById('detail-body').innerHTML.includes(asg.subject), 'details show the subject');
 });
@@ -245,11 +256,11 @@ test('teacher query is removed from the student portal', async () => {
   assert.equal(doc.getElementById('home-content').innerHTML.includes('শিক্ষক প্রশ্ন'), false, 'no teacher-query label on home');
 });
 
-test('notification preview and carousel work on the home screen', async () => {
+test('carousel and notification centre work on the home screen', async () => {
   const { doc, data } = await bootHome();
-  assert.ok(doc.querySelector('#home-content [data-act="notif"]'), 'notification preview offers View All');
-  click(doc, '#home-content [data-act="notif"]');
-  assert.equal(doc.getElementById('notif-center').getAttribute('aria-hidden'), 'false', 'opens the centre');
+  click(doc, '#bell');
+  assert.equal(doc.getElementById('notif-center').getAttribute('aria-hidden'), 'false', 'the bell opens the centre');
+  assert.ok(doc.getElementById('notif-list').innerHTML.length > 20, 'rows rendered');
   doc.getElementById('notif-center').classList.remove('active');
 
   assert.ok(doc.getElementById('banner-track'), 'banner carousel rendered');
@@ -305,17 +316,15 @@ test('a tile/tab tap shows ONLY the panel it names, with a way back', async () =
   assert.ok(doc.querySelector('#more-menu [data-act="routine"]'), 'routine still reachable');
   assert.equal(doc.getElementById('home-logout'), null, 'logout stays in the top-bar profile menu');
 
-  // A home shortcut (📅 রুটিন chip) → routine alone.
+  // The home's single door → the More menu index, and nothing else.
   click(doc, '.bottom-nav button[data-view="home"]');
-  click(doc, '#home-content [data-act="routine"]');
-  assert.ok(doc.getElementById('more-routine'), 'routine shortcut shows the routine card');
-  assert.equal(doc.getElementById('more-profile'), null, 'and nothing else');
-  assert.equal(doc.getElementById('more-fees'), null, 'fees stays hidden too');
+  click(doc, '#home-content [data-act="more"]');
+  assert.ok(doc.getElementById('more-menu'), 'the home door opens the menu index');
+  assert.equal(doc.getElementById('more-routine'), null, 'no panel is dumped on the index');
 
-  // A folded home card button (অ্যাসাইনমেন্ট “সব দেখুন”) → assignments alone.
-  click(doc, '.bottom-nav button[data-view="home"]');
-  click(doc, '#home-content [data-act="assignments"]');
-  assert.ok(doc.getElementById('more-assignments'), 'the assignments card is shown');
+  // A calendar row → the calendar alone (the feature asked for).
+  click(doc, '#more-menu [data-act="calendar"]');
+  assert.ok(doc.getElementById('more-calendar'), 'the calendar is shown');
   assert.equal(doc.getElementById('more-routine'), null, 'routine stays hidden');
   assert.equal(doc.getElementById('more-profile'), null, 'profile stays hidden');
 
@@ -340,8 +349,11 @@ test('a tile/tab tap shows ONLY the panel it names, with a way back', async () =
 });
 
 test('clickable rows work from the keyboard, not just a tap', async () => {
-  const { doc } = await bootHome();
-  const row = doc.querySelector('#home-content [role="button"][data-act="assignment"]');
+  const { doc, data } = await bootHome();
+  const asg = data.db.assignments.list()[0];
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="assignments"]');
+  const row = doc.querySelector(`#more-assignments [data-asg="${asg.id}"]`);
   assert.ok(row, 'assignment row is focusable');
   assert.equal(row.getAttribute('tabindex'), '0');
   row.dispatchEvent(new doc.defaultView.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -366,12 +378,13 @@ test('leaderboard visibility is an admin switch', async () => {
   data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
 
   data.setHomeCards({ leaderboard: true });
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.ok(doc.getElementById('home-content').innerHTML.includes('র‍্যাঙ্ক'), 'rank shown when leaderboard is on');
+  click(doc, '.bottom-nav button[data-view="result"]');
+  assert.ok(doc.getElementById('result-content').textContent.includes('মেধা তালিকা'), 'merit list shown when the admin allows it');
 
   data.setHomeCards({ leaderboard: false });
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.equal(doc.getElementById('home-content').innerHTML.includes('র‍্যাঙ্ক'), false, 'rank hidden when admin turns it off');
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '.bottom-nav button[data-view="result"]');
+  assert.equal(doc.getElementById('result-content').textContent.includes('মেধা তালিকা'), false, 'merit list hidden when the admin turns it off');
   data.setHomeCards({ leaderboard: true });
 });
 
@@ -420,27 +433,34 @@ test('More includes a Settings panel with real app state', async () => {
   assert.equal(doc.getElementById('view-more').hidden, false, 'settings opens in More');
 });
 
-test('clickable rows on the home stay actionable', async () => {
+test('the compact home keeps every visible row actionable', async () => {
   const { doc } = await bootHome();
-  const rows = [...doc.querySelectorAll('#home-content [role="button"][data-act]')];
-  // Pending assignment rows (if any) or nothing — still ok if seed has none pending.
-  click(doc, '#home-content [data-act="routine"]');
-  assert.equal(doc.getElementById('view-more').hidden, false, 'routine opens More');
-  assert.ok(doc.getElementById('more-routine'), 'routine panel shown');
+  const acts = [...new Set([...doc.querySelectorAll('#home-content [data-act]')].map((el) => el.dataset.act))];
+  assert.ok(acts.length >= 3, `home exposes its actions (${acts.join(', ')})`);
+
+  click(doc, '#home-content [data-act="more"]');
+  assert.equal(doc.getElementById('view-more').hidden, false, 'the door opens More');
+  assert.ok(doc.getElementById('more-menu'), 'menu index shown');
 });
 
-test('latest result card shows the class position when leaderboard is on', async () => {
+test('the Result tab shows the exam position when the leaderboard is on', async () => {
   const { doc, data } = await bootHome();
   const student = data.db.students.find('2026-09-001');
   const exam = data.examsFor(student.className)[0];
   const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
-  data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+  data.db.examResults.add({
+    id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name,
+    score: r.score, total: r.total, date: data.todayBn(), answers: exam.questions.map((q) => q.answer)
+  });
   data.setHomeCards({ leaderboard: true });
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.ok(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), 'position shown');
+  click(doc, '.bottom-nav button[data-view="result"]');
+  assert.ok(doc.getElementById('result-content').innerHTML.includes('অবস্থান'), 'position shown');
+
   data.setHomeCards({ leaderboard: false });
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.equal(doc.getElementById('home-content').innerHTML.includes('অবস্থান'), false, 'hidden with the leaderboard');
+  click(doc, '.bottom-nav button[data-view="home"]');
+  click(doc, '.bottom-nav button[data-view="result"]');
+  assert.equal(doc.getElementById('result-content').innerHTML.includes('অবস্থান'), false, 'hidden with the leaderboard');
+  data.setHomeCards({ leaderboard: true });
 });
 
 test('the Result view opens the review of a past paper', async () => {
@@ -477,35 +497,30 @@ test('every row in the More menu actually opens its panel (no dead buttons)', as
   }
 });
 
-test('home follows a simple glance order: banners, overview, then one card each', async () => {
+test('home follows the compact order: hero, overview, then one card each', async () => {
   const { doc } = await bootHome();
 
   const html = doc.getElementById('home-content').innerHTML;
   const at = (needle) => html.indexOf(needle);
+  assert.ok(doc.querySelector('.home-hero'), 'visual hero first');
+  const hero = at('home-hero');
   const overview = at('আজকের অবস্থা');
-  const nextClass = at('পরবর্তী ক্লাস');
-  const resume = at('পড়া চালিয়ে যান');
-  const exam = at('আসন্ন পরীক্ষা');
-  const asg = Math.max(at('বাকি অ্যাসাইনমেন্ট'), at('অ্যাসাইনমেন্ট'));
-  const fee = at('ফি');
+  const exam = at('id="home-exam"');
+  const resume = at('id="home-resume"');
+  const fee = at('id="home-fee"');
+  const more = at('home-more-link');
 
-  assert.ok(doc.querySelector('.home-banners'), 'notice/tip banners under student info');
-  assert.ok(overview >= 0, 'overview rendered');
-  assert.ok(nextClass >= 0, 'next class rendered');
-  assert.ok(resume >= 0, 'resume rendered');
-  assert.ok(exam >= 0, 'exam rendered');
-  assert.ok(asg >= 0, 'assignments rendered');
-  assert.ok(fee >= 0, 'fee rendered');
-  assert.ok(doc.getElementById('home-next-class'), 'next class card');
-  assert.ok(doc.getElementById('home-resume'), 'resume card');
-  assert.ok(doc.getElementById('home-exam'), 'exam card');
-  assert.ok(doc.getElementById('home-assignments'), 'assignments card');
-  assert.ok(overview < html.indexOf('id="home-next-class"') || overview < nextClass, 'overview before next class');
-  const resumePos = html.indexOf('id="home-resume"');
-  const examPos = html.indexOf('id="home-exam"');
-  const asgPos = html.indexOf('id="home-assignments"');
-  assert.ok(resumePos < examPos, 'resume before exam card');
-  assert.ok(examPos < asgPos, 'exam before assignments card');
+  assert.ok(overview >= 0 && exam >= 0 && resume >= 0 && fee >= 0 && more >= 0, 'every card rendered');
+  assert.ok(hero < overview, 'hero sits above the overview');
+  assert.ok(overview < exam, 'overview before the exam card');
+  assert.ok(exam < resume, 'exam before continue-learning');
+  assert.ok(resume < fee, 'study before the fee card');
+  assert.ok(fee < more, 'the আরও door sits last');
+
+  // Nothing that moved into আরও is repeated on the home.
+  for (const id of ['home-next-class', 'home-assignments', 'home-result', 'home-notice-banner']) {
+    assert.equal(doc.getElementById(id), null, `${id} lives in আরও, not on the home`);
+  }
   assert.equal(doc.querySelector('#student-quick'), null, 'no shortcut row');
   assert.equal(html.includes('✨ আরও ফিচার'), false, 'no more-features fold');
   assert.equal(html.includes('কুইক শর্টকাট'), false, 'no quick shortcuts');
@@ -557,8 +572,10 @@ test('a student can submit a pending assignment from its details', async () => {
   // the signed-in student (2026-09-001) already submitted in seed, so use a fresh one
   const fresh = { id: 'asg-ui', title: 'UI Test Task', subject: 'Math', className: 'নবম', deadline: '২০২৬-০৯-৩০', teacher: 'T', marks: 10, description: '' };
   data.db.assignments.add(fresh);
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  click(doc, '#home-content [data-act="assignment"][data-id="asg-ui"]');
+
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="assignments"]');
+  click(doc, '#more-assignments [data-asg="asg-ui"]');
   const form = doc.getElementById('submit-assignment-form');
   assert.ok(form, 'submit form offered for pending work');
   doc.getElementById('submit-note').value = 'done';
@@ -568,7 +585,11 @@ test('a student can submit a pending assignment from its details', async () => {
   assert.ok(stored, 'submission stored');
   assert.equal(stored.studentId, '2026-09-001', 'recorded against the signed-in student only');
   assert.equal(data.assignmentStatus(fresh, data.db.students.find('2026-09-001')).status, 'submitted');
-  assert.ok(doc.getElementById('home-content').innerHTML.includes('জমা হয়েছে'), 'home chip updated');
+
+  // Re-opening the panel shows the new status.
+  click(doc, '#more-back');
+  click(doc, '#more-menu [data-act="assignments"]');
+  assert.ok(doc.querySelector('#more-assignments [data-asg="asg-ui"]').textContent.includes('জমা হয়েছে'), 'panel chip updated');
 });
 
 test('marking a material complete updates the home progress', async () => {
@@ -591,13 +612,14 @@ test('marking a material complete updates the home progress', async () => {
   assert.ok(html.includes('এই ম্যাটেরিয়াল সম্পন্ন'), 'the resumed material is flagged complete');
 });
 
-test('the home notification preview shows relative time, not a raw date', async () => {
+test('the notification centre shows relative time, not a raw date', async () => {
   const { doc, data } = await bootHome();
   const fresh = { id: 'ntf-fresh', type: 'নতুন অ্যাসাইনমেন্ট', title: 'গণিত অ্যাসাইনমেন্ট যুক্ত হয়েছে', target: 'সবাই', date: data.todayBn(), createdAt: new Date(Date.now() - 2 * 60000).toISOString(), read: false };
   data.db.notifications.add(fresh);
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  const html = doc.getElementById('home-content').innerHTML;
-  assert.ok(html.includes(fresh.title), 'newest notification previewed');
+
+  click(doc, '#bell');
+  const html = doc.getElementById('notif-list').innerHTML;
+  assert.ok(html.includes(fresh.title), 'newest notification listed');
   assert.ok(html.includes('মিনিট আগে'), 'shown as relative time');
 });
 
@@ -642,17 +664,17 @@ test('question-bank practice is removed from shortcuts and More', async () => {
   assert.equal(doc.querySelector('#more-content [data-act="questionbank"]'), null, 'no More tile');
 });
 
-test('the latest result on home is readable as text, not only colour', async () => {
+test('results are readable as text, not only colour', async () => {
   const { doc, data } = await bootHome();
   const student = data.db.students.find('2026-09-001');
   const exam = data.examsFor(student.className)[0];
   const r = data.scoreExam(exam, Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)])));
   data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  const card = doc.getElementById('home-result');
-  assert.ok(card, 'latest result card rendered');
-  assert.ok(card.textContent.includes('স্কোর'), 'score labelled in text');
-  assert.match(card.textContent, /১০০%|100%|[০-৯]+%/, 'percentage shown as text');
+
+  click(doc, '.bottom-nav button[data-view="result"]');
+  const body = doc.getElementById('result-content').textContent;
+  assert.ok(body.includes('স্কোর'), 'score labelled in text');
+  assert.match(body, /[০-৯]+%/, 'percentage shown as text');
 });
 
 test('settings is one tap away from the profile menu', async () => {
@@ -667,10 +689,11 @@ test('announcement banners can carry an admin-supplied image', async () => {
   const { doc, data } = await bootHome();
   data.db.banners.update('ban-1', { image: 'https://example.edu/model-test.jpg' });
   doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  const img = doc.querySelector('#banner-track img');
-  assert.ok(img, 'banner image rendered');
-  assert.equal(img.getAttribute('src'), 'https://example.edu/model-test.jpg');
-  assert.equal(img.getAttribute('alt'), '', 'decorative image is hidden from screen readers');
+
+  const slide = doc.querySelector('#banner-track .hero-slide.has-image');
+  assert.ok(slide, 'banner artwork rendered as picture-backed hero slide');
+  assert.ok(slide.getAttribute('style').includes('https://example.edu/model-test.jpg'), 'the admin image reaches the hero');
+  assert.ok(doc.querySelector('#banner-track .hero-slide.has-image .hero-kicker'), 'the text stays on top of the picture');
 });
 
 test('no home action is a dead button', async () => {
@@ -735,7 +758,7 @@ test('a signed-in student with no profile row still gets a usable home', async (
 
   assert.equal(doc.getElementById('home-skeleton').hidden, true, 'no crash, skeleton cleared');
   assert.equal(doc.getElementById('home-content').hidden, false, 'home rendered');
-  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 5, 'cards still render');
+  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 3, 'cards still render');
   assert.ok(doc.getElementById('home-content').innerHTML.length < 200000, 'not an error screen');
   assert.equal(doc.getElementById('home-retry'), null, 'no error state triggered');
   // and the More view survives too
@@ -785,10 +808,13 @@ test('class leaderboard appears in Result when the admin allows it', async () =>
     data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: id, studentName: st.name, score: r.score, total: r.total, date: data.todayBn() });
   }
   click(doc, '.bottom-nav button[data-view="result"]');
-  const card = doc.getElementById('result-content');
-  assert.ok(card.textContent.includes('লিডারবোর্ড'), 'leaderboard shown');
+  const card = doc.getElementById('result-leaderboard');
+  assert.ok(card, 'merit list shown');
   assert.ok(card.textContent.includes('১.'), 'positions rendered');
-  assert.equal(card.querySelector('.info-row.me') !== null, true, 'the signed-in student is marked');
+  assert.ok(card.querySelector('.info-row.me'), 'the signed-in student is marked');
+  // Anonymous by design: positions and rolls, never a classmate's name.
+  assert.equal(card.textContent.includes('সুমাইয়া'), false, 'no classmate name is published');
+  assert.ok(card.textContent.includes('রোল'), 'identified by roll instead');
 });
 
 test('hiding the leaderboard removes it from the Result view', async () => {
@@ -799,7 +825,7 @@ test('hiding the leaderboard removes it from the Result view', async () => {
   const r = data.scoreExam(exam, answers);
   data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: '2026-09-001', studentName: 'আরিয়ান', score: r.score, total: r.total, date: data.todayBn() });
   click(doc, '.bottom-nav button[data-view="result"]');
-  assert.equal(doc.getElementById('result-content').textContent.includes('লিডারবোর্ড'), false, 'admin toggle respected');
+  assert.equal(doc.getElementById('result-content').textContent.includes('মেধা তালিকা'), false, 'admin toggle respected');
 });
 
 test('leaderboard is class-scoped and empty without results', async () => {
@@ -810,5 +836,178 @@ test('leaderboard is class-scoped and empty without results', async () => {
   const r = data.scoreExam(exam, answers);
   data.db.examResults.add({ id: data.newId('res'), examId: exam.id, studentId: '2026-10-014', studentName: 'তানভীর', score: r.score, total: r.total, date: data.todayBn() });
   click(doc, '.bottom-nav button[data-view="result"]');
-  assert.equal(doc.getElementById('result-content').textContent.includes('লিডারবোর্ড'), false, 'another class result does not create a leaderboard');
+  assert.equal(doc.getElementById('result-content').textContent.includes('মেধা তালিকা'), false, 'another class result does not create a merit list');
+});
+
+/* ------------------------------------------------------------------ */
+/* Rearranged student home: calendar, ledger, subject graph, offline   */
+/* ------------------------------------------------------------------ */
+
+test('the calendar shows the month, marks event days and opens a day sheet', async () => {
+  const { doc, data } = await bootHome();
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="calendar"]');
+
+  assert.ok(doc.getElementById('more-calendar'), 'calendar panel opens');
+  assert.ok(doc.querySelectorAll('#cal-days .cal-day:not(.blank)').length >= 28, 'a full month of days');
+  assert.equal(doc.querySelectorAll('#cal-days .cal-day.today').length, 1, 'today is marked exactly once');
+
+  // The seeded exam sits on a real date — that day carries the exam marker.
+  const exam = data.examsFor('নবম')[0];
+  const parts = String(exam.date).replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6)).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const day = Number(parts[3]);
+  const cell = doc.querySelector(`#cal-days [data-cal-day="${day}"]`);
+  assert.ok(cell, `day ${day} exists in the grid`);
+  assert.ok(cell.querySelector('.mk.exam'), 'exam marker on the exam day');
+  assert.ok(cell.getAttribute('aria-label').includes('পরীক্ষা'), 'the marker is described in words, not colour only');
+
+  click(doc, `#cal-days [data-cal-day="${day}"]`);
+  assert.equal(doc.getElementById('detail-modal').getAttribute('aria-hidden'), 'false', 'day sheet opens');
+  assert.ok(doc.getElementById('detail-body').innerHTML.includes(exam.title), 'the day sheet lists the exam');
+  doc.getElementById('detail-modal').classList.remove('active');
+
+  const before = doc.getElementById('cal-month').textContent;
+  click(doc, '#more-calendar [data-cal="next"]');
+  assert.notEqual(doc.getElementById('cal-month').textContent, before, 'next month shown');
+  click(doc, '#more-calendar [data-cal="prev"]');
+  assert.equal(doc.getElementById('cal-month').textContent, before, 'and back again');
+});
+
+test('the fee panel carries the payment ledger', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  data.db.payments.add({ id: 'pay-test', studentId: student.id, month: 'সেপ্টেম্বর ২০২৬', amount: 1200, date: data.todayBn(), receivedBy: 'অ্যাডমিন' });
+
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="fees"]');
+  const panel = doc.getElementById('more-fees');
+  assert.ok(panel, 'fee panel opens');
+  assert.ok(panel.textContent.includes('পেমেন্ট হিস্ট্রি'), 'ledger section present');
+  assert.ok(panel.textContent.includes('সেপ্টেম্বর ২০২৬'), 'a real payment row is listed');
+  const paid = data.feeStatusFor(student).paid;
+  assert.ok(panel.textContent.includes(`৳${data.toBnDigits(paid)}`), 'totals match feeStatusFor()');
+});
+
+test('the result tab draws the subject-wise graph', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const r = data.scoreExam(exam, { 0: String(exam.questions[0].answer) });
+  data.db.examResults.add({ id: 'res-subj', examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+
+  click(doc, '.bottom-nav button[data-view="result"]');
+  const chart = doc.getElementById('result-subjects');
+  assert.ok(chart, 'subject chart rendered');
+  assert.ok(chart.textContent.includes(exam.subject), 'shows the subject');
+  const bar = chart.querySelector('.subject-bar');
+  assert.ok(bar, 'a bar per subject');
+  assert.ok(bar.getAttribute('aria-label').includes('%'), 'the bar has a text alternative');
+
+  const rows = data.subjectPerformanceFor(student);
+  assert.equal(rows.length, 1, 'one subject so far');
+  assert.ok(chart.textContent.includes(`${data.toBnDigits(rows[0].avg)}%`), 'the average matches the data layer');
+});
+
+test('an offline paper is graded now and synced when the net returns', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+
+  Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: false, configurable: true });
+  click(doc, '#home-content [data-act="startexam"]');
+  const form = doc.getElementById('exam-take-form');
+  assert.ok(form, 'the paper opens offline');
+
+  form.querySelector('input[name="q0"]').checked = true;
+  form.dispatchEvent(new doc.defaultView.Event('submit', { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  const stored = data.examResultFor(exam.id, student.id);
+  assert.ok(stored, 'the paper is graded on the device while offline');
+  assert.equal(stored.pendingSync, true, 'queued for the network');
+  assert.match(doc.getElementById('exam-player').innerHTML, /অফলাইনে জমা/, 'the student is told it will sync');
+
+  Object.defineProperty(doc.defaultView.navigator, 'onLine', { value: true, configurable: true });
+  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(data.pendingSyncResults().length, 0, 'nothing left in the queue');
+  assert.equal(data.examResultFor(exam.id, student.id).pendingSync, false, 'the result is marked delivered');
+});
+
+test('the answer review writes the verdict out and shows the right answer', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  data.db.examResults.add({
+    id: 'res-verdict', examId: exam.id, studentId: student.id, studentName: student.name,
+    score: 1, total: exam.questions.length, date: data.todayBn(),
+    answers: exam.questions.map((q, qi) => (qi === 0 ? q.answer : (q.answer === 0 ? 1 : 0)))
+  });
+
+  click(doc, '.bottom-nav button[data-view="result"]');
+  click(doc, '#result-content [data-act="review"]');
+  const player = doc.getElementById('exam-player').innerHTML;
+  assert.match(player, /✓ সঠিক/, 'a correct answer is labelled in words');
+  assert.match(player, /✗ ভুল/, 'a wrong answer is labelled in words');
+  assert.ok(player.includes('সঠিক উত্তর'), 'the right answer is spelled out');
+});
+
+test('the exam list carries full marks and the previous attempt', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const answers = Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)]));
+  const r = data.scoreExam(exam, answers);
+  data.db.examResults.add({ id: 'res-attempt', examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn(), answers: exam.questions.map((q) => q.answer) });
+
+  click(doc, '.bottom-nav button[data-view="exam"]');
+  const list = doc.getElementById('student-exam-list').textContent;
+  assert.ok(list.includes('পূর্ণমান'), 'full marks printed');
+  assert.ok(list.includes('আগের চেষ্টা'), 'the previous attempt is named');
+  assert.ok(list.includes(`${data.toBnDigits(r.score)}/${data.toBnDigits(r.total)}`), 'with the real score');
+});
+
+test('the notification centre carries exam, result and notice news', async () => {
+  const { doc, data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  const exam = data.examsFor(student.className)[0];
+  const r = data.scoreExam(exam, {});
+  data.db.examResults.add({ id: 'res-feed', examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+
+  // A second, still-to-sit paper for the class — news the student can act on.
+  data.db.exams.add({
+    id: 'exam-feed', title: 'নতুন মডেল টেস্ট', className: 'নবম', subject: 'পদার্থবিজ্ঞান',
+    author: 'রাহেলা আক্তার', date: data.todayBn(), time: '১০:০০', duration: 20,
+    startDate: data.todayBn(), endDate: '২০২৬-১২-৩১',
+    questions: [{ q: '১+১=?', options: ['১', '২', '৩', ''], answer: 1 }]
+  });
+
+  const kinds = new Set(data.notificationsFor(student).map((n) => n.kind));
+  for (const k of ['exam', 'result', 'notice', 'system']) assert.ok(kinds.has(k), `feed carries ${k} news`);
+
+  // A student with something outstanding sees the actionable kinds as well.
+  const owing = data.db.students.find('2026-09-002');
+  const owingKinds = new Set(data.notificationsFor(owing).map((n) => n.kind));
+  assert.ok(owingKinds.has('fee'), 'a dues reminder reaches the student who owes');
+  assert.ok(owingKinds.has('assignment') || owingKinds.has('exam'), 'so does pending work');
+
+  click(doc, '#bell');
+  const html = doc.getElementById('notif-list').innerHTML;
+  assert.ok(html.includes('📝'), 'exam icon rendered');
+  assert.ok(html.includes('🏆'), 'result icon rendered');
+});
+
+test('badges stay few and clearly earned', async () => {
+  const { data } = await bootHome();
+  const student = data.db.students.find('2026-09-001');
+  assert.equal(data.achievementsFor(student).length, 0, 'nothing earned yet on a fresh store');
+
+  const exam = data.examsFor(student.className)[0];
+  const answers = Object.fromEntries(exam.questions.map((_, i) => [i, String(exam.questions[i].answer)]));
+  const r = data.scoreExam(exam, answers);
+  data.db.examResults.add({ id: 'res-badge', examId: exam.id, studentId: student.id, studentName: student.name, score: r.score, total: r.total, date: data.todayBn() });
+
+  const badges = data.achievementsFor(student);
+  assert.equal(badges.length, 1, 'one perfect paper earns exactly one badge');
+  assert.ok(badges[0].name.includes('৯০'), 'named for what was done');
 });

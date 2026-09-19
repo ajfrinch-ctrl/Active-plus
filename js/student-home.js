@@ -8,19 +8,21 @@ import { initApp, escapeHtml, safeUrl, showToast, openModal, closeModal, getAuth
 import { signOut } from './auth.js';
 import {
   db, noticesFor,
-  greetingByHour, studyStreak, todayProgress, nextClass, upcomingExam,
+  greetingByHour, studyStreak, todayProgress, upcomingExam,
   performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
   recordStudyActivity, todayBn, homeCards, lastAccessedMaterial,
-  examWindow, assignmentStatus, dueLabel, latestNotifications, DATA_VERSION, subscribeRemote,
+  examWindow, assignmentStatus, dueLabel, DATA_VERSION, subscribeRemote,
   formatBnDate, orgInfo,
   submitAssignment, markMaterialComplete, completedMaterialIds, materialProgressFor, timeAgo,
-  homeFeatures, leaderboard
+  homeFeatures, leaderboard, notificationsFor, subjectPerformanceFor, paymentHistoryFor,
+  markResultsSynced, examFullMarks, BN_MONTHS, toBnDigits, examsFor
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
 
 /** More-menu items that are not already on the bottom nav or profile menu. */
 const MORE_MENU = [
+  { act: 'calendar', ico: '🗓️', label: 'ক্যালেন্ডার' },
   { act: 'routine', ico: '📅', label: 'রুটিন' },
   { act: 'assignments', ico: '📋', label: 'অ্যাসাইনমেন্ট' },
   { act: 'fees', ico: '💰', label: 'ফি' },
@@ -136,7 +138,15 @@ export function initStudentHome() {
     headerBar.classList.toggle('offline', !online);
   };
   paintNet();
-  window.addEventListener('online', () => { paintNet(); renderHomeSafe(); });
+  window.addEventListener('online', () => {
+    paintNet();
+    /* Papers submitted while offline were graded locally; the network coming
+       back is what turns them into delivered results. */
+    const queued = markResultsSynced();
+    if (queued) showToast(`${bn(queued)}টি অফলাইনে জমা দেওয়া উত্তরপত্র সিঙ্ক হয়েছে।`, 'success');
+    renderHomeSafe();
+    refreshExams?.();
+  });
   window.addEventListener('offline', paintNet);
 
   /* ---------- Bottom nav ---------- */
@@ -156,12 +166,23 @@ export function initStudentHome() {
     if (b) switchView(b.dataset.view);
   });
 
-  /* ---------- Notification centre ---------- */
-  document.getElementById('bell').addEventListener('click', () => {
-    const rows = noticesFor(student);
+  /* ---------- Notification centre — every event, not only notices ---------- */
+  const NOTIF_ICON = { fee: '💰', assignment: '📋', exam: '📝', result: '🏆', notice: '📢', system: '🔔' };
+  const renderNotifCentre = () => {
+    const rows = notificationsFor(student);
     document.getElementById('notif-list').innerHTML = rows.length
-      ? rows.map((n) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(n.title)}</div><div class="li-sub">${escapeHtml(timeAgo(n.createdAt) || formatBnDate(n.date))} · ${escapeHtml(n.audience || '')}</div></div></div>`).join('')
+      ? rows.map((n) => `
+        <div class="list-item notif-row" data-kind="${escapeHtml(n.kind)}">
+          <div class="li-main">
+            <div class="li-title">${NOTIF_ICON[n.kind] || '🔔'} ${escapeHtml(n.title)}</div>
+            <div class="li-sub">${escapeHtml(n.body || '')}${n.createdAt || n.date ? ` · ${escapeHtml(timeAgo(n.createdAt || n.date) || formatBnDate(n.date))}` : ''}</div>
+          </div>
+        </div>`).join('')
       : '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
+  };
+
+  document.getElementById('bell').addEventListener('click', () => {
+    renderNotifCentre();
     openModal('notif-center');
     db.notifications.list().filter((n) => !n.read && (n.target === 'সবাই' || n.target === 'শিক্ষার্থী'))
       .forEach((n) => db.notifications.update(n.id, { read: true }));
@@ -178,119 +199,99 @@ export function initStudentHome() {
    * Home = glance only. No shortcuts (bottom nav), no folds, no “more features”.
    * Each fact appears once.
    */
+  /**
+   * Home = one visual hero + the four cards a student acts on: today's state,
+   * the exam, what to study, the fee. Everything else is one tap away in আরও,
+   * so nothing is duplicated and nothing is buried twice.
+   */
   const renderHome = () => {
     const cards = homeCards();
     const progress = todayProgress(student);
     const { streak, week } = studyStreak();
-    const next = cards.nextClass ? nextClass() : null;
     const exam = cards.exam ? upcomingExam(student.className) : null;
     const fee = feeStatusFor(student);
     const tip = cards.tip ? latestTip() : null;
     const banners = cards.banners ? activeBanners() : [];
     const resume = cards.materials ? (lastAccessedMaterial() || classMaterials()[0] || null) : null;
-    const previewNotes = cards.notices ? latestNotifications(student, 2) : [];
-    const assignments = cards.assignments
-      ? db.assignments.list().filter((a) => a.className === student.className) : [];
-    const pendingAsg = assignments.filter((a) => {
-      const st = assignmentStatus(a, student).status;
-      return st === 'pending' || st === 'overdue';
-    });
-
-    const cell = (icon, value, label) =>
-      `<div class="analytics-cell"><span class="ico">${icon}</span><strong>${value}</strong><span>${label}</span></div>`;
 
     const parts = [];
 
-    /* 1. Notices & tip — under the fixed identity bar */
-    const bannerParts = [];
-    if (cards.banners && banners.length) {
-      bannerParts.push(`
-      <div class="carousel">
-        <div class="carousel-track" id="banner-track">
-          ${banners.map((b) => `
-          <div class="banner">
-            ${b.image ? `<img src="${escapeHtml(b.image)}" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:14px;margin-bottom:.5rem">` : ''}
-            <h3>📢 ${escapeHtml(b.title)}</h3>
-            <p>${escapeHtml(b.desc)}</p>
-            <button type="button" class="btn btn-small" data-act="banner" data-id="${escapeHtml(b.id)}">${escapeHtml(b.cta || 'দেখুন')}</button>
-          </div>`).join('')}
-        </div>
-        ${banners.length > 1 ? `<div class="carousel-dots" id="banner-dots">${banners.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
-      </div>`);
-    }
-    if (cards.notices && previewNotes.length) {
-      bannerParts.push(`
-      <div class="notice-banner" id="home-notice-banner">
-        <div class="h-title">🔔 নোটিশ</div>
-        ${previewNotes.map((n) => `
-        <div class="notif-preview">
-          <span class="dot"></span>
-          <div style="flex:1">
-            <div style="font-weight:600">${escapeHtml(n.title)}</div>
-            <div class="meta">${escapeHtml(n.body)} · ${escapeHtml(timeAgo(n.createdAt) || formatBnDate(n.date))}</div>
-          </div>
-        </div>`).join('')}
-        <button type="button" class="btn btn-secondary btn-block" data-act="notif" style="margin-top:.5rem">সব দেখুন</button>
-      </div>`);
-    }
-    if (tip) {
-      bannerParts.push(`
-      <div class="tip-banner" id="home-tip-banner">
-        <div class="h-title">💡 শিক্ষকের টিপ</div>
-        <p>"${escapeHtml(tip.text)}"</p>
-      </div>`);
-    }
-    if (bannerParts.length) {
-      parts.push(`<section class="home-section home-banners" aria-label="নোটিশ ও টিপ">${bannerParts.join('')}</section>`);
-    }
-
-    /* 2. Today's glance */
-    if (cards.progress || cards.exam || cards.fee) {
-      const cells = [
-        ...(cards.progress ? [
-          cell('📈', `${bn(progress.pct)}%`, 'আজকের প্রগ্রেস'),
-          cell('🔥', bn(streak), 'দিন স্ট্রিক')
-        ] : []),
-        ...(cards.exam ? [cell('📝', bn(exam ? 1 : 0), 'আসন্ন পরীক্ষা')] : []),
-        ...(cards.fee ? [cell('💰', fee.due > 0 ? `৳${bn(fee.due)}` : '✓', 'ফি')] : [])
-      ];
+    /* 1. Hero — banners and illustrations first, so the screen has a face.
+          The teacher's tip rides along as the last slide instead of its own
+          block (keeps the home short without losing the tip). */
+    const slides = banners.map((b) => ({
+      id: b.id, act: 'banner', image: b.image || '', kicker: '📢 ঘোষণা',
+      title: b.title, text: b.desc || '', cta: b.cta || 'দেখুন'
+    }));
+    if (tip) slides.push({ id: tip.id, act: '', image: '', kicker: '💡 শিক্ষকের টিপ', title: '', text: tip.text, cta: '' });
+    if (slides.length) {
       parts.push(`
-      <section class="home-section" aria-label="আজকের অবস্থা">
-        <h2 class="sec-title">📊 আজকের অবস্থা</h2>
-        <div class="hcard overview-card" id="student-overview">
-          <div class="analytics-grid">${cells.join('')}</div>
-          ${cards.progress ? `
-          <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
-          <div class="week" style="margin-top:.625rem">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>` : ''}
+      <section class="home-section home-hero" aria-label="হাইলাইট">
+        <div class="carousel">
+          <div class="carousel-track" id="banner-track">
+            ${slides.map((s) => `
+            <article class="hero-slide${s.image ? ' has-image' : ''}"${s.image ? ` style="background-image:linear-gradient(180deg, rgba(5,8,14,.30), rgba(5,8,14,.88)), url('${escapeHtml(safeUrl(s.image))}')"` : ''}>
+              <span class="hero-kicker">${escapeHtml(s.kicker)}</span>
+              ${s.title ? `<h3>${escapeHtml(s.title)}</h3>` : ''}
+              <p>${escapeHtml(s.text)}</p>
+              ${s.cta ? `<button type="button" class="btn btn-small" data-act="${s.act}" data-id="${escapeHtml(s.id)}">${escapeHtml(s.cta)}</button>` : ''}
+            </article>`).join('')}
+          </div>
+          ${slides.length > 1 ? `<div class="carousel-dots" id="banner-dots">${slides.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
         </div>
       </section>`);
     }
 
-    /* 3. Next class — once */
-    if (cards.nextClass) {
-      parts.push(next ? `
-      <div class="hcard" id="home-next-class">
-        <div class="h-title">পরবর্তী ক্লাস</div>
-        <div class="big">${escapeHtml(next.item.subject)}</div>
-        <div class="info-row"><span class="l">সময়</span><span class="v">${escapeHtml(next.when)} · ${escapeHtml(next.item.time)}</span></div>
-        <div class="info-row"><span class="l">শিক্ষক</span><span class="v">${escapeHtml(next.item.teacher)}</span></div>
-        <div class="info-row"><span class="l">কক্ষ</span><span class="v">${escapeHtml(next.item.room)}</span></div>
-        <button type="button" class="btn btn-secondary btn-block" data-act="routine" style="margin-top:.5rem">পূর্ণ রুটিন</button>
-      </div>` : `
-      <div class="hcard" id="home-next-class">
-        <div class="h-title">পরবর্তী ক্লাস</div>
-        <p>আপাতত কোনো ক্লাস নির্ধারিত নেই 🎉</p>
-      </div>`);
+    /* 2. Today's glance — the two numbers that change every day. */
+    if (cards.progress) {
+      parts.push(`
+      <section class="home-section" aria-label="আজকের অবস্থা">
+        <h2 class="sec-title">📊 আজকের অবস্থা</h2>
+        <div class="hcard overview-card" id="student-overview">
+          <div class="analytics-grid">
+            <div class="analytics-cell"><span class="ico">📈</span><strong>${bn(progress.pct)}%</strong><span>আজকের প্রগ্রেস</span></div>
+            <div class="analytics-cell"><span class="ico">🔥</span><strong>${bn(streak)}</strong><span>দিন স্ট্রিক</span></div>
+          </div>
+          <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
+          <div class="week" style="margin-top:.625rem">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
+        </div>
+      </section>`);
     }
 
-    /* 4. Continue learning — once (full list lives on Study tab) */
+    /* 3. The exam — the one thing with a deadline attached. */
+    if (cards.exam) {
+      if (exam) {
+        const win = examWindow(exam);
+        const marks = examFullMarks(exam);
+        parts.push(`
+        <div class="hcard hcard-exam" id="home-exam">
+          <div class="h-title">📝 আসন্ন পরীক্ষা</div>
+          <div class="big">${escapeHtml(exam.title)}</div>
+          <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(exam.subject)}</span></div>
+          <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(exam.date) || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
+          <div class="info-row"><span class="l">সময় ও নম্বর</span><span class="v">${bn(exam.duration || 0)} মিনিট · ${bn(marks)}টি প্রশ্ন · পূর্ণমান ${bn(marks)}</span></div>
+          ${win.canStart
+            ? `<button type="button" class="btn btn-block" data-act="startexam" style="margin-top:.5rem">পরীক্ষা শুরু করুন</button>`
+            : `<button type="button" class="btn btn-secondary btn-block" data-act="exam" style="margin-top:.5rem">পরীক্ষা দেখুন</button>
+               <p class="meta" style="margin-top:.5rem">${escapeHtml(win.state === 'closed' ? 'এই পরীক্ষার সময় শেষ।' : 'পরীক্ষা শুরুর সময় হয়নি।')}</p>`}
+        </div>`);
+      } else {
+        parts.push(`
+        <div class="hcard" id="home-exam">
+          <div class="h-title">📝 আসন্ন পরীক্ষা</div>
+          <p>কোনো পরীক্ষা নির্ধারিত নেই।</p>
+        </div>`);
+      }
+    }
+
+    /* 4. Continue learning. */
     if (cards.materials) {
       if (resume) {
         const mp = materialProgressFor(student, student.className);
         const doneThis = completedMaterialIds(student).includes(resume.id);
         parts.push(`
-        <div class="hcard" id="home-resume">
-          <div class="h-title">পড়া চালিয়ে যান</div>
+        <div class="hcard hcard-study" id="home-resume">
+          <div class="h-title">📚 পড়া চালিয়ে যান</div>
           <div class="big">${escapeHtml(resume.title)}</div>
           <div class="meta">${escapeHtml(resume.subject)} · ${escapeHtml(resume.type || '')}</div>
           <div class="progress-bar" style="margin:.5rem 0"><div class="progress-fill" style="width:${mp.pct}%"></div></div>
@@ -300,96 +301,34 @@ export function initStudentHome() {
       } else {
         parts.push(`
         <div class="hcard" id="home-resume">
-          <div class="h-title">পড়া চালিয়ে যান</div>
+          <div class="h-title">📚 পড়া চালিয়ে যান</div>
           <p>নতুন কিছু শেখা শুরু করুন 📚</p>
           <button type="button" class="btn btn-secondary btn-block" data-act="study" style="margin-top:.5rem">স্টাডি খুলুন</button>
         </div>`);
       }
     }
 
-    /* 5. Upcoming exam — once (list lives on Exam tab) */
-    if (cards.exam) {
-      if (exam) {
-        const win = examWindow(exam);
-        parts.push(`
-        <div class="hcard" id="home-exam">
-          <div class="h-title">আসন্ন পরীক্ষা</div>
-          <div class="big">${escapeHtml(exam.title)}</div>
-          <div class="info-row"><span class="l">বিষয়</span><span class="v">${escapeHtml(exam.subject)}</span></div>
-          <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(exam.date) || '—')}${exam.time ? ` · ${escapeHtml(exam.time)}` : ''}</span></div>
-          <div class="info-row"><span class="l">সময়</span><span class="v">${bn(exam.duration || 0)} মিনিট · ${bn(exam.questions.length)} প্রশ্ন</span></div>
-          ${win.canStart
-            ? `<button type="button" class="btn btn-block" data-act="startexam" style="margin-top:.5rem">পরীক্ষা শুরু করুন</button>`
-            : `<button type="button" class="btn btn-secondary btn-block" data-act="exam" style="margin-top:.5rem">পরীক্ষা দেখুন</button>
-               <p class="meta" style="margin-top:.5rem">${escapeHtml(win.state === 'closed' ? 'এই পরীক্ষার সময় শেষ।' : 'পরীক্ষা শুরুর সময় হয়নি।')}</p>`}
-        </div>`);
-      } else {
-        parts.push(`
-        <div class="hcard" id="home-exam">
-          <div class="h-title">আসন্ন পরীক্ষা</div>
-          <p>কোনো পরীক্ষা নির্ধারিত নেই।</p>
-        </div>`);
-      }
-    }
-
-    /* 6. Assignments — up to 3 rows; full list lives in More */
-    if (cards.assignments) {
-      if (assignments.length) {
-        const show = (pendingAsg.length ? pendingAsg : assignments).slice(0, 3);
-        parts.push(`
-        <div class="hcard" id="home-assignments">
-          <div class="h-title">${pendingAsg.length ? 'বাকি অ্যাসাইনমেন্ট' : 'অ্যাসাইনমেন্ট'}</div>
-          ${show.map((a) => {
-            const st = assignmentStatus(a, student);
-            return `<div class="info-row" role="button" tabindex="0" data-act="assignment" data-id="${escapeHtml(a.id)}" style="cursor:pointer">
-              <span class="l">📋 ${escapeHtml(a.title)}<br><span class="chip ${st.status}">${STATUS_BN[st.status]}</span></span>
-              <span class="v">${escapeHtml(dueLabel(a, student))}</span>
-            </div>`;
-          }).join('')}
-          <button type="button" class="btn btn-secondary btn-block" data-act="assignments" style="margin-top:.5rem">সব দেখুন</button>
-        </div>`);
-      } else {
-        parts.push(`
-        <div class="hcard" id="home-assignments">
-          <div class="h-title">অ্যাসাইনমেন্ট</div>
-          <p>সব শেষ! 🎉</p>
-        </div>`);
-      }
-    }
-
-    /* 7. Latest result — once (full history on Result tab) */
-    if (cards.performance || cards.exam) {
-      const mine = db.examResults.list().filter((r) => r.studentId === student.id).slice(-1)[0];
-      if (mine) {
-        const ex = db.exams.find(mine.examId);
-        const pct = Math.round(mine.score / mine.total * 100);
-        const rank = cards.leaderboard ? performanceFor(student)?.rank : null;
-        parts.push(`
-        <div class="hcard" id="home-result">
-          <div class="h-title">🏆 সাম্প্রতিক ফলাফল</div>
-          <div class="big">${escapeHtml(ex?.title || 'পরীক্ষা')}</div>
-          <div class="info-row"><span class="l">স্কোর</span><span class="v">${bn(mine.score)}/${bn(mine.total)} (${bn(pct)}%)</span></div>
-          ${rank != null ? `<div class="info-row"><span class="l">অবস্থান</span><span class="v">#${bn(rank)}</span></div>
-          <div class="info-row"><span class="l">র‍্যাঙ্ক</span><span class="v">#${bn(rank)}</span></div>` : ''}
-          <button type="button" class="btn btn-secondary btn-block" data-act="result" style="margin-top:.5rem">ফলাফল দেখুন</button>
-        </div>`);
-      }
-    }
-
-    /* 8. Fee status */
+    /* 5. Fee — one line, detailed ledger lives in আরও → ফি. */
     if (cards.fee) {
       parts.push(fee.due > 0 ? `
-      <div class="hcard" id="home-fee">
+      <div class="hcard hcard-fee" id="home-fee">
         <div class="h-title">💰 ফি বকেয়া</div>
         <div class="info-row"><span class="l">বকেয়া</span><span class="v" style="color:var(--warning)">৳${bn(fee.due)}</span></div>
         ${fee.nextDue ? `<div class="info-row"><span class="l">মাস</span><span class="v">${escapeHtml(fee.nextDue.month)}</span></div>` : ''}
-        <button type="button" class="btn btn-secondary btn-block" data-act="fees" style="margin-top:.5rem">বিস্তারিত</button>
+        <button type="button" class="btn btn-secondary btn-block" data-act="fees" style="margin-top:.5rem">বিস্তারিত ও পেমেন্ট হিস্ট্রি</button>
       </div>` : `
-      <div class="hcard" id="home-fee">
+      <div class="hcard hcard-fee" id="home-fee">
         <div class="h-title">💰 ফি</div>
         <p>সব ফি পরিশোধিত ✓</p>
       </div>`);
     }
+
+    /* 6. One small door to everything else (calendar, routine, notices …). */
+    parts.push(`
+      <button type="button" class="home-more-link" data-act="more">
+        <span aria-hidden="true">🗓️</span> ক্যালেন্ডার, রুটিন, নোটিশসহ সব কিছু
+        <span class="chev" aria-hidden="true">›</span>
+      </button>`);
 
     host.innerHTML = parts.join('\n');
   };
@@ -424,13 +363,13 @@ export function initStudentHome() {
     if (!el) return;
     const act = el.dataset.act;
     if (act === 'exam' || act === 'startexam') {
-      if (!navigator.onLine) {
-        showToast('অফলাইনে পরীক্ষা দেওয়া যাবে না — ইন্টারনেট সংযোগ ফিরলে আবার চেষ্টা করুন।', 'error');
-        return;
-      }
+      /* An exam can be sat offline: it is graded on the device straight away
+         and mirrored as soon as the network returns. */
       switchView('exam');
       if (act === 'startexam') refreshExams?.start?.();
     } else if (act === 'result' || act === 'progress') switchView('result');
+    else if (act === 'more') switchView('more');
+    else if (act === 'calendar') openMore('calendar');
     else if (act === 'review') { switchView('exam'); refreshExams?.review?.(el.dataset.exam); }
     else if (act === 'study' || act === 'downloads') switchView('study');
     else if (['routine', 'fees', 'notices', 'assignments', 'achievements', 'certificates', 'streak', 'profile', 'settings', 'help'].includes(act)) openMore(act);
@@ -528,13 +467,15 @@ export function initStudentHome() {
     const downloadable = classMaterials().filter((m) => (m.type || '').includes('পিডিএফ') || m.file || m.link);
     const streak = studyStreak();
     const enabled = homeFeatures();
+    const feeTotals = feeStatusFor(student);
+    const payments = paymentHistoryFor(student);
 
     const row = (label, value) =>
       `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
 
     const menuItems = MORE_MENU.filter((f) => {
       // Core utilities always stay; optional extras follow admin feature flags.
-      if (['routine', 'assignments', 'fees', 'notices'].includes(f.act)) return true;
+      if (['calendar', 'routine', 'assignments', 'fees', 'notices'].includes(f.act)) return true;
       if (f.act === 'achievements') return enabled.includes('achievements');
       if (f.act === 'certificates') return enabled.includes('certificates');
       if (f.act === 'downloads') return enabled.includes('downloads');
@@ -555,10 +496,19 @@ export function initStudentHome() {
       routine: `
       <div class="hcard" id="more-routine"><div class="h-title">রুটিন</div>${
         db.routine.list().map((r) => row(`${r.day} · ${r.subject}`, `${r.time} · ${r.room || ''}`)).join('') || '<p>রুটিন নেই।</p>'}</div>`,
+      calendar: calendarPanel(),
       fees: `
-      <div class="hcard" id="more-fees"><div class="h-title">ফি</div>${
+      <div class="hcard" id="more-fees"><div class="h-title">💰 ফি</div>${
         db.fees.list().filter((f) => f.studentId === student.id).map((f) =>
-          `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}</div>`,
+          `<div class="info-row"><span class="l">${escapeHtml(f.month)}</span><span class="v" style="color:${f.status === 'বকেয়া' ? 'var(--warning)' : 'var(--success)'}">${escapeHtml(f.status)} · ৳${bn(f.amount)}</span></div>`).join('') || '<p>ফি তথ্য নেই।</p>'}
+        <div class="info-row"><span class="l">মোট পরিশোধিত</span><span class="v">৳${bn(feeTotals.paid)}</span></div>
+        ${feeTotals.due > 0 ? `<div class="info-row"><span class="l">মোট বকেয়া</span><span class="v" style="color:var(--warning)">৳${bn(feeTotals.due)}</span></div>` : ''}
+        <div class="h-title" style="margin-top:.75rem">🧾 পেমেন্ট হিস্ট্রি</div>${
+        payments.length
+          ? payments.map((p) => `<div class="info-row"><span class="l">${escapeHtml(p.month || '')}
+              <br><small class="meta">${escapeHtml(formatBnDate(p.date) || p.date || '')}${p.receiptNo ? ` · রসিদ ${escapeHtml(p.receiptNo)}` : ''}${p.receivedBy ? ` · ${escapeHtml(p.receivedBy)}` : ''}</small></span>
+              <span class="v" style="color:var(--success)">৳${bn(p.amount)} ✓</span></div>`).join('')
+          : '<p class="meta">এখনো কোনো পেমেন্ট হয়নি।</p>'}</div>`,
       notices: `
       <div class="hcard" id="more-notices"><div class="h-title">নোটিশ</div>${
         noticesFor(student).map((n) => row(n.title, formatBnDate(n.date))).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>`,
@@ -657,7 +607,31 @@ export function initStudentHome() {
       }
     });
 
+    // The calendar paints its own grid (month state lives outside the markup).
+    if (document.getElementById('cal-days')) calendarHtml();
+
+    /* Keyboard parity for the role="button" rows inside a More panel — a tap
+       is not the only way in (Enter/Space open the same row). */
+    moreHost.onkeydown = (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('[role="button"][data-asg], [role="button"][data-mat2]');
+      if (!row) return;
+      e.preventDefault();
+      row.click();
+    };
+
     moreHost.onclick = (e) => {
+      const calNav = e.target.closest('[data-cal]');
+      if (calNav) {
+        const step = calNav.dataset.cal === 'next' ? 1 : -1;
+        const moved = new Date(calState.y, calState.m + step, 1);
+        calState.y = moved.getFullYear();
+        calState.m = moved.getMonth();
+        renderMore('calendar');
+        return;
+      }
+      const calDay = e.target.closest('[data-cal-day]');
+      if (calDay) { openCalendarDay(Number(calDay.dataset.calDay)); return; }
       const asg = e.target.closest('[data-asg]');
       if (asg) { openAssignment(asg.dataset.asg); return; }
       const mat = e.target.closest('[data-mat2]');
@@ -721,36 +695,149 @@ export function initStudentHome() {
     const perf = performanceFor(student);
     const mine = db.examResults.list().filter((r) => r.studentId === student.id);
     document.getElementById('result-content').innerHTML = `
-      ${perf ? `<div class="hcard"><div class="h-title">সারসংক্ষেপ</div>
+      ${perf ? `<div class="hcard" id="result-summary"><div class="h-title">📈 সারসংক্ষেপ</div>
         <div class="info-row"><span class="l">গড়</span><span class="v">${bn(perf.avg)}%</span></div>
         <div class="info-row"><span class="l">সেরা</span><span class="v">${bn(perf.best)}%</span></div>
         <div class="info-row"><span class="l">টেস্ট</span><span class="v">${bn(perf.tests)}</span></div>
         <div class="info-row"><span class="l">র‍্যাঙ্ক</span><span class="v">#${bn(perf.rank)}</span></div></div>` : ''}
-      <div class="hcard"><div class="h-title">সব ফলাফল</div>${
+      ${subjectChart()}
+      <div class="hcard" id="result-list"><div class="h-title">🏆 সব ফলাফল</div>${
         mine.length ? mine.map((r) => {
           const ex = db.exams.find(r.examId);
-          const pct = Math.round(r.score / r.total * 100);
+          const pct = r.total ? Math.round(r.score / r.total * 100) : 0;
           const reviewable = Array.isArray(r.answers) && ex;
           const when = formatBnDate(r.date);
-          return `<div class="info-row"><span class="l">${escapeHtml(ex?.title || '')}${when ? `<br><small class="meta">জমা: ${escapeHtml(when)}</small>` : ''}</span>
-            <span class="v">${bn(pct)}%${reviewable ? ` <button type="button" class="btn btn-small btn-secondary" data-act="review" data-exam="${escapeHtml(r.examId)}">উত্তর</button>` : ''}</span></div>`;
+          /* Position in this one exam — the class merit list, per paper.
+             Gated by the same admin switch as the merit list itself. */
+          const pos = leaderboardEnabled()
+            ? leaderboard(r.examId).find((row) => row.studentId === student.id)?.position
+            : null;
+          return `<div class="info-row"><span class="l">${escapeHtml(ex?.title || '')}
+              <br><small class="meta">স্কোর ${bn(r.score)}/${bn(r.total)} · ${bn(pct)}%${pos ? ` · অবস্থান #${bn(pos)}` : ''}</small>
+              ${when ? `<br><small class="meta">জমা: ${escapeHtml(when)}${r.pendingSync ? ' · অফলাইনে জমা, সিঙ্ক বাকি' : ''}</small>` : ''}</span>
+            <span class="v">${reviewable ? ` <button type="button" class="btn btn-small btn-secondary" data-act="review" data-exam="${escapeHtml(r.examId)}">উত্তর দেখুন</button>` : ''}</span></div>`;
         }).join('') : '<p>কোনো ফলাফল নেই।</p>'}</div>
       ${leaderboardCard()}`;
   }
 
-  function leaderboardCard() {
+  /** Subject-wise bars — where the student is strong and where to revise. */
+  function subjectChart() {
+    const rows = subjectPerformanceFor(student);
+    if (!rows.length) return '';
+    return `<div class="hcard" id="result-subjects">
+      <div class="h-title">📊 বিষয়ভিত্তিক ফল</div>
+      ${rows.map((s) => `
+        <div class="subject-row">
+          <span class="l">${escapeHtml(s.subject)} <small class="meta">· ${bn(s.tests)}টি পরীক্ষা</small></span>
+          <span class="v">${bn(s.avg)}%</span>
+          <span class="subject-bar" role="img" aria-label="${escapeHtml(s.subject)} — ${bn(s.avg)}%"><i style="width:${Math.max(3, Math.min(100, s.avg))}%"></i></span>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  /** Is the merit list switched on for students? (admin setting) */
+  function leaderboardEnabled() {
     const settings = db.settings.get();
-    if (!(settings.leaderboard ?? settings.homeCards?.leaderboard)) return '';
+    return Boolean(settings.leaderboard ?? settings.homeCards?.leaderboard);
+  }
+
+  /** Class merit list. Names stay hidden: position + roll is enough to find
+      yourself without publishing a classmate's marks next to their name. */
+  function leaderboardCard() {
+    if (!leaderboardEnabled()) return '';
     const mine = leaderboard().filter((r) => r.className === student.className);
     if (!mine.length) return '';
     const top = mine.slice(0, 5);
     const myRow = mine.find((r) => r.studentId === student.id);
-    return `<div class="hcard"><div class="h-title">🏆 ক্লাস লিডারবোর্ড</div>
-      <p class="meta">${escapeHtml(student.className)} — পরীক্ষার শতাংশ অনুযায়ী</p>
-      ${top.map((r) => `<div class="info-row${r.studentId === student.id ? ' me' : ''}">
-        <span class="l">${bn(r.position)}. ${escapeHtml(r.studentName)}</span>
-        <span class="v">${bn(r.pct)}%</span></div>`).join('')}
-      ${myRow && myRow.position > 5 ? `<div class="info-row me"><span class="l">${bn(myRow.position)}. ${escapeHtml(myRow.studentName)} (আপনি)</span><span class="v">${bn(myRow.pct)}%</span></div>` : ''}</div>`;
+    const label = (row) => {
+      const who = db.students.find(row.studentId);
+      return `রোল ${escapeHtml(String(who?.roll || who?.id || row.studentId))}`;
+    };
+    const row = (r) => `<div class="info-row${r.studentId === student.id ? ' me' : ''}">
+        <span class="l">${bn(r.position)}. ${label(r)}${r.studentId === student.id ? ' (আপনি)' : ''}</span>
+        <span class="v">${bn(r.pct)}%</span></div>`;
+    return `<div class="hcard" id="result-leaderboard"><div class="h-title">🏆 ক্লাস মেধা তালিকা</div>
+      <p class="meta">${escapeHtml(student.className)} — নাম গোপন, শুধু রোল ও শতাংশ</p>
+      ${top.map(row).join('')}
+      ${myRow && myRow.position > 5 ? row(myRow) : ''}</div>`;
+  }
+
+  /* ---------------- Calendar: classes, exams and deadlines ---------------- */
+
+  const CAL_SHORT = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+  const CAL_LONG = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  const asciiDigits = (value) => String(value ?? '').replace(/[\u09E6-\u09EF]/g, (d) => String(d.charCodeAt(0) - 0x09E6));
+  /** Any stored date → { y, m, d } numbers, or null when it carries no date. */
+  const dateParts = (value) => {
+    const m = asciiDigits(value).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    return m ? { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) } : null;
+  };
+  const todayParts = () => dateParts(todayBn()) || (() => { const n = new Date(); return { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() }; })();
+  const calState = (() => { const t = todayParts(); return { y: t.y, m: t.m - 1 }; })();
+
+  /** Everything happening on one calendar day. */
+  const eventsOn = (y, m, d) => {
+    const weekday = CAL_LONG[new Date(y, m - 1, d).getDay()];
+    return {
+      date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+      classes: db.routine.list().filter((r) => r.day === weekday),
+      exams: examsFor(student.className).filter((e) => { const p = dateParts(e.date); return p && p.y === y && p.m === m && p.d === d; }),
+      deadlines: db.assignments.list()
+        .filter((a) => a.className === student.className)
+        .filter((a) => { const p = dateParts(a.deadline); return p && p.y === y && p.m === m && p.d === d; })
+    };
+  };
+
+  function calendarHtml() {
+    const { y, m } = calState;
+    const first = new Date(y, m, 1).getDay();
+    const days = new Date(y, m + 1, 0).getDate();
+    const t = todayParts();
+    document.getElementById('cal-month').textContent = `${BN_MONTHS[m]} ${toBnDigits(y)}`;
+    const cells = [];
+    for (let i = 0; i < first; i += 1) cells.push('<span class="cal-day blank" aria-hidden="true"></span>');
+    for (let d = 1; d <= days; d += 1) {
+      const ev = eventsOn(y, m + 1, d);
+      const isToday = t.y === y && t.m === m + 1 && t.d === d;
+      const marks = [
+        ev.exams.length ? `<b class="mk exam" aria-hidden="true">📝</b>` : '',
+        ev.classes.length ? `<b class="mk class" aria-hidden="true">📚</b>` : '',
+        ev.deadlines.length ? `<b class="mk due" aria-hidden="true">📋</b>` : ''
+      ].join('');
+      const label = `${toBnDigits(d)} ${BN_MONTHS[m]}${isToday ? ' — আজ' : ''}${ev.exams.length ? ` · ${ev.exams.length}টি পরীক্ষা` : ''}${ev.classes.length ? ` · ${ev.classes.length}টি ক্লাস` : ''}`;
+      cells.push(`<button type="button" class="cal-day${isToday ? ' today' : ''}${marks ? ' has-event' : ''}"
+        data-cal-day="${d}" aria-label="${escapeHtml(label)}">${toBnDigits(d)}${marks}</button>`);
+    }
+    document.getElementById('cal-days').innerHTML = cells.join('');
+  }
+
+  function calendarPanel() {
+    return `
+      <div class="hcard" id="more-calendar">
+        <div class="h-title">🗓️ ক্যালেন্ডার</div>
+        <div class="cal-head">
+          <button type="button" class="btn btn-small btn-secondary" data-cal="prev" aria-label="আগের মাস">‹</button>
+          <strong id="cal-month">—</strong>
+          <button type="button" class="btn btn-small btn-secondary" data-cal="next" aria-label="পরের মাস">›</button>
+        </div>
+        <div class="cal-grid cal-week" aria-hidden="true">${CAL_SHORT.map((d) => `<span>${d}</span>`).join('')}</div>
+        <div class="cal-grid" id="cal-days"></div>
+        <p class="meta" style="margin-top:.5rem">📝 পরীক্ষা · 📚 ক্লাস · 📋 জমার শেষ দিন — যেকোনো দিনে চাপ দিলে বিস্তারিত দেখা যাবে।</p>
+      </div>`;
+  }
+
+  /** A day sheet: classes, exams and deadlines for the tapped date. */
+  function openCalendarDay(d) {
+    const { y, m } = calState;
+    const ev = eventsOn(y, m + 1, d);
+    const row = (label, value) => `<div class="info-row"><span class="l">${escapeHtml(label)}</span><span class="v">${escapeHtml(value)}</span></div>`;
+    showDetail(`${toBnDigits(d)} ${BN_MONTHS[m]} ${toBnDigits(y)}`, `
+      ${ev.exams.length ? `<div class="h-title">📝 পরীক্ষা</div>${ev.exams.map((e) => `
+        <div class="info-row"><span class="l">${escapeHtml(e.title)}<br><small class="meta">${escapeHtml(e.subject)} · ${bn(e.duration || 0)} মিনিট · পূর্ণমান ${bn(examFullMarks(e))}</small></span>
+        <span class="v">${escapeHtml(e.time || '')}</span></div>`).join('')}` : ''}
+      ${ev.classes.length ? `<div class="h-title" style="margin-top:.75rem">📚 ক্লাস</div>${ev.classes.map((c) => `${row(`${c.subject} · ${c.time}`, `${c.room || ''} · ${c.teacher || ''}`)}`).join('')}` : ''}
+      ${ev.deadlines.length ? `<div class="h-title" style="margin-top:.75rem">📋 অ্যাসাইনমেন্ট</div>${ev.deadlines.map((a) => `${row(a.title, dueLabel(a, student))}`).join('')}` : ''}
+      ${!ev.exams.length && !ev.classes.length && !ev.deadlines.length ? '<p class="empty-state">এই দিনে কিছু নেই।</p>' : ''}`);
   }
 
   setTimeout(() => {
