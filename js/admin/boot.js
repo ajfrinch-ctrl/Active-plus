@@ -158,36 +158,127 @@ export async function bootAdminPanel() {
       classFilter.innerHTML = classOptionsHtml(ALL_CLASSES);
 
       /* Student list quick search (দ্রুত সার্চ ও ফিল্টার): name, id, phone,
-         guardian, school or roll — combined with the class filter. The global
-         top-bar search pre-fills this input to isolate a single student. */
+         guardian, school or roll — combined with the class filter and a sort.
+         The global top-bar search pre-fills this input to isolate one student. */
       const studentSearch = document.getElementById('student-search');
+      const studentSort = document.getElementById('student-sort');
+      const searchClear = document.getElementById('student-search-clear');
+      const studentSummary = document.getElementById('student-summary');
+
+      // Admission dates are stored in the canonical Bengali ISO shape, so a
+      // plain string compare orders them correctly newest-first.
+      const STUDENT_SORTS = {
+        name: (a, b) => String(a.name || '').localeCompare(String(b.name || '')),
+        id: (a, b) => String(a.id || '').localeCompare(String(b.id || '')),
+        class: (a, b) => String(a.className || '').localeCompare(String(b.className || ''))
+          || String(a.roll || '').localeCompare(String(b.roll || '')),
+        newest: (a, b) => String(b.admissionDate || '').localeCompare(String(a.admissionDate || ''))
+      };
+
+      const toAsciiDigits = (value) => String(value).replace(/[০-৯]/g, (d) => String('০১২৩৪৫৬৭৮৯'.indexOf(d)));
+      const telHref = (value) => {
+        const digits = toAsciiDigits(value || '').replace(/[^\d+]/g, '');
+        return digits.length >= 6 ? `tel:${digits}` : '';
+      };
+      // A name may open with a consonant + matra (কো, সু…), so the initial is
+      // taken as one grapheme, not one code unit; charAt(0) would print "ক".
+      const graphemes = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'
+        ? new Intl.Segmenter('bn', { granularity: 'grapheme' })
+        : null;
+      const initialOf = (name) => {
+        const value = String(name || '').trim();
+        if (!value) return '·';
+        const first = graphemes ? graphemes.segment(value)[Symbol.iterator]().next().value?.segment : value.charAt(0);
+        return first || '·';
+      };
+
+      const studentColumns = () => [
+        {
+          key: 'name', label: 'শিক্ষার্থী',
+          render: (row) => {
+            const sub = [row.roll ? `রোল ${row.roll}` : '', row.section || ''].filter(Boolean).join(' · ');
+            return `<span class="cell-student">
+              <span class="cell-avatar" aria-hidden="true">${escapeHtml(initialOf(row.name))}</span>
+              <span class="cell-student-text">
+                <span class="cell-student-name">${escapeHtml(row.name || '—')}</span>
+                ${sub ? `<span class="cell-student-sub">${escapeHtml(sub)}</span>` : ''}
+              </span>
+            </span>`;
+          }
+        },
+        { key: 'id', label: 'আইডি', render: (row) => `<span class="cell-id">${escapeHtml(row.id)}</span>` },
+        { key: 'className', label: 'শ্রেণি', render: (row) => `<span class="badge accent">${escapeHtml(row.className || '—')}</span>` },
+        { key: 'school', label: 'স্কুল / কলেজ', render: (row) => escapeHtml(row.school || '—') },
+        {
+          key: 'phone', label: 'মোবাইল',
+          render: (row) => {
+            const href = telHref(row.phone);
+            const label = escapeHtml(row.phone || '—');
+            return href ? `<a class="cell-tel" href="${href}">${label}</a>` : label;
+          }
+        },
+        { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'সক্রিয়' ? 'success' : 'warning'}">${escapeHtml(row.status)}</span>` },
+        // Icon-only so the row stops forcing the whole table into a
+        // horizontal scroll; the aria-label names the student for readers.
+        {
+          key: '_actions', label: 'অ্যাকশন',
+          render: (row) => {
+            const who = escapeHtml(row.name || row.id);
+            return `<span class="row-actions">
+              <button type="button" class="btn-icon" data-profile-student="${escapeHtml(row.id)}" title="প্রোফাইল" aria-label="${who} — প্রোফাইল">👤</button>
+              <button type="button" class="btn-icon is-wa" data-wa-student="${escapeHtml(row.id)}" title="হোয়াটসঅ্যাপ" aria-label="${who} — হোয়াটসঅ্যাপ">💬</button>
+              <button type="button" class="btn-icon" data-edit-student="${escapeHtml(row.id)}" title="সম্পাদনা" aria-label="${who} — সম্পাদনা">✎</button>
+              <button type="button" class="btn-icon is-danger" data-delete-student="${escapeHtml(row.id)}" title="মুছুন" aria-label="${who} — মুছুন">🗑</button>
+            </span>`;
+          }
+        }
+      ];
+
       const renderStudents = () => {
         const query = (studentSearch?.value || '').trim().toLowerCase();
-        let rows = studentsOfClass(classFilter.value || ALL_CLASSES);
-        if (query) {
-          rows = rows.filter((s) => [s.name, s.id, s.phone, s.guardian, s.school, s.roll]
-            .some((value) => String(value ?? '').toLowerCase().includes(query)));
+        const classValue = classFilter.value || ALL_CLASSES;
+        const scope = studentsOfClass(classValue);
+        const rows = (query
+          ? scope.filter((s) => [s.name, s.id, s.phone, s.guardian, s.school, s.roll]
+            .some((value) => String(value ?? '').toLowerCase().includes(query)))
+          : scope.slice()
+        ).sort(STUDENT_SORTS[studentSort?.value] || STUDENT_SORTS.name);
+
+        const filtering = Boolean(query) || classValue !== ALL_CLASSES;
+        renderTable('#student-table', studentColumns(), rows,
+          filtering
+            ? 'এই ফিল্টারে কোনো শিক্ষার্থী নেই — সার্চ বা ক্লাস বদলে দেখুন।'
+            : 'এখনো কোনো শিক্ষার্থী ভর্তি হয়নি।');
+
+        // The count span lives inside the summary line, so the whole line is
+        // rebuilt at once — setting textContent on the parent would destroy the
+        // span that renderOverview() also writes.
+        if (studentSummary) {
+          const suffix = classValue !== ALL_CLASSES ? ` · ${escapeHtml(classValue)}` : '';
+          studentSummary.innerHTML = query
+            ? `<span id="student-count">${bn(rows.length)}</span> / ${bn(scope.length)} জন মিলেছে${suffix}`
+            : `<span id="student-count">${bn(rows.length)}</span> জন শিক্ষার্থী${suffix}`;
+        } else {
+          document.getElementById('student-count').textContent = bn(rows.length);
         }
-        renderTable('#student-table', [
-          { key: 'id', label: 'আইডি' },
-          { key: 'name', label: 'নাম' },
-          { key: 'className', label: 'শ্রেণি' },
-          { key: 'school', label: 'স্কুল / কলেজ' },
-          { key: 'phone', label: 'মোবাইল' },
-          { key: 'status', label: 'অবস্থা', render: (row) => `<span class="badge ${row.status === 'সক্রিয়' ? 'success' : 'warning'}">${escapeHtml(row.status)}</span>` },
-          { key: '_actions', label: 'অ্যাকশন', render: (row) => `
-            <span class="row-actions">
-              <button type="button" class="btn btn-small" data-profile-student="${escapeHtml(row.id)}">প্রোফাইল</button>
-              <button type="button" class="btn btn-small btn-success" data-wa-student="${escapeHtml(row.id)}">হোয়াটসঅ্যাপ</button>
-              <button type="button" class="btn btn-small btn-secondary" data-edit-student="${escapeHtml(row.id)}">সম্পাদনা</button>
-              <button type="button" class="btn btn-small btn-error" data-delete-student="${escapeHtml(row.id)}">মুছুন</button>
-            </span>` }
-        ], rows);
-        document.getElementById('student-count').textContent = bn(rows.length);
       };
 
       classFilter.addEventListener('change', renderStudents);
-      studentSearch?.addEventListener('input', renderStudents);
+      studentSort?.addEventListener('change', renderStudents);
+      // Repainting the whole roster on every keystroke is what made the list
+      // feel laggy while typing — wait for a pause, like the CRUD engine does.
+      let studentSearchTimer = null;
+      studentSearch?.addEventListener('input', () => {
+        if (searchClear) searchClear.hidden = !studentSearch.value;
+        clearTimeout(studentSearchTimer);
+        studentSearchTimer = setTimeout(renderStudents, 160);
+      });
+      searchClear?.addEventListener('click', () => {
+        studentSearch.value = '';
+        searchClear.hidden = true;
+        studentSearch.focus();
+        renderStudents();
+      });
 
       const studentForm = document.getElementById('student-form');
       const classSelect = document.getElementById('student-class');

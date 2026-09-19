@@ -123,24 +123,46 @@
 
         <!-- ======================= Students ======================= -->
         <section class="tab-panel" id="tab-students" hidden>
-          <h2 class="section-title">
-            শিক্ষার্থী তালিকা · Students (<span id="student-count">০</span>)
-            <button type="button" class="btn btn-small" id="open-student-modal">+ নতুন ভর্তি</button>
-            <button type="button" class="btn btn-small btn-secondary" id="students-csv">⬇ সিএসভি</button>
-          </h2>
+          <!-- Title and actions live in their own flex row: buttons used to sit
+               inside the <h2>, so screen readers read "নতুন ভর্তি সিএসভি" as part
+               of the heading and the two buttons wrapped over the title. -->
+          <div class="panel-head">
+            <div class="panel-head-text">
+              <h2 class="section-title">শিক্ষার্থী তালিকা · Students</h2>
+              <p class="panel-sub" id="student-summary" aria-live="polite">
+                <span id="student-count">০</span> জন শিক্ষার্থী
+              </p>
+            </div>
+            <div class="panel-actions">
+              <button type="button" class="btn btn-small" id="open-student-modal">+ নতুন ভর্তি</button>
+              <button type="button" class="btn btn-small btn-secondary" id="students-csv">⬇ সিএসভি</button>
+            </div>
+          </div>
           <div class="student-filters">
-            <div class="form-group">
+            <div class="form-group field-affix">
               <label for="student-search">খুঁজুন · Search</label>
-              <input id="student-search" class="form-input" type="search"
-                placeholder="নাম, আইডি, মোবাইল বা অভিভাবক…" aria-label="শিক্ষার্থী খুঁজুন">
+              <div class="affix-wrap">
+                <input id="student-search" class="form-input has-icon" type="search"
+                  placeholder="নাম, আইডি, মোবাইল বা অভিভাবক…" aria-label="শিক্ষার্থী খুঁজুন">
+                <button type="button" class="affix-clear" id="student-search-clear" hidden aria-label="সার্চ মুছুন">×</button>
+              </div>
             </div>
             <div class="form-group">
               <label for="class-filter">ক্লাস ফিল্টার</label>
               <select id="class-filter" class="form-input form-select"></select>
             </div>
+            <div class="form-group">
+              <label for="student-sort">সাজান</label>
+              <select id="student-sort" class="form-input form-select">
+                <option value="name">নাম (ক–হ)</option>
+                <option value="id">আইডি</option>
+                <option value="class">শ্রেণি</option>
+                <option value="newest">নতুন ভর্তি</option>
+              </select>
+            </div>
           </div>
-          <div class="table-wrap">
-            <table class="table" id="student-table">
+          <div class="table-wrap table-wrap--scroll">
+            <table class="table student-table" id="student-table">
               <thead><tr></tr></thead>
               <tbody></tbody>
             </table>

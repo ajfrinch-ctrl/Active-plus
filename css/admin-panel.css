@@ -365,10 +365,133 @@ body.admin-portal .net-chip { background: var(--surface-hover); color: var(--tex
 
 body.admin-portal .progress-bar { background: rgba(15, 23, 42, 0.10); }
 
-/* Student filters sit side by side when there is room */
-body.admin-portal .student-filters { display: grid; gap: 0.625rem; max-width: 560px; grid-template-columns: 1fr; }
-@media (min-width: 640px) {
-  body.admin-portal .student-filters { grid-template-columns: 1fr 240px; }
+/* ------------------------- Students list (UI refresh) ---------------------- */
+/* Panel header: title + live count on the left, actions on the right. */
+body.admin-portal .panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.625rem 1rem;
+  margin-bottom: 0.875rem;
+}
+body.admin-portal .panel-head .section-title { margin-bottom: 0.125rem; }
+body.admin-portal .panel-sub { margin: 0; font-size: 0.8125rem; color: var(--text-muted); }
+body.admin-portal .panel-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+/* Search + class filter + sort share one row when there is room. */
+body.admin-portal .student-filters {
+  display: grid;
+  gap: 0.625rem;
+  margin-bottom: 0.75rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 720px) {
+  body.admin-portal .student-filters {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 0.9fr);
+  }
+}
+body.admin-portal .student-filters .form-group { margin: 0; }
+
+/* One clear affordance inside the search box. */
+body.admin-portal .affix-wrap { position: relative; }
+body.admin-portal .affix-wrap .has-icon { padding-right: 2.25rem; }
+body.admin-portal .affix-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.375rem;
+  transform: translateY(-50%);
+  width: 1.625rem;
+  height: 1.625rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+body.admin-portal .affix-clear:hover { background: #dde4ef; color: var(--text); }
+body.admin-portal .affix-clear[hidden] { display: none; }
+
+/* Long rosters keep their column headings while the body scrolls. */
+body.admin-portal .table-wrap--scroll { max-height: min(66vh, 680px); overflow: auto; }
+body.admin-portal .table-wrap--scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+/* Student cell: initial, then the name with roll/section underneath. */
+body.admin-portal .cell-student { display: flex; align-items: center; gap: 0.625rem; min-width: 0; }
+body.admin-portal .cell-avatar {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(26, 111, 216, 0.12);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+body.admin-portal .cell-student-text { display: block; min-width: 0; }
+body.admin-portal .cell-student-name { display: block; font-weight: 600; color: var(--text); }
+body.admin-portal .cell-student-sub { display: block; font-size: 0.75rem; color: var(--text-muted); }
+body.admin-portal .cell-id {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.125rem 0.375rem;
+  white-space: nowrap;
+}
+body.admin-portal .cell-tel { color: var(--accent); text-decoration: none; white-space: nowrap; }
+body.admin-portal .cell-tel:hover { text-decoration: underline; }
+
+/* Row actions: icon buttons replace four full-text buttons, so the table
+   fits the panel instead of pushing it into a sideways scroll. */
+body.admin-portal .row-actions .btn-icon {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-grid;
+  place-items: center;
+}
+body.admin-portal .row-actions .btn-icon:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+body.admin-portal .row-actions .btn-icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+body.admin-portal .row-actions .btn-icon.is-wa:hover {
+  background: rgba(23, 138, 76, 0.14);
+  color: var(--success);
+  border-color: transparent;
+}
+body.admin-portal .row-actions .btn-icon.is-danger:hover {
+  background: rgba(210, 59, 65, 0.12);
+  color: var(--danger);
+  border-color: transparent;
+}
+
+/* A jump from the global search flashes the row; keep it out for people who
+   ask their OS for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  body.admin-portal tr.row-flash td { animation: none; }
 }
 
 /* Search hit highlight */
@@ -421,6 +544,25 @@ body.admin-portal .table tbody tr:hover td { background: var(--surface-hover); }
   body.admin-portal table.table td[colspan] { justify-content: center; }
   body.admin-portal table.table td[colspan]::before { content: none; }
   body.admin-portal table.table td .row-actions { flex-wrap: wrap; justify-content: flex-end; }
+  /* Scrolling and stickiness belong to the desktop table only. */
+  body.admin-portal .table-wrap--scroll { max-height: none; overflow: visible; }
+  /* In a card the student's name IS the header, and the actions read as a
+     footer strip — neither needs a "শিক্ষার্থী"/"অ্যাকশন" label. */
+  body.admin-portal .student-table td:first-child:not([colspan]) {
+    justify-content: flex-start;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  body.admin-portal .student-table td:first-child:not([colspan])::before { content: none; }
+  body.admin-portal .student-table td:last-child:not([colspan]) {
+    justify-content: flex-end;
+    gap: 0;
+    margin-top: 0.125rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+  }
+  body.admin-portal .student-table td:last-child:not([colspan])::before { content: none; }
 }
 
 /* ----------------------------- Bottom nav -------------------------------- */
