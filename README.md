@@ -282,7 +282,9 @@ Beyond CRUD for every collection, the panel includes:
 
 - **Fees & finance** — collect a due through a payment sheet that captures
   amount, date, method, reference and remarks, generates a receipt number and
-  opens a printable receipt. Totals, discounts, paid and due are derived.
+  opens the receipt preview (PDF ডাউনলোড / ছবি শেয়ার — the same flow the
+  student portal uses to download their receipt). Totals, discounts, paid and
+  due are derived.
 - **Report Centre** — deliberately small: three groups of icon cards and eight
   documents, no duplicates.
   - *Finance Reports* — Collection (month-wise আদায় summary), Due / Outstanding,

@@ -176,6 +176,7 @@ async function warmFonts() {
   try {
     await Promise.all([
       document.fonts.load(`400 22px ${FONT}`),
+      document.fonts.load(`600 22px ${FONT}`),
       document.fonts.load(`700 22px ${FONT}`)
     ]);
   } catch (e) { /* proceed */ }

@@ -15,13 +15,10 @@
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/modern.css">
-    <!-- Fonts load without blocking first paint: a slow CDN must never
-         leave the app staring at a blank "loading" screen. Degrades to
-         system fonts when the CDN cannot be reached. -->
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap"></noscript>
+    <!-- Bengali font (Hind Siliguri) is bundled in assets/fonts/ (see
+         css/fonts.css) — the app UI and every receipt/report it renders
+         work with no internet connection. -->
+    <link rel="stylesheet" href="css/fonts.css">
 
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">

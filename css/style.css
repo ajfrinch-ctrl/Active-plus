@@ -858,6 +858,9 @@ a { color: var(--accent); }
    * modals would print a blank page, so the open sheet becomes the page and the
    * app shell behind it is dropped instead.
    */
+  /* The admin/teacher portals wrap their shell in .app; the student portal
+     uses <main class="home"> instead. Drop whichever shell is present — the
+     bug this prevents: a student printing a sheet got the WHOLE page. */
   .modal-overlay { display: none !important; }
   .modal-overlay.active {
     display: block !important;
@@ -888,7 +891,9 @@ a { color: var(--accent); }
   .modal-overlay.active .modal-content > h2,
   .modal-overlay.active .row-actions,
   .modal-overlay.active .btn-stack { display: none !important; }
-  body.modal-open .app { display: none !important; }
+  body.modal-open .app,
+  body.modal-open main.home,
+  body.modal-open .auth-shell { display: none !important; }
 
   /* The admission form carries its own logo + org header inside the sheet;
      drop the shared letterhead so the logo doesn't print twice. */

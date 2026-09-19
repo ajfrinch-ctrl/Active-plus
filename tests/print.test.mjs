@@ -68,8 +68,11 @@ test('the print stylesheet prints the open sheet, not a blank page', () => {
     'the active modal is styled for print');
   assert.match(block, /\.modal-overlay\.active\s*\{[^}]*display:\s*block/,
     'the open modal is displayed when printing');
-  assert.match(block, /body\.modal-open \.app\s*\{[^}]*display:\s*none/,
-    'the app shell behind the sheet is hidden');
+  assert.match(block, /body\.modal-open[^{}]*\.app[^{}]*\{[^}]*display:\s*none/,
+    'the app shell behind the sheet is hidden (admin/teacher .app)');
+  assert.match(block, /body\.modal-open[^{}]*main\.home[^{}]*\{[^}]*display:\s*none/,
+    'the student shell behind the sheet is hidden (main.home) — the old '
+    + 'bug printed the whole student page for a receipt');
   assert.match(block, /\.modal-close[\s\S]{0,80}display:\s*none/,
     'the close button is not printed');
   assert.equal(/\.toast-container,\s*\.modal-overlay\s*\{/.test(block), false,

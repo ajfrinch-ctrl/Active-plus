@@ -4,12 +4,14 @@
  * Strategy:
  *   - Navigations: network-first (fresh HTML wins), falling back to cache
  *     so the app still opens offline.
- *   - Same-origin static assets (css/js/png): network-first (so a fresh
- *     deploy shows up at once), falling back to the cache offline.
- *   - Anything else (fonts, Firebase): pass through untouched.
+ *   - Same-origin static assets (css/js/png/woff2): network-first (so a fresh
+ *     deploy shows up at once), falling back to the cache offline. The
+ *     bundled Hind Siliguri fonts are same-origin, so they are cached too —
+ *     Bengali keeps rendering (and receipts keep exporting) with no network.
+ *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v26';   // student v2: icon-grid More, all-in-one exam paper, prefs
+const CACHE_NAME = 'active-plus-v27';   // bundled Hind Siliguri fonts (offline Bengali), receipt preview on student portal
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -21,6 +23,19 @@ const PRECACHE_URLS = [
   'css/admin-shell.css',
   'css/modern.css',
   'css/student-v2.css',
+  'css/fonts.css',
+  // Bengali (Hind Siliguri) is part of the app — offline receipt/PDF
+  // rendering depends on these files, so they are precached like everything
+  // else instead of passing through to the network.
+  'assets/fonts/hind-siliguri-bengali-400.woff2',
+  'assets/fonts/hind-siliguri-bengali-600.woff2',
+  'assets/fonts/hind-siliguri-bengali-700.woff2',
+  'assets/fonts/hind-siliguri-latin-400.woff2',
+  'assets/fonts/hind-siliguri-latin-600.woff2',
+  'assets/fonts/hind-siliguri-latin-700.woff2',
+  'assets/fonts/hind-siliguri-latin-ext-400.woff2',
+  'assets/fonts/hind-siliguri-latin-ext-600.woff2',
+  'assets/fonts/hind-siliguri-latin-ext-700.woff2',
   'js/firebase.js',
   'js/store.js',
   'js/data.js',
@@ -75,7 +90,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // let fonts/Firebase fetch directly
+  if (url.origin !== self.location.origin) return; // let Firebase & other external requests fetch directly
 
   // Fresh pages first so deploys are visible; cache keeps us usable offline.
   // Only successful responses are cached — a 404/500 error page must never
