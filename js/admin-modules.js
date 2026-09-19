@@ -893,3 +893,8 @@ function mountProfile() {
     } catch (err) { showToast(err.message, 'error'); }
   });
 }
+
+/* Admin Panel v2: the page's own wiring lives in js/admin/boot.js. The
+   re-export keeps admin.html's inline importer pointing at the classic
+   module path, so the page shell and the test harness stay unchanged. */
+export { bootAdminPanel } from './admin/boot.js';

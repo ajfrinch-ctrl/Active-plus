@@ -193,8 +193,10 @@ export function renderTable(tableSelector, columns, rows, emptyMessage = 'কো
       const value = row[col.key];
       return looksLikeDate(value) ? escapeHtml(formatBnDate(value)) : escapeHtml(value);
     };
+    // data-label powers the responsive card tables (Admin Panel v2): below
+    // 720px CSS hides the header and prints each column name beside its cell.
     body.innerHTML = slice.map((row) => `<tr>${
-      st.columns.map((col) => `<td>${cell(row, col)}</td>`).join('')
+      st.columns.map((col) => `<td data-label="${escapeHtml(col.label)}">${cell(row, col)}</td>`).join('')
     }</tr>`).join('') + (remaining > 0
       ? `<tr><td colspan="${st.columns.length}"><button type="button" class="btn btn-small" data-load-more>আরও ${bnDigits(Math.min(st.pageSize, remaining))}টি দেখুন (${bnDigits(remaining)} বাকি)</button></td></tr>`
       : '');

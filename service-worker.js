@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v27';   // bundled Hind Siliguri fonts (offline Bengali), receipt preview on student portal
+const CACHE_NAME = 'active-plus-v28';   // Admin Panel v2: component modules under js/admin/ + light panel theme
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -24,6 +24,7 @@ const PRECACHE_URLS = [
   'css/modern.css',
   'css/student-v2.css',
   'css/fonts.css',
+  'css/admin-panel.css',
   // Bengali (Hind Siliguri) is part of the app — offline receipt/PDF
   // rendering depends on these files, so they are precached like everything
   // else instead of passing through to the network.
@@ -44,6 +45,13 @@ const PRECACHE_URLS = [
   'js/exams.js',
   'js/crud.js',
   'js/admin-modules.js',
+  // Admin Panel v2 — component framework (registry / layout / search / …)
+  'js/admin/boot.js',
+  'js/admin/registry.js',
+  'js/admin/layout.js',
+  'js/admin/search.js',
+  'js/admin/autobackup.js',
+  'js/admin/export-csv.js',
   'js/student-home.js',
   'js/student-prefs.js',
   'js/teacher-home.js',

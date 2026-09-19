@@ -55,16 +55,20 @@ const GROUPS = [
   }
 ];
 
-/* The ＋ in the bottom navigation already admits students and takes payments,
-   so the shortcut row holds only what it does not. */
-const QUICK_SHORTCUTS = [
-  { act: 'add-teacher', icon: '＋', label: 'শিক্ষক' },
-  { act: 'create-exam', icon: '＋', label: 'পরীক্ষা' },
-  { act: 'add-question', icon: '＋', label: 'প্রশ্ন' },
-  { act: 'create-notice', icon: '＋', label: 'নোটিশ' },
+/* Dashboard quick actions — the heart of the landing screen (Admin Panel v2:
+   the owner asked for the daily one-tap jobs FIRST, stats after). Admission,
+   payment and attendance were previously only reachable through the ⧺ FAB;
+   they now sit on the dashboard itself. */
+const DASH_ACTIONS = [
+  { act: 'admission', icon: '🎓', label: 'নতুন ভর্তি', en: 'Admission' },
+  { act: 'payment', icon: '💰', label: 'পেমেন্ট নিন', en: 'Payment' },
+  { act: 'attendance', icon: '✅', label: 'হাজিরা নিন', en: 'Attendance' },
+  { act: 'add-teacher', icon: '👨‍🏫', label: 'শিক্ষক যোগ', en: 'Add Teacher' },
+  { act: 'create-exam', icon: '📝', label: 'নতুন পরীক্ষা', en: 'New Exam' },
+  { act: 'create-notice', icon: '📢', label: 'নোটিশ দিন', en: 'New Notice' },
   // The ☰ menu left the top bar, so the extra-features grid keeps its own
   // one-tap entry right here on the first screen.
-  { act: 'more', icon: '⊞', label: 'সব ফিচার' }
+  { act: 'more', icon: '⊞', label: 'সব ফিচার', en: 'All Features' }
 ];
 
 const MORE_ITEMS = [
@@ -81,7 +85,7 @@ const MORE_ITEMS = [
   { key: 'backup', icon: '💾', label: 'ব্যাকআপ' }
 ];
 
-export function initAdminHome({ session, tabs, openModal, showToast, onLogout }) {
+export function initAdminHome({ session, tabs, openModal, showToast, onLogout, onAttendance }) {
   const host = document.getElementById('admin-home');
   if (!host) return null;
 
@@ -152,7 +156,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
 
     return `
       <section class="home-section" aria-label="সামগ্রিক অবস্থা">
-        <h2 class="sec-title">📊 সামগ্রিক অবস্থা</h2>
+        <h2 class="sec-title">📊 সামগ্রিক অবস্থা · Overview</h2>
         <div class="hcard overview-card" id="admin-overview">
           <div class="analytics-grid">
             ${cell('👨‍🎓', bn(a.totalStudents), 'মোট শিক্ষার্থী')}
@@ -176,13 +180,52 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
       </section>`;
   };
 
-  const quickShortcuts = () => `
-    <section class="home-section" aria-label="কুইক শর্টকাট">
-      <h2 class="sec-title">⚡ কুইক শর্টকাট</h2>
-      <div class="quick-row" id="admin-quick">
-        ${QUICK_SHORTCUTS.map((q) => `<button type="button" class="chip" data-act="${q.act}">${q.icon} ${escapeHtml(q.label)}</button>`).join('')}
+  /** Quick actions lead the dashboard (Admin Panel v2). Big, tappable tiles
+      for the daily jobs; every button also carries the .chip class so the
+      legacy styling and the boot test selector keep working. */
+  const quickActions = () => `
+    <section class="home-section" aria-label="কুইক অ্যাকশন">
+      <h2 class="sec-title">⚡ কুইক অ্যাকশন · Quick Actions</h2>
+      <div class="quick-row dash-actions" id="admin-quick">
+        ${DASH_ACTIONS.map((q) => `
+          <button type="button" class="chip dash-action" data-act="${q.act}">
+            <span class="da-ico" aria-hidden="true">${q.icon}</span>
+            <span class="da-label">${escapeHtml(q.label)}</span>
+            <small class="da-en">${escapeHtml(q.en)}</small>
+          </button>`).join('')}
       </div>
     </section>`;
+
+  /** Dues alert: the students owing the most money, one tap away from the
+      payment screen. Hidden entirely when nothing is due. */
+  const duesCard = () => {
+    const dues = dueFees();
+    if (!dues.length) return '';
+    const byStudent = new Map();
+    dues.forEach((due) => {
+      const cur = byStudent.get(due.studentId) || { student: due.student, total: 0, months: 0 };
+      cur.total += Number(due.remaining) || 0;
+      cur.months += 1;
+      byStudent.set(due.studentId, cur);
+    });
+    const top = [...byStudent.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+    return `
+      <section class="home-section" aria-label="বকেয়া সতর্কতা">
+        <h2 class="sec-title">⚠️ বকেয়া সতর্কতা · Dues Alert</h2>
+        <div class="hcard dues-card">
+          <div class="list">
+            ${top.map(({ student, total, months }) => `
+              <div class="list-item">
+                <div class="li-main">
+                  <div class="li-title">${escapeHtml(student?.name || '—')}</div>
+                  <div class="li-sub">${escapeHtml(student?.id || '')} · ${bn(months)} মাস বকেয়া</div>
+                </div>
+                <button type="button" class="btn btn-small btn-success" data-goto="dues">৳${bn(Number(total).toLocaleString('en-US'))} নিন</button>
+              </div>`).join('')}
+          </div>
+        </div>
+      </section>`;
+  };
 
   /** One collapsible section per group — minimized until tapped. */
   const fold = (title, innerHtml, id = '') => `
@@ -198,20 +241,23 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
 
   const featureFolds = () => `
     <section class="home-section" aria-label="সব ফিচার">
-      <h2 class="sec-title">🧭 সব ফিচার</h2>
+      <h2 class="sec-title">🧭 সব ফিচার · All Features</h2>
       ${GROUPS.map((g) => fold(`${g.title}`, tileGrid(g.tiles))).join('')}
-      ${fold('✨ আরও ফিচার', tileGrid(MORE_ITEMS, 'admin-more-grid'), 'admin-more-sec')}
+      ${fold('✨ আরও ফিচার · More', tileGrid(MORE_ITEMS, 'admin-more-grid'), 'admin-more-sec')}
     </section>`;
 
   function render() {
     const headerSub = document.getElementById('user-role');
     if (headerSub) headerSub.textContent = orgInfo().name;
 
+    // Dashboard order (Admin Panel v2): quick actions first, then the numbers,
+    // the dues alert and the institute card; every feature stays folded below.
     host.innerHTML = `
       ${statusChip()}
-      ${instituteCard()}
+      ${quickActions()}
       ${overviewCard()}
-      ${quickShortcuts()}
+      ${duesCard()}
+      ${instituteCard()}
       ${featureFolds()}`;
   }
 
@@ -221,7 +267,10 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout })
     const action = e.target.closest('[data-act]');
     if (!action) return;
     const act = action.dataset.act;
-    if (act === 'add-teacher') { tabs?.activate?.('teachers'); openModal?.('teacher-modal'); }
+    if (act === 'admission') { tabs?.activate?.('students'); openModal?.('student-modal'); }
+    else if (act === 'payment') { tabs?.activate?.('dues'); }
+    else if (act === 'attendance') { onAttendance?.(); }
+    else if (act === 'add-teacher') { tabs?.activate?.('teachers'); openModal?.('teacher-modal'); }
     else if (act === 'create-exam') { tabs?.activate?.('exam'); openModal?.('exam-modal'); }
     else if (act === 'add-question') { tabs?.activate?.('questionbank'); }
     else if (act === 'create-notice') { tabs?.activate?.('notices'); openModal?.('notice-modal'); }

@@ -123,7 +123,18 @@ test('every page registers the service worker', () => {
     if (html.includes('service-worker')) continue; // direct registration
     const modules = [...html.matchAll(/from\s*['"]\.\/js\/([^'"]+)['"]/g)].map((m) => `js/${m[1]}`);
     assert.ok(modules.length > 0, `${page} imports app modules`);
-    const reachesInitApp = modules.some((mod) => read(mod).includes('initApp('));
+    // Follow one more hop: Admin Panel v2 moved the page boot behind a page
+    // module (admin.html → js/admin-modules.js → js/admin/boot.js), so the
+    // worker registration may sit two imports away from the HTML.
+    const graph = [...modules];
+    for (const mod of modules) {
+      for (const m of read(mod).matchAll(/from\s*['"]\.\/((?:admin\/)?[^'"]+)['"]/g)) {
+        graph.push(`js/${m[1]}`);
+      }
+    }
+    const reachesInitApp = graph.some((mod) => {
+      try { return read(mod).includes('initApp('); } catch { return false; }
+    });
     assert.ok(reachesInitApp, `${page} reaches initApp(), which registers the worker`);
   }
 });
