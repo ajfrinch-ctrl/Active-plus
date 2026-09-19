@@ -9,7 +9,7 @@
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v25';   // rearranged student home: hero art, calendar, ledger
+const CACHE_NAME = 'active-plus-v26';   // student v2: icon-grid More, all-in-one exam paper, prefs
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -20,6 +20,7 @@ const PRECACHE_URLS = [
   'css/home.css',
   'css/admin-shell.css',
   'css/modern.css',
+  'css/student-v2.css',
   'js/firebase.js',
   'js/store.js',
   'js/data.js',
@@ -29,6 +30,7 @@ const PRECACHE_URLS = [
   'js/crud.js',
   'js/admin-modules.js',
   'js/student-home.js',
+  'js/student-prefs.js',
   'js/teacher-home.js',
   'js/admin-home.js',
   'js/pdf.js',

@@ -8,11 +8,12 @@ import {
   db, CLASS_OPTIONS, ALL_CLASSES, todayBn, newId, scoreExam, examResultFor, suggestionsFor,
   examsFor, recordStudyActivity, examWindow, getDbStatus, assertCan, teacherCanAccessClass,
   parseMcqPaste, parseBnDateInput, formatBnDate, MCQ_TEMPLATE, MCQ_PASTE_RULES, downloadText,
-  examFullMarks
+  examFullMarks, toBnDigits
 } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 import { previewDocument } from './preview.js';
 import { renderQuestionPaperCanvases } from './docs.js';
+import { beepWarn5, beepWarn1, beepTimeUp, confettiBurst } from './student-prefs.js';
 
 // Spec 51: never report a saved record that could not be saved.
 const onlineFor = (action) => requireOnline(action, getDbStatus);
@@ -402,7 +403,8 @@ export function renderStudentSuggestions(selector, className) {
 export function mountExamTaker({ listSelector, student }) {
   const list = document.querySelector(listSelector);
   const player = document.getElementById('exam-player');
-  const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+  /* Digits follow the student's Settings → সংখ্যা preference (toBnDigits). */
+  const bn = toBnDigits;
   let ticker = null;
   let onScreen = false;
 
@@ -450,6 +452,17 @@ export function mountExamTaker({ listSelector, student }) {
     return `${bn(String(Math.floor(totalSec / 60)).padStart(2, '0'))}:${bn(String(totalSec % 60).padStart(2, '0'))}`;
   };
 
+  /* One glance tells the story of the card: done / live / open / later / over. */
+  const statusChip = ({ done, running, win }) => {
+    const chip = (cls, icon, label) =>
+      `<span class="exam-status ${cls}">${icon} ${label}</span>`;
+    if (done) return chip('st-done', '✅', 'দেওয়া হয়েছে');
+    if (running && running !== 'সময় শেষ') return chip('st-live', '⏱', 'চলছে');
+    if (win && win.canStart) return chip('st-open', '🟢', 'এখন দেওয়া যাবে');
+    if (win && win.state === 'closed') return chip('st-closed', '⛔', 'সময় শেষ');
+    return chip('st-wait', '⏳', 'শুরু হয়নি');
+  };
+
   const render = () => {
     const rows = examsFor(student.className);
     list.innerHTML = rows.length
@@ -462,6 +475,7 @@ export function mountExamTaker({ listSelector, student }) {
         return `
         <div class="list-item">
           <div class="li-main">
+            ${statusChip({ done, running, win })}
             <div class="li-title">${escapeHtml(exam.title)}</div>
             <div class="li-sub">${escapeHtml(exam.subject)} · ⏱ ${bn(exam.duration || 30)} মিনিট · ${escapeHtml(exam.author)}</div>
             <div class="li-sub">📝 ${bn(marks)}টি প্রশ্ন · পূর্ণমান ${bn(marks)}${db.settings.get().negativeMarking ? ` · নেগেটিভ ${bn(db.settings.get().negativeMarking)}` : ''}</div>
@@ -555,10 +569,13 @@ export function mountExamTaker({ listSelector, student }) {
     onScreen = true;
     list.hidden = true;
     player.hidden = false;
+    /* Every question on one scrollable page: the palette dots stay as quick
+       jumps (and as the answered checklist), the submit button is pinned to
+       the bottom of the screen so it is never out of reach. */
     player.innerHTML = `
       <div class="exam-topbar">
         <span class="exam-timer" id="exam-timer" role="timer" aria-label="বাকি সময়">⏱ --:--</span>
-        <span class="exam-count" id="exam-count">প্রশ্ন ${bn(1)} / ${bn(total)}</span>
+        <span class="exam-count" id="exam-count">উত্তর ${bn(0)} / ${bn(total)}</span>
       </div>
       <div class="exam-timebar" id="exam-timebar" role="progressbar" aria-label="সময়ের অগ্রগতি"
            aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="exam-time-fill" style="width:100%"></i></div>
@@ -566,10 +583,10 @@ export function mountExamTaker({ listSelector, student }) {
       <div class="alert alert-info" id="exam-notice">${exam.questions.length}টি প্রশ্ন · সময় ${bn(exam.duration || 30)} মিনিট। সময় শেষ হলে উত্তরপত্র স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</div>
       <form id="exam-take-form" novalidate>
         <div class="exam-palette" id="exam-palette">
-          ${exam.questions.map((_, qi) => `<button type="button" class="exam-dot" data-goto="${qi}" aria-label="প্রশ্ন ${bn(qi + 1)}">${bn(qi + 1)}</button>`).join('')}
+          ${exam.questions.map((_, qi) => `<button type="button" class="exam-dot" data-goto="${qi}" aria-label="প্রশ্ন ${bn(qi + 1)}-এ যান">${bn(qi + 1)}</button>`).join('')}
         </div>
         ${exam.questions.map((q, qi) => `
-          <div class="exam-q hcard" data-q="${qi}"${qi === 0 ? '' : ' hidden'}>
+          <div class="exam-q hcard" data-q="${qi}">
             <div class="h-title">প্রশ্ন ${bn(qi + 1)} / ${bn(total)}</div>
             <p class="exam-q-text">${escapeHtml(q.q)}</p>
             <div class="role-grid" style="grid-template-columns:1fr;margin-top:.5rem">
@@ -580,36 +597,31 @@ export function mountExamTaker({ listSelector, student }) {
                 </label>`).join('')}
             </div>
           </div>`).join('')}
-        <div class="exam-actions">
-          <button type="button" class="btn btn-secondary" id="exam-prev">◀ আগের</button>
-          <button type="button" class="btn btn-secondary" id="exam-next">পরের ▶</button>
+        <div class="exam-submit-zone">
+          <button type="submit" class="btn btn-block" id="exam-submit">উত্তরপত্র জমা দিন</button>
         </div>
-        <button type="submit" class="btn btn-block" id="exam-submit">উত্তরপত্র জমা দিন</button>
       </form>`;
 
     const form = player.querySelector('#exam-take-form');
     const timerEl = player.querySelector('#exam-timer');
-    let current = 0;
 
     const paintProgress = () => {
       const answered = form.querySelectorAll('input[type="radio"]:checked').length;
       const fill = player.querySelector('#exam-bar-fill');
       if (fill) fill.style.width = `${Math.round((answered / total) * 100)}%`;
       const count = player.querySelector('#exam-count');
-      if (count) count.textContent = `প্রশ্ন ${bn(current + 1)} / ${bn(total)} · উত্তর ${bn(answered)}`;
-      player.querySelectorAll('.exam-q').forEach((el) => { el.hidden = Number(el.dataset.q) !== current; });
+      if (count) count.textContent = `উত্তর ${bn(answered)} / ${bn(total)}`;
       player.querySelectorAll('.exam-dot').forEach((dot) => {
         const qi = Number(dot.dataset.goto);
         const chosen = form.querySelector(`input[name="q${qi}"]:checked`);
-        dot.classList.toggle('on', qi === current);
         dot.classList.toggle('done', Boolean(chosen));
       });
     };
 
+    /** A palette dot scrolls straight to its question on the one-page paper. */
     const goTo = (index) => {
-      current = Math.max(0, Math.min(total - 1, index));
-      paintProgress();
-      player.querySelector(`.exam-q[data-q="${current}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+      const target = player.querySelector(`.exam-q[data-q="${Math.max(0, Math.min(total - 1, index))}"]`);
+      target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     };
 
     const persist = () => {
@@ -623,20 +635,8 @@ export function mountExamTaker({ listSelector, student }) {
 
     form.addEventListener('change', () => { persist(); paintProgress(); });
 
-    // Keep navigation buttons separate from form submission. Delegating these
-    // clicks through the form made the previous-question control fragile when
-    // the player was re-rendered (and a click could appear to leave the task).
-    // They are explicit type="button" controls, and never close the player.
-    player.querySelector('#exam-prev')?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      goTo(current - 1);
-    });
-    player.querySelector('#exam-next')?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      goTo(current + 1);
-    });
+    // Palette dots are jumps, never submits: explicit type="button" controls
+    // whose clicks stay inside the paper.
     player.querySelectorAll('.exam-dot[data-goto]').forEach((dot) => {
       dot.addEventListener('click', (event) => {
         event.preventDefault();
@@ -698,6 +698,9 @@ export function mountExamTaker({ listSelector, student }) {
         </details>
         <button type="button" class="btn btn-block" id="back-to-exams">ফিরে যান</button>`;
       player.querySelector('#back-to-exams').addEventListener('click', () => showList('', 'info'));
+      /* A pass deserves confetti; a timed-out paper just gets the calm tone. */
+      if (auto) beepTimeUp();
+      else if (pct >= 50) confettiBurst(player);
       // Keep the (hidden) exam list in step with the result just stored, so
       // returning to it can never offer the same paper again.
       render();
@@ -733,9 +736,10 @@ export function mountExamTaker({ listSelector, student }) {
       timerEl.classList.toggle('warn', left <= 60000);
       timerEl.classList.toggle('danger', left <= 30000);
       paintTimeLeft(left);
-      // Warn once on the way down, so the ending is never a surprise.
-      if (!warned.five && left <= 300000) { warned.five = true; showToast('⏰ আর ৫ মিনিট বাকি।', 'info'); }
-      if (!warned.one && left <= 60000) { warned.one = true; showToast('⏰ আর ১ মিনিট বাকি — উত্তরপত্র জমা দিন।', 'warning'); }
+      // Warn once on the way down — by toast AND by a soft beep (Settings →
+      // সাউন্ড can silence the beep) — so the ending is never a surprise.
+      if (!warned.five && left <= 300000) { warned.five = true; showToast('⏰ আর ৫ মিনিট বাকি।', 'info'); beepWarn5(); }
+      if (!warned.one && left <= 60000) { warned.one = true; showToast('⏰ আর ১ মিনিট বাকি — উত্তরপত্র জমা দিন।', 'warning'); beepWarn1(); }
     };
 
     /* A background tab throttles timers, so on coming back the clock is
