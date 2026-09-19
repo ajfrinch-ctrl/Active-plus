@@ -1542,19 +1542,117 @@ export function feeStatusFor(student) {
   return { total, paid, due, nextDue };
 }
 
-/** Only badges the student has actually earned. */
+/**
+ * Only badges the student has actually earned.
+ *
+ * Deliberately small (three clearly-earned badges, spec: "সরল করুন — কম ব্যাজ"):
+ * a wall of badges nobody reaches motivates no one.
+ */
 export function achievementsFor(student) {
   const perf = performanceFor(student);
   const { streak } = studyStreak();
-  const mcqs = db.studyActivity.list().reduce((s, a) => s + a.mcqs, 0);
   const badges = [];
-  if (streak >= 7) badges.push({ icon: '🔥', name: `${streak} দিন স্ট্রিক` });
-  if (mcqs >= 100) badges.push({ icon: '🎯', name: '১০০ MCQ সম্পন্ন' });
+  if (streak >= 7) badges.push({ icon: '🔥', name: '৭ দিনের স্ট্রিক' });
   if (completedMaterialIds(student).length >= 10) badges.push({ icon: '📚', name: '১০ ম্যাটেরিয়াল সম্পন্ন' });
   if (perf && perf.best >= 90) badges.push({ icon: '🏆', name: '৯০%+ স্কোর' });
-  if (perf && perf.best === 100) badges.push({ icon: '⭐', name: 'পারফেক্ট স্কোর' });
-  if (perf && perf.rank === 1) badges.push({ icon: '🥇', name: 'টপার' });
   return badges;
+}
+
+/**
+ * Subject-wise average from the student's own results — the data behind the
+ * progress graph ("+ বিষয়ভিত্তিক গ্রাফ" on the result summary).
+ */
+export function subjectPerformanceFor(student) {
+  const rows = db.examResults.list().filter((r) => r.studentId === student?.id);
+  const bySubject = new Map();
+  rows.forEach((r) => {
+    const exam = db.exams.find(r.examId);
+    const subject = exam?.subject || 'অন্যান্য';
+    const pct = r.total ? Math.round((r.score / r.total) * 100) : 0;
+    const entry = bySubject.get(subject) || { subject, sum: 0, tests: 0 };
+    entry.sum += pct;
+    entry.tests += 1;
+    bySubject.set(subject, entry);
+  });
+  return [...bySubject.values()]
+    .map((s) => ({ subject: s.subject, tests: s.tests, avg: Math.round(s.sum / s.tests) }))
+    .sort((a, b) => b.avg - a.avg);
+}
+
+/** Fee payments actually received from this student, newest first. */
+export function paymentHistoryFor(student) {
+  return db.payments.list().filter((p) => p.studentId === student?.id).slice().reverse();
+}
+
+/** Full marks of a paper — one mark per question (negative marking is a setting). */
+export function examFullMarks(exam) {
+  return Array.isArray(exam?.questions) ? exam.questions.length : 0;
+}
+
+/**
+ * Everything worth telling the student, in one feed: notices, system
+ * notifications and the events that get a bell elsewhere in the app — a new
+ * exam, a published result, a pending assignment and a due fee.
+ *
+ * Ordered by what the student can still act on, most urgent first.
+ */
+export function notificationsFor(student, limit = 0) {
+  if (!student) return [];
+  const rows = [];
+  const at = (kind, icon, title, body, date = '', createdAt = '') =>
+    rows.push({ id: `${kind}-${rows.length}`, kind, icon, title, body, date, createdAt });
+
+  const fee = feeStatusFor(student);
+  if (fee.due > 0) at('fee', '💰', `ফি বকেয়া ৳${fee.due}`, fee.nextDue?.month ? `${fee.nextDue.month} মাসের ফি` : 'বকেয়া পরিশোধ করুন');
+
+  db.assignments.list()
+    .filter((a) => a.className === student.className)
+    .forEach((a) => {
+      const st = assignmentStatus(a, student);
+      if (st.status === 'pending' || st.status === 'overdue') {
+        at('assignment', '📋', `অ্যাসাইনমেন্ট: ${a.title}`, dueLabel(a, student), a.deadline);
+      }
+    });
+
+  examsFor(student.className)
+    .filter((e) => !examResultFor(e.id, student.id))
+    .forEach((e) => {
+      const win = examWindow(e);
+      at('exam', '📝', `পরীক্ষা: ${e.title}`,
+        `${e.subject} · ${formatBnDate(e.date)}${e.time ? ` · ${e.time}` : ''}${win?.state === 'active' ? ' · এখন দেওয়া যাবে' : ''}`, e.date);
+    });
+
+  db.examResults.list()
+    .filter((r) => r.studentId === student.id)
+    .forEach((r) => {
+      const exam = db.exams.find(r.examId);
+      at('result', '🏆', `ফলাফল প্রকাশিত — ${exam?.title || 'পরীক্ষা'}`, `${r.score}/${r.total}`, r.date);
+    });
+
+  noticesFor(student).forEach((n) => at('notice', '📢', n.title, n.audience || 'ঘোষণা', n.date, n.createdAt));
+  db.notifications.list()
+    .filter((n) => n.target === 'সবাই' || n.target === 'শিক্ষার্থী')
+    .forEach((n) => at('system', '🔔', n.title, n.type || 'নোটিফিকেশন', n.date, n.createdAt));
+
+  return limit > 0 ? rows.slice(0, limit) : rows;
+}
+
+/* ---------------- Offline exam queue ---------------- */
+
+/**
+ * Papers submitted while the device was offline. They are graded and stored
+ * locally at once (so the student is never blocked), and wait here until the
+ * network is back so the mirror can pick them up.
+ */
+export function pendingSyncResults() {
+  return db.examResults.list().filter((r) => r.pendingSync);
+}
+
+/** Marks every queued paper as delivered. Returns how many were waiting. */
+export function markResultsSynced() {
+  const waiting = pendingSyncResults();
+  waiting.forEach((r) => db.examResults.update(r.id, { pendingSync: false, syncedAt: new Date().toISOString() }));
+  return waiting.length;
 }
 
 /**

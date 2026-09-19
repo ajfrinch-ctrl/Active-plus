@@ -9,7 +9,7 @@
  *   - Anything else (fonts, Firebase): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v24';
+const CACHE_NAME = 'active-plus-v25';   // rearranged student home: hero art, calendar, ledger
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -36,6 +36,7 @@ const PRECACHE_URLS = [
   'js/preview.js',
   'js/install.js',
   'manifest.json',
+  'assets/hero-default.jpg', // the hero backdrop the rearranged home paints behind its banners
   'assets/logo.png', // byte-identical to logo-transparent.png: precaching both wasted ~1 MB per install
   'assets/icon-192.png',
   'assets/icon-512.png',

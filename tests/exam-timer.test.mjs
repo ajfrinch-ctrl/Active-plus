@@ -173,7 +173,11 @@ test('a stored result can be reviewed again from the controller', async () => {
     assert.equal(player.hidden, false, 'the review opens');
     assert.match(player.innerHTML, /উত্তরপত্র/, 'it is the answer review');
     assert.match(player.innerHTML, /স্বয়ংক্রিয়ভাবে জমা/, 'an auto-submitted paper says so');
-    assert.equal((player.innerHTML.match(/সঠিক উত্তর:/g) || []).length, exam.questions.length - 1, 'the misses are shown');
+    // Every question now spells out the right answer, and each is marked
+    // ✓/✗ in words (never by colour alone).
+    assert.equal((player.innerHTML.match(/সঠিক উত্তর:/g) || []).length, exam.questions.length, 'the right answer is shown for every question');
+    assert.equal((player.innerHTML.match(/✓ সঠিক/g) || []).length, 1, 'the correct one is marked');
+    assert.equal((player.innerHTML.match(/✗ ভুল|— উত্তর দেননি/g) || []).length, exam.questions.length - 1, 'the misses are marked too');
   } finally {
     controller.stop();
   }
@@ -196,4 +200,25 @@ test('reopening a running paper keeps the original deadline', async () => {
   assert.ok(first?.deadline, 'the sitting was saved when the paper opened');
   assert.ok(!second || second.deadline <= first.deadline, 'reopening never extends the deadline');
   controller.stop();
+});
+
+test('the time left is a progress bar as well as a clock', async () => {
+  const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
+  const doc = dom.window.document;
+  const { exam, controller } = await openExam(dom, '2026-09-001');
+
+  click(dom, doc.querySelector(`[data-take="${exam.id}"]`));
+  try {
+    const bar = doc.getElementById('exam-timebar');
+    assert.ok(bar, 'a time bar is rendered above the paper');
+    assert.equal(bar.getAttribute('role'), 'progressbar', 'announced as a progress bar');
+    assert.equal(bar.getAttribute('aria-valuemax'), '100');
+    const fill = doc.getElementById('exam-time-fill');
+    const shown = Number(String(fill.style.width).replace('%', ''));
+    assert.ok(shown > 90 && shown <= 100, `a just-started paper shows almost all its time left (got ${fill.style.width})`);
+    assert.equal(Number(bar.getAttribute('aria-valuenow')), Math.round(shown), 'the remaining share is announced');
+    assert.equal(bar.classList.contains('danger'), false, 'no alarm styling at the start');
+  } finally {
+    controller.stop();
+  }
 });

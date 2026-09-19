@@ -147,20 +147,28 @@ as PDFs — no browser print dialog anywhere.
 ### Reviewing a finished paper
 
 The chosen answers travel with the result, so a finished paper offers
-**উত্তর দেখুন** (question-by-question, with the right answer against a wrong
-one) long after the sitting ended — from the exam list or straight from **ফলাফল** in
-the Result view, where each result row now carries its submission date. The
+**উত্তর দেখুন** (question-by-question) long after the sitting ended — from the
+exam list or straight from **ফলাফল** in the Result view, where each result row
+carries its score, the submission date and its position in that paper. Every
+question now prints the right answer next to the student's own, and each row is
+marked **✓ সঠিক / ✗ ভুল / — উত্তর দেননি** in words, never by colour alone. The
 teacher's result list says which question numbers each student missed.
+
+The running paper shows the time left twice — as a clock and as a progress bar
+that turns amber, then red, as the deadline approaches — and still submits
+itself when the time is up. A paper can also be **sat offline**: it is graded on
+the device straight away, marked *“অফলাইনে জমা, সিঙ্ক বাকি”*, and mirrored as
+soon as the network returns.
 
 ## Structure
 
 ```
 index.html          single login — detects the user type and routes to the
                     matching portal (mobile-first)
-student.html        student portal — app-style Home (today's progress, next
-                    class/exam, daily challenge, materials, assignments,
-                    performance, fees, tips, banners) plus Study / Exam /
-                    Result / More views
+student.html        student portal — compact app-style Home (hero banner,
+                    today's progress, upcoming exam, continue learning, fee)
+                    plus Study / Exam / Result / More views, with the calendar
+                    and every secondary destination inside More
 teacher.html        teacher portal — app-style Home (today's teaching, next
                     class, pending work) plus My Classes, Students, Tasks,
                     Materials, Results, Question Bank, Routine, Batches,
@@ -201,22 +209,27 @@ tests/              Node test suite (`npm test`)
 The student portal opens on an app-style Home built entirely from the signed-in
 student's own records — no hard-coded statistics anywhere:
 
+The Home is deliberately **short**: a picture-led hero, then one card per thing a
+student actually acts on. Everything else is one tap away under **আরও**, never
+repeated twice.
+
 | Section | Data source |
 | ------- | ----------- |
-| Today's Progress (done/total, %, streak) | today's routine + assignments, `activityLogs` |
-| Today summary | routine, assignments, exams, pending items |
-| Next class / Upcoming exam | `routine` by class & weekday, `examWindow(exam)` |
-| Daily challenge | `settings.dailyChallengeTarget` MCQs, progress persisted |
-| Study streak + weekly calendar | `studyActivity` / `activityLogs` |
-| Continue Learning + Study Material | `materials` for the student's class, `materialProgress` |
-| Pending assignments (submit flow) | `assignments` + `submissions` |
-| My Performance + mini chart | that student's own `examResults` |
-| Latest result, Achievements | `examResults`, badges earned from real data |
-| Fee status | that student's `fees` row + `payments` |
-| Notices, Teacher's Tip, banners | admin-managed `notices`, `tips`, `banners` |
+| Hero (banner slides, artwork, teacher's tip as the last slide) | admin-managed `banners` (optional `image`), `tips` |
+| আজকের অবস্থা (today's progress %, streak, weekly dots) | `todayProgress`, `studyStreak` |
+| আসন্ন পরীক্ষা (subject, date, minutes, question count, full marks, Start) | `examsFor` + `examWindow(exam)` |
+| পড়া চালিয়ে যান (resume the last-opened material) | `materials` + `materialProgress`, `lastAccessedMaterial` |
+| ফি (due amount, full ledger in আরও → ফি) | that student's `fees` + received `payments` |
+| One door to everything else | calendar, routine, assignments, notices, badges, downloads |
 
 Every card answers with the student's own rows only; the data layer filters by
 class/batch before anything reaches the UI.
+
+*আরও* holds the **ক্যালেন্ডার** (a Bengali month grid marking class days, exams
+and deadlines; tapping a day opens its sheet), the routine, the assignment list
+with its submit flow, notices, achievements and certificates, the download
+centre, the streak panel, the fee **ledger** (`payments` rows with receipt and
+totals), and help.
 
 The Home **top bar** is a single rounded card: avatar, greeting, name and
 class/roll, the profile and notification buttons, and a strip with today's date
