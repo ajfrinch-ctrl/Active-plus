@@ -30,7 +30,20 @@ export const BN_MONTHS = ['জানুয়ারি', 'ফেব্রুয�
 const EN_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'];
 
-export const toBnDigits = (value) => String(value).replace(/\d/g, (d) => SEED_DIGITS[d]);
+/**
+ * Students can read numbers in Bengali or English digits (Settings → সংখ্যা).
+ * Only student-facing pages ever flip this switch — admin/teacher pages keep
+ * the Bengali default because they never call setDigitMode().
+ */
+let DISPLAY_DIGIT_MODE = 'bn';
+export function setDigitMode(mode) {
+  DISPLAY_DIGIT_MODE = mode === 'en' ? 'en' : 'bn';
+}
+export function getDigitMode() {
+  return DISPLAY_DIGIT_MODE;
+}
+export const toBnDigits = (value) =>
+  DISPLAY_DIGIT_MODE === 'en' ? String(value) : String(value).replace(/\d/g, (d) => SEED_DIGITS[d]);
 
 /** ১৬/০৯/২০২৬ → '16/09/2026' — everything below parses on plain digits. */
 export const toAsciiDigits = (value) => String(value ?? '')

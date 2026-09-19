@@ -7,8 +7,8 @@
 import { initApp, escapeHtml, safeUrl, showToast, openModal, closeModal, getAuthMode } from './app.js';
 import { signOut } from './auth.js';
 import {
-  db, noticesFor,
-  greetingByHour, studyStreak, todayProgress, upcomingExam,
+  db, noticesFor, ALL_CLASSES,
+  greetingByHour, studyStreak, upcomingExam,
   performanceFor, feeStatusFor,
   achievementsFor, unreadNotifications, latestTip, activeBanners,
   recordStudyActivity, todayBn, homeCards, lastAccessedMaterial,
@@ -19,8 +19,13 @@ import {
   markResultsSynced, examFullMarks, BN_MONTHS, toBnDigits, examsFor
 } from './data.js';
 import { renderStudentSuggestions, mountExamTaker } from './exams.js';
+import { getPrefs, setPref, applyPrefs } from './student-prefs.js';
 
-/** More-menu items that are not already on the bottom nav or profile menu. */
+/**
+ * More-menu items that are not already on the bottom nav or profile menu.
+ * The streak panel is gone — its numbers now live inside অর্জন (badge
+ * progress) instead of a card of their own.
+ */
 const MORE_MENU = [
   { act: 'calendar', ico: '🗓️', label: 'ক্যালেন্ডার' },
   { act: 'routine', ico: '📅', label: 'রুটিন' },
@@ -30,18 +35,20 @@ const MORE_MENU = [
   { act: 'achievements', ico: '🏅', label: 'অর্জন' },
   { act: 'certificates', ico: '🎓', label: 'সনদ' },
   { act: 'downloads', ico: '⬇️', label: 'ডাউনলোড' },
-  { act: 'streak', ico: '🔥', label: 'স্ট্রিক' },
   { act: 'help', ico: '❓', label: 'সহায়তা' }
 ];
 
 const FIELD_BN = { phone: 'মোবাইল', guardianPhone: 'অভিভাবকের মোবাইল' };
 const STATUS_BN = { pending: 'বাকি', submitted: 'জমা হয়েছে', checked: 'চেক হয়েছে', overdue: 'সময় পার' };
-const BN = '০১২৩৪৫৬৭৮৯';
-const bn = (n) => String(n).replace(/\d/g, (d) => BN[Number(d)]);
+/* Digits follow the student's Settings → সংখ্যা preference (toBnDigits). */
+const bn = toBnDigits;
 
 export function initStudentHome() {
   const session = initApp({ roles: ['student'], tabs: false });
   if (!session) return;
+
+  /* Settings → সংখ্যা / সাউন্ড / লেখার আকার applied before anything renders. */
+  applyPrefs();
 
   const me = db.students.find(session.username) || null;
   const student = { id: me?.id || session.username, name: session.name, className: me?.className };
@@ -145,15 +152,24 @@ export function initStudentHome() {
     const queued = markResultsSynced();
     if (queued) showToast(`${bn(queued)}টি অফলাইনে জমা দেওয়া উত্তরপত্র সিঙ্ক হয়েছে।`, 'success');
     renderHomeSafe();
-    refreshExams?.();
+    /* A broken exam list must never swallow the home's recovery above. */
+    try { refreshExams?.(); } catch (err) { console.error('[Active Plus] exam list refresh failed:', err); }
   });
   window.addEventListener('offline', paintNet);
 
   /* ---------- Bottom nav ---------- */
   const views = { home: 'view-home', study: 'view-study', exam: 'view-exam', result: 'view-result', more: 'view-more' };
+  /** The gradient ink that slides under whichever tab is active. */
+  const navInk = document.getElementById('nav-ink');
+  const moveNavInk = (name) => {
+    if (!navInk) return;
+    const index = Object.keys(views).indexOf(name);
+    if (index >= 0) navInk.style.transform = `translateX(${index * 100}%)`;
+  };
   const switchView = (name) => {
     Object.entries(views).forEach(([k, id]) => { document.getElementById(id).hidden = k !== name; });
     document.querySelectorAll('.bottom-nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === name)));
+    moveNavInk(name);
     if (name === 'home') renderHomeSafe();
     else if (name === 'exam') refreshExams?.();
     else if (name === 'more') renderMore();
@@ -161,6 +177,7 @@ export function initStudentHome() {
     else if (name === 'result') renderResult();
     window.scrollTo({ top: 0 });
   };
+  moveNavInk('home');
   document.querySelector('.bottom-nav').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-view]');
     if (b) switchView(b.dataset.view);
@@ -168,11 +185,21 @@ export function initStudentHome() {
 
   /* ---------- Notification centre — every event, not only notices ---------- */
   const NOTIF_ICON = { fee: '💰', assignment: '📋', exam: '📝', result: '🏆', notice: '📢', system: '🔔' };
+  /* A tap on a row goes to the thing itself: dues → ফি, a paper → পরীক্ষা … */
+  const NOTIF_GO = {
+    fee: () => openMore('fees'),
+    assignment: () => openMore('assignments'),
+    exam: () => switchView('exam'),
+    result: () => switchView('result'),
+    notice: () => openMore('notices'),
+    system: () => openMore('notices')
+  };
   const renderNotifCentre = () => {
     const rows = notificationsFor(student);
     document.getElementById('notif-list').innerHTML = rows.length
       ? rows.map((n) => `
-        <div class="list-item notif-row" data-kind="${escapeHtml(n.kind)}">
+        <div class="list-item notif-row" data-kind="${escapeHtml(n.kind)}" role="button" tabindex="0"
+             aria-label="${escapeHtml(n.title)} — খুলতে চাপ দিন">
           <div class="li-main">
             <div class="li-title">${NOTIF_ICON[n.kind] || '🔔'} ${escapeHtml(n.title)}</div>
             <div class="li-sub">${escapeHtml(n.body || '')}${n.createdAt || n.date ? ` · ${escapeHtml(timeAgo(n.createdAt || n.date) || formatBnDate(n.date))}` : ''}</div>
@@ -180,6 +207,23 @@ export function initStudentHome() {
         </div>`).join('')
       : '<div class="empty-state">কোনো নোটিফিকেশন নেই।</div>';
   };
+
+  const goToNotif = (row) => {
+    const kind = row?.dataset?.kind;
+    if (!kind) return;
+    closeModal('notif-center');
+    (NOTIF_GO[kind] || NOTIF_GO.system)();
+  };
+  document.getElementById('notif-list').addEventListener('click', (e) => {
+    goToNotif(e.target.closest('.notif-row'));
+  });
+  document.getElementById('notif-list').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.notif-row');
+    if (!row) return;
+    e.preventDefault();
+    goToNotif(row);
+  });
 
   document.getElementById('bell').addEventListener('click', () => {
     renderNotifCentre();
@@ -200,14 +244,12 @@ export function initStudentHome() {
    * Each fact appears once.
    */
   /**
-   * Home = one visual hero + the four cards a student acts on: today's state,
-   * the exam, what to study, the fee. Everything else is one tap away in আরও,
-   * so nothing is duplicated and nothing is buried twice.
+   * Home = one visual hero + the three cards a student acts on: the exam,
+   * what to study, the fee. Everything else is one tap away in আরও, so
+   * nothing is duplicated and nothing is buried twice.
    */
   const renderHome = () => {
     const cards = homeCards();
-    const progress = todayProgress(student);
-    const { streak, week } = studyStreak();
     const exam = cards.exam ? upcomingExam(student.className) : null;
     const fee = feeStatusFor(student);
     const tip = cards.tip ? latestTip() : null;
@@ -216,9 +258,9 @@ export function initStudentHome() {
 
     const parts = [];
 
-    /* 1. Hero — banners and illustrations first, so the screen has a face.
-          The teacher's tip rides along as the last slide instead of its own
-          block (keeps the home short without losing the tip). */
+    /* 1. Hero — banners and illustrations first, so the screen has a face,
+          sliding on its own (auto-slide). The teacher's tip rides along as
+          the last slide instead of its own block. */
     const slides = banners.map((b) => ({
       id: b.id, act: 'banner', image: b.image || '', kicker: '📢 ঘোষণা',
       title: b.title, text: b.desc || '', cta: b.cta || 'দেখুন'
@@ -237,28 +279,12 @@ export function initStudentHome() {
               ${s.cta ? `<button type="button" class="btn btn-small" data-act="${s.act}" data-id="${escapeHtml(s.id)}">${escapeHtml(s.cta)}</button>` : ''}
             </article>`).join('')}
           </div>
-          ${slides.length > 1 ? `<div class="carousel-dots" id="banner-dots">${slides.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+          ${slides.length > 1 ? `<div class="carousel-dots" id="banner-dots" aria-hidden="true">${slides.map((_, i) => `<i class="${i === 0 ? 'on' : ''}"></i>`).join('')}</div>` : ''}
         </div>
       </section>`);
     }
 
-    /* 2. Today's glance — the two numbers that change every day. */
-    if (cards.progress) {
-      parts.push(`
-      <section class="home-section" aria-label="আজকের অবস্থা">
-        <h2 class="sec-title">📊 আজকের অবস্থা</h2>
-        <div class="hcard overview-card" id="student-overview">
-          <div class="analytics-grid">
-            <div class="analytics-cell"><span class="ico">📈</span><strong>${bn(progress.pct)}%</strong><span>আজকের প্রগ্রেস</span></div>
-            <div class="analytics-cell"><span class="ico">🔥</span><strong>${bn(streak)}</strong><span>দিন স্ট্রিক</span></div>
-          </div>
-          <div class="progress-bar" style="margin-top:.625rem"><div class="progress-fill" style="width:${progress.pct}%"></div></div>
-          <div class="week" style="margin-top:.625rem">${week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
-        </div>
-      </section>`);
-    }
-
-    /* 3. The exam — the one thing with a deadline attached. */
+    /* 2. The exam — the one thing with a deadline attached. */
     if (cards.exam) {
       if (exam) {
         const win = examWindow(exam);
@@ -284,7 +310,7 @@ export function initStudentHome() {
       }
     }
 
-    /* 4. Continue learning. */
+    /* 3. Continue learning. */
     if (cards.materials) {
       if (resume) {
         const mp = materialProgressFor(student, student.className);
@@ -308,7 +334,7 @@ export function initStudentHome() {
       }
     }
 
-    /* 5. Fee — one line, detailed ledger lives in আরও → ফি. */
+    /* 4. Fee — one line, detailed ledger lives in আরও → ফি. */
     if (cards.fee) {
       parts.push(fee.due > 0 ? `
       <div class="hcard hcard-fee" id="home-fee">
@@ -323,7 +349,7 @@ export function initStudentHome() {
       </div>`);
     }
 
-    /* 6. One small door to everything else (calendar, routine, notices …). */
+    /* 5. One small door to everything else (calendar, routine, notices …). */
     parts.push(`
       <button type="button" class="home-more-link" data-act="more">
         <span aria-hidden="true">🗓️</span> ক্যালেন্ডার, রুটিন, নোটিশসহ সব কিছু
@@ -331,7 +357,52 @@ export function initStudentHome() {
       </button>`);
 
     host.innerHTML = parts.join('\n');
+    initHeroCarousel();
   };
+
+  /* ---------- Hero auto-slide: glides on its own, pauses on a touch -------- */
+  let heroTimer = null;
+  function initHeroCarousel() {
+    if (heroTimer) { clearInterval(heroTimer); heroTimer = null; }
+    const track = host.querySelector('#banner-track');
+    const dots = [...(host.querySelectorAll('#banner-dots i') || [])];
+    if (!track) return;
+    const slides = [...track.children];
+    if (slides.length < 2) return;
+
+    const indexFromScroll = () => {
+      const left = track.scrollLeft || 0;
+      let best = 0; let bestDist = Infinity;
+      slides.forEach((el, i) => {
+        const dist = Math.abs((el.offsetLeft || 0) - left - (track.clientLeft || 0));
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      });
+      return best;
+    };
+    const paintDots = (i) => dots.forEach((d, di) => d.classList.toggle('on', di === i));
+
+    /* Manual swipes keep the dots honest, and pause auto-play for a while. */
+    let resumeAt = 0;
+    track.addEventListener('scroll', () => paintDots(indexFromScroll()), { passive: true });
+    track.addEventListener('pointerdown', () => { resumeAt = Date.now() + 12000; }, { passive: true });
+
+    const reduceMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return; // animation-sensitive users keep manual control
+
+    heroTimer = setInterval(() => {
+      if (document.hidden) return;                 // background tab: don't drift
+      if (document.getElementById('view-home')?.hidden) return;
+      if (Date.now() < resumeAt) return;           // the student is swiping
+      const next = (indexFromScroll() + 1) % slides.length;
+      const el = slides[next];
+      if (typeof track.scrollTo === 'function') {
+        track.scrollTo({ left: (el.offsetLeft || 0) - 16, behavior: 'smooth' });
+      }
+      paintDots(next);
+    }, 5200);
+    heroTimer.unref?.(); // Node/jsdom tests must not be held open by the ticker
+  }
 
   const renderHomeSafe = () => {
     try {
@@ -381,19 +452,57 @@ export function initStudentHome() {
 
   function openCertificate(badge) {
     if (!badge) return;
+    const org = db.settings.get().orgName || 'Active Plus';
     showDetail('🎓 সনদ', `
-      <div id="certificate-sheet" style="text-align:center;padding:1rem;border:2px dashed var(--accent);border-radius:16px">
-        <img src="assets/logo.png" alt="" class="doc-logo" style="width:64px;height:64px">
-        <div style="font-size:.75rem;letter-spacing:.08em">${escapeHtml(db.settings.get().orgName || 'Active Plus')}</div>
-        <div style="font-size:1.5rem;margin:.5rem 0">${badge.icon}</div>
-        <div style="font-weight:700;font-size:1.125rem">${escapeHtml(badge.name)}</div>
-        <p style="margin:.5rem 0">এই সনদ প্রদান করা হলো</p>
-        <div style="font-weight:700">${escapeHtml(session.name)}</div>
-        <div class="meta">${escapeHtml(student.id)}${me?.className ? ` · ${escapeHtml(me.className)}` : ''}</div>
-        <div class="meta" style="margin-top:.75rem">তারিখ: ${escapeHtml(formatBnDate(todayBn()))}</div>
+      <div id="certificate-sheet" class="cert-sheet-v2">
+        <img src="assets/logo.png" alt="" class="doc-logo" style="width:56px;height:56px;display:block;margin:0 auto .4rem">
+        <div class="cert-org">${escapeHtml(org)}</div>
+        <div class="cert-kicker">অর্জনের সনদপত্র · Certificate of Achievement</div>
+        <div class="cert-icon">${badge.icon}</div>
+        <div class="cert-name">${escapeHtml(badge.name)}</div>
+        <div class="cert-line" aria-hidden="true"></div>
+        <div class="cert-for">এই সনদটি গর্বের সঙ্গে প্রদান করা হলো</div>
+        <div class="cert-student">${escapeHtml(session.name)}</div>
+        <div class="cert-meta">${escapeHtml(student.id)}${me?.className ? ` · ${escapeHtml(me.className)}` : ''}</div>
+        <div class="cert-foot">
+          <span>তারিখ: ${escapeHtml(formatBnDate(todayBn()))}</span>
+          <span class="cert-sign">অনুমোদন</span>
+          <span class="cert-seal" aria-hidden="true">🏅</span>
+        </div>
       </div>
-      <button type="button" class="btn btn-block" id="print-cert" style="margin-top:.75rem">প্রিন্ট করুন</button>`);
+      <button type="button" class="btn btn-block" id="print-cert" style="margin-top:.75rem">🖨️ প্রিন্ট করুন</button>`);
     detail.querySelector('#print-cert')?.addEventListener('click', () => {
+      if (typeof window.print === 'function') window.print();
+      else showToast('এই ব্রাউজারে প্রিন্ট করা যায়নি।', 'warning');
+    });
+  }
+
+  /** Official-looking fee receipt for one recorded payment. */
+  function openReceipt(payment) {
+    if (!payment) return;
+    const org = db.settings.get().orgName || 'Active Plus';
+    showDetail('🧾 পেমেন্ট রসিদ', `
+      <div class="receipt-sheet" id="receipt-sheet">
+        <div class="r-head">
+          <img src="assets/logo.png" alt="">
+          <div>
+            <div class="r-org">${escapeHtml(org)}</div>
+            <div class="r-title">মানি রসিদ · Money Receipt</div>
+          </div>
+        </div>
+        <div class="r-line"></div>
+        <div class="info-row"><span class="l">রসিদ নং</span><span class="v">${escapeHtml(payment.receiptNo || payment.id || '—')}</span></div>
+        <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(payment.date) || payment.date || '—')}</span></div>
+        <div class="info-row"><span class="l">শিক্ষার্থী</span><span class="v">${escapeHtml(session.name)}</span></div>
+        <div class="info-row"><span class="l">আইডি</span><span class="v">${escapeHtml(student.id)}</span></div>
+        <div class="info-row"><span class="l">মাস</span><span class="v">${escapeHtml(payment.month || '—')}</span></div>
+        <div class="r-amount">৳${bn(payment.amount || 0)}</div>
+        <div class="r-paid">✓ পরিশোধিত</div>
+        <div class="r-line"></div>
+        <div class="info-row"><span class="l">গ্রহণকারী</span><span class="v">${escapeHtml(payment.receivedBy || db.settings.get().orgName || 'Active Plus')}</span></div>
+      </div>
+      <button type="button" class="btn btn-block" id="print-receipt" style="margin-top:.75rem">🖨️ রসিদ প্রিন্ট করুন</button>`);
+    detail.querySelector('#print-receipt')?.addEventListener('click', () => {
       if (typeof window.print === 'function') window.print();
       else showToast('এই ব্রাউজারে প্রিন্ট করা যায়নি।', 'warning');
     });
@@ -403,6 +512,16 @@ export function initStudentHome() {
     const b = db.banners.find(id);
     if (!b) return;
     showDetail(b.title, `<p>${escapeHtml(b.desc || '')}</p><p class="meta" style="margin-top:.5rem">${escapeHtml(formatBnDate(b.date))}</p>`);
+  }
+
+  /** A notice tapped in আরও → নোটিশ — the whole thing, not just its title. */
+  function openNotice(n) {
+    if (!n) return;
+    const scope = [n.audience || 'সবাই', n.className && n.className !== ALL_CLASSES ? n.className : ''].filter(Boolean).join(' · ');
+    showDetail(`📢 ${n.title}`, `
+      ${n.body ? `<p style="white-space:pre-wrap;margin-bottom:.5rem">${escapeHtml(n.body)}</p>` : ''}
+      <div class="info-row"><span class="l">তারিখ</span><span class="v">${escapeHtml(formatBnDate(n.date) || '—')}</span></div>
+      <div class="info-row"><span class="l">কার জন্য</span><span class="v">${escapeHtml(scope || 'সবাই')}</span></div>`);
   }
 
   function openAssignment(id) {
@@ -439,15 +558,29 @@ export function initStudentHome() {
     });
   }
 
+  /* Pictures preview inline; PDFs preview in an embedded frame when the host
+     allows it (the open/download button always remains as the sure way). */
+  const IMAGE_URL = /\.(png|jpe?g|webp|gif|bmp|avif)(\?|#|$)/i;
+  const PDF_URL = /\.pdf(\?|#|$)/i;
+
   function openMaterial(id) {
     const m = db.materials.find(id);
     if (!m) return;
     recordStudyActivity('view', 1, id);
     const isDone = completedMaterialIds(student).includes(m.id);
+    const link = m.link ? safeUrl(m.link) : '';
+    const preview = !link ? '' : IMAGE_URL.test(link)
+      ? `<img class="mat-preview-img" src="${escapeHtml(link)}" alt="${escapeHtml(m.title)} — প্রিভিউ" loading="lazy">`
+      : PDF_URL.test(link)
+        ? `<details class="mat-preview-box"><summary>👁️ পিডিএফ প্রিভিউ দেখুন</summary>
+             <iframe src="${escapeHtml(link)}" title="${escapeHtml(m.title)} — প্রিভিউ" loading="lazy"></iframe>
+           </details>`
+        : '';
     showDetail(m.title, `
       <p>${escapeHtml(m.subject)} · ${escapeHtml(m.className)} · ${escapeHtml(formatBnDate(m.date))}</p>
       <p style="white-space:pre-wrap;margin-top:.5rem">${escapeHtml(m.description || '')}</p>
-      ${m.link ? `<a class="btn btn-secondary btn-block" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="margin-top:.75rem">ফাইল খুলুন / ডাউনলোড</a>` : ''}
+      ${preview}
+      ${link ? `<a class="btn btn-secondary btn-block" href="${escapeHtml(link)}" target="_blank" rel="noopener" style="margin-top:.75rem">ফাইল খুলুন / ডাউনলোড</a>` : ''}
       ${isDone
         ? '<p class="meta" style="margin-top:.75rem">আপনি এটি সম্পন্ন করেছেন ✓</p>'
         : '<button type="button" class="btn btn-block" id="mark-complete" style="margin-top:.75rem">সম্পন্ন হিসেবে চিহ্নিত করুন</button>'}`);
@@ -479,10 +612,44 @@ export function initStudentHome() {
       if (f.act === 'achievements') return enabled.includes('achievements');
       if (f.act === 'certificates') return enabled.includes('certificates');
       if (f.act === 'downloads') return enabled.includes('downloads');
-      if (f.act === 'streak') return enabled.includes('streak');
       if (f.act === 'help') return enabled.includes('help');
       return true;
     });
+
+    /* Routine grouped by weekday; today's block lights up. */
+    const routineByDay = CAL_LONG.map((day) => ({
+      day,
+      items: db.routine.list().filter((r) => r.day === day),
+      isToday: day === CAL_LONG[new Date().getDay()]
+    })).filter((g) => g.items.length);
+
+    /* Notices are tappable: the full text opens in the detail modal. */
+    const noticeRows = noticesFor(student);
+
+    /* Every badge, earned or not, with the honest path to earning it. */
+    const completedCount = completedMaterialIds(student).length;
+    const bestScore = performanceFor(student)?.best || 0;
+    const badgeCatalog = [
+      { icon: '🔥', name: '৭ দিনের স্ট্রিক', target: 7, have: Math.min(7, streak.streak), tip: 'প্রতিদিন অন্তত একটু পড়াশোনা বা পরীক্ষা দিলে স্ট্রিক বাড়ে।', suffix: 'দিন' },
+      { icon: '📚', name: '১০ ম্যাটেরিয়াল সম্পন্ন', target: 10, have: Math.min(10, completedCount), tip: 'স্টাডি ট্যাবে ম্যাটেরিয়াল খুলে "সম্পন্ন হিসেবে চিহ্নিত" করুন।', suffix: 'টি' },
+      { icon: '🏆', name: 'কোনো পরীক্ষায় ৯০%+ স্কোর', target: 90, have: Math.min(90, bestScore), tip: 'যেকোনো পরীক্ষায় ৯০% বা বেশি নম্বর পেলেই এই ব্যাজ।', suffix: '%' }
+    ];
+    const badgeRow = (b) => {
+      const earned = b.have >= b.target;
+      return `<div class="badge-row ${earned ? 'earned' : 'locked'}">
+        <span class="b-ico" aria-hidden="true">${b.icon}</span>
+        <div class="b-main">
+          <div class="b-name">${escapeHtml(b.name)}</div>
+          <div class="b-tip">${escapeHtml(b.tip)}</div>
+          <div class="b-bar" role="img" aria-label="${escapeHtml(b.name)} — ${bn(b.have)}/${bn(b.target)}"><i style="width:${Math.max(earned ? 100 : 3, Math.round((b.have / b.target) * 100))}%"></i></div>
+        </div>
+        <span class="b-state">${earned ? '✓ অর্জিত' : `${bn(b.have)}/${bn(b.target)}`}</span>
+      </div>`;
+    };
+
+    const prefs = getPrefs();
+    const seg = (prefKey, value, label) =>
+      `<button type="button" class="seg-btn" data-pref="${prefKey}" data-value="${value}" aria-pressed="${String(String(prefs[prefKey]) === value)}">${label}</button>`;
 
     const panels = {
       assignments: `
@@ -494,8 +661,14 @@ export function initStudentHome() {
             <span class="v">${escapeHtml(dueLabel(a, student))}</span></div>`;
         }).join('') || '<p>কোনো অ্যাসাইনমেন্ট নেই।</p>'}</div>`,
       routine: `
-      <div class="hcard" id="more-routine"><div class="h-title">রুটিন</div>${
-        db.routine.list().map((r) => row(`${r.day} · ${r.subject}`, `${r.time} · ${r.room || ''}`)).join('') || '<p>রুটিন নেই।</p>'}</div>`,
+      <div class="hcard" id="more-routine"><div class="h-title">📅 সাপ্তাহিক রুটিন</div>${
+        routineByDay.length
+          ? routineByDay.map((g) => `
+            <div class="routine-day${g.isToday ? ' today' : ''}">
+              <div class="routine-day-head">${g.isToday ? '📍 ' : ''}${escapeHtml(g.day)}${g.isToday ? ' <span class="today-pill">আজ</span>' : ''}</div>
+              ${g.items.map((r) => row(escapeHtml(r.subject), `${escapeHtml(r.time)}${r.room ? ` · ${escapeHtml(r.room)}` : ''}${r.teacher ? ` · ${escapeHtml(r.teacher)}` : ''}`)).join('')}
+            </div>`).join('')
+          : '<p>রুটিন নেই।</p>'}</div>`,
       calendar: calendarPanel(),
       fees: `
       <div class="hcard" id="more-fees"><div class="h-title">💰 ফি</div>${
@@ -505,16 +678,25 @@ export function initStudentHome() {
         ${feeTotals.due > 0 ? `<div class="info-row"><span class="l">মোট বকেয়া</span><span class="v" style="color:var(--warning)">৳${bn(feeTotals.due)}</span></div>` : ''}
         <div class="h-title" style="margin-top:.75rem">🧾 পেমেন্ট হিস্ট্রি</div>${
         payments.length
-          ? payments.map((p) => `<div class="info-row"><span class="l">${escapeHtml(p.month || '')}
+          ? payments.map((p, i) => `<div class="info-row"><span class="l">${escapeHtml(p.month || '')}
               <br><small class="meta">${escapeHtml(formatBnDate(p.date) || p.date || '')}${p.receiptNo ? ` · রসিদ ${escapeHtml(p.receiptNo)}` : ''}${p.receivedBy ? ` · ${escapeHtml(p.receivedBy)}` : ''}</small></span>
-              <span class="v" style="color:var(--success)">৳${bn(p.amount)} ✓</span></div>`).join('')
+              <span class="v"><span style="color:var(--success)">৳${bn(p.amount)} ✓</span>
+              <button type="button" class="btn btn-small btn-secondary" data-receipt="${i}" aria-label="${escapeHtml(p.month || 'পেমেন্ট')} — রসিদ দেখুন" style="margin-inline-start:.5rem">রসিদ</button></span></div>`).join('')
           : '<p class="meta">এখনো কোনো পেমেন্ট হয়নি।</p>'}</div>`,
       notices: `
       <div class="hcard" id="more-notices"><div class="h-title">নোটিশ</div>${
-        noticesFor(student).map((n) => row(n.title, formatBnDate(n.date))).join('') || '<p>কোনো নোটিশ নেই।</p>'}</div>`,
+        noticeRows.length
+          ? noticeRows.map((n, i) => `
+            <div class="info-row" role="button" tabindex="0" data-notice="${i}" style="cursor:pointer" aria-label="${escapeHtml(n.title)} — বিস্তারিত দেখুন">
+              <span class="l">📢 ${escapeHtml(n.title)}</span>
+              <span class="v">${escapeHtml(formatBnDate(n.date))}</span></div>`).join('')
+          : '<p>কোনো নোটিশ নেই।</p>'}</div>`,
       achievements: `
-      <div class="hcard" id="more-achievements"><div class="h-title">অর্জন</div>${
-        badges.map((b) => row(`${b.icon} ${b.name}`, '')).join('') || '<p>এখনো কোনো ব্যাজ অর্জিত হয়নি।</p>'}</div>`,
+      <div class="hcard" id="more-achievements"><div class="h-title">🏅 অর্জন</div>
+        <div class="info-row"><span class="l">🔥 বর্তমান স্ট্রিক</span><span class="v">${bn(streak.streak)} দিন</span></div>
+        <div class="week" style="margin:.25rem 0 .625rem">${streak.week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
+        ${badgeCatalog.map(badgeRow).join('')}
+        ${badges.length ? `<p class="meta" style="margin-top:.5rem">অর্জিত ব্যাজের সনদ পাবেন: আরও → 🎓 সনদ।</p>` : ''}</div>`,
       certificates: `
       <div class="hcard" id="more-certificates"><div class="h-title">সনদ</div>${
         badges.length
@@ -531,14 +713,18 @@ export function initStudentHome() {
               ? `<a class="info-row" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener" style="text-decoration:none"><span class="l">⬇️ ${escapeHtml(m.title)}</span><span class="v">ডাউনলোড</span></a>`
               : `<div class="info-row" role="button" tabindex="0" data-mat2="${escapeHtml(m.id)}" style="cursor:pointer"><span class="l">📄 ${escapeHtml(m.title)}</span><span class="v">${escapeHtml(m.type || '')}</span></div>`).join('')
           : '<p>আপনার ক্লাসের জন্য ডাউনলোডযোগ্য ফাইল নেই।</p>'}</div>`,
-      streak: `
-      <div class="hcard" id="more-streak"><div class="h-title">স্টাডি স্ট্রিক</div>
-        <div class="info-row"><span class="l">🔥 ধারাবাহিক দিন</span><span class="v">${bn(streak.streak)}</span></div>
-        <div class="week" style="margin-top:.5rem">${streak.week.map((d) => `<div class="d ${d.done ? 'on' : ''}" role="img" aria-label="${d.day}${d.done ? ' — পড়াশোনা হয়েছে' : ' — পড়াশোনা নেই'}">${d.day}<div class="dot"></div></div>`).join('')}</div>
-        <p class="meta" style="margin-top:.5rem">প্রতিদিন পড়াশোনা করলে স্ট্রিক বাড়ে।</p></div>`,
       profile: `
       <div class="hcard" id="more-profile"><div class="h-title">প্রোফাইল</div>
-        ${meRow.photo ? `<img src="${escapeHtml(meRow.photo)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin-bottom:.75rem">` : ''}
+        <div class="profile-photo-row">
+          ${meRow.photo
+            ? `<img class="pp-img" src="${escapeHtml(meRow.photo)}" alt="${escapeHtml(session.name)} — প্রোফাইল ছবি">`
+            : `<span class="pp-placeholder" aria-hidden="true">${escapeHtml((session.name || 'A').charAt(0))}</span>`}
+          <div>
+            <strong>${escapeHtml(session.name)}</strong><br>
+            <label class="btn btn-small btn-secondary" for="profile-photo-input" style="margin-top:.4rem;cursor:pointer">📷 ছবি ${meRow.photo ? 'বদলান' : 'যোগ করুন'}</label>
+            <input id="profile-photo-input" type="file" accept="image/*" hidden>
+          </div>
+        </div>
         ${row('নাম', session.name)}
         ${row('শিক্ষার্থী আইডি', student.id)}
         ${row('শ্রেণি', meRow.className || '—')}
@@ -556,16 +742,64 @@ export function initStudentHome() {
         </form></div>`,
       settings: `
       <div class="hcard" id="more-settings"><div class="h-title">সেটিংস</div>
-        ${row('ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)')}
-        ${row('অ্যাপ ভার্সন', `v${DATA_VERSION}`)}
-        <button type="button" class="btn btn-secondary btn-block" id="clear-cache" style="margin-top:.75rem">অ্যাপ ক্যাশ রিফ্রেশ করুন</button>
+        <div class="pref-block">
+          <span class="pref-label">🔢 সংখ্যা দেখানোর ধরন</span>
+          <div class="seg-row" role="group" aria-label="সংখ্যার ভাষা">
+            ${seg('digits', 'bn', 'বাংলা (১২৩)')}
+            ${seg('digits', 'en', 'English (123)')}
+          </div>
+          <p class="pref-hint">বদলানোর সঙ্গে সঙ্গে পুরো অ্যাপে প্রযোজ্য হবে।</p>
+        </div>
+        <div class="pref-block">
+          <span class="pref-label">🔔 পরীক্ষার সাউন্ড</span>
+          <div class="seg-row" role="group" aria-label="সাউন্ড">
+            ${seg('sound', 'true', 'চালু')}
+            ${seg('sound', 'false', 'বন্ধ')}
+          </div>
+          <p class="pref-hint">পরীক্ষায় ৫ মিনিট ও ১ মিনিট বাকি থাকলে সুস্বর বীপ বাজে।</p>
+        </div>
+        <div class="pref-block">
+          <span class="pref-label">🔠 লেখার আকার</span>
+          <div class="seg-row" role="group" aria-label="লেখার আকার">
+            ${seg('font', 'sm', 'ছোট')}
+            ${seg('font', 'md', 'সাধারণ')}
+            ${seg('font', 'lg', 'বড়')}
+          </div>
+        </div>
+        <div class="pref-block">
+          ${row('ডেটা মোড', getAuthMode() === 'firebase' ? 'Firebase (ক্লাউড)' : 'লোকাল (এই ডিভাইস)')}
+          ${row('অ্যাপ ভার্সন', `v${DATA_VERSION}`)}
+          <button type="button" class="btn btn-secondary btn-block" id="clear-cache" style="margin-top:.5rem">অ্যাপ ক্যাশ রিফ্রেশ করুন</button>
+        </div>
       </div>`,
       help: `
       <div class="hcard" id="more-help"><div class="h-title">সহায়তা</div>
         ${row('প্রতিষ্ঠান', db.settings.get().orgName || 'Active Plus')}
         ${row('মোবাইল', db.settings.get().mobile || '—')}
         ${row('ইমেইল', db.settings.get().email || '—')}
-        <p class="meta" style="margin-top:.5rem">সমস্যা হলে উপরের নম্বরে যোগাযোগ করুন।</p></div>`
+        <p class="meta" style="margin-top:.5rem">সমস্যা হলে উপরের নম্বরে যোগাযোগ করুন।</p>
+        <div class="h-title" style="margin-top:.75rem">সচরাচর জিজ্ঞাসা</div>
+        <details class="faq-item">
+          <summary>ইন্টারনেট না থাকলে পরীক্ষা দেওয়া যাবে?</summary>
+          <p>যাবে। পরীক্ষা চলাকালীন অফলাইন হলে উত্তরপত্র এই ডিভাইসেই মূল্যায়ন হয়ে সংরক্ষিত থাকে; ইন্টারনেট ফিরলে ফলাফল স্বয়ংক্রিয়ভাবে সিঙ্ক হয়ে যায়। হেডারের বর্ডার হলুদ হলে বুঝবেন আপনি অফলাইনে আছেন।</p>
+        </details>
+        <details class="faq-item">
+          <summary>পরীক্ষার মাঝে অ্যাপ বন্ধ হলে কী হবে?</summary>
+          <p>চিন্তা নেই — চলমান পরীক্ষা ডিভাইসে সংরক্ষিত থাকে। আবার খুললে "চালিয়ে যান" দেখাবেন এবং আগের উত্তর ও একই সময়সীমা ফিরে পাবেন।</p>
+        </details>
+        <details class="faq-item">
+          <summary>ফলাফল কোথায় দেখব?</summary>
+          <p>নিচের 🏆 ফলাফল ট্যাবে প্রতিটি পরীক্ষার স্কোর, বিষয়ভিত্তিক গড়, অগ্রগতির ধারা ও ক্লাসে আপনার অবস্থান (মেধা তালিকা চালু থাকলে) দেখা যায়।</p>
+        </details>
+        <details class="faq-item">
+          <summary>ফি বকেয়া আছে কি না কীভাবে জানব?</summary>
+          <p>আরও → 💰 ফি-তে মাসভিত্তিক অবস্থা, মোট পরিশোধ/বকেয়া এবং প্রতিটি পেমেন্টের রসিদ দেখতে ও প্রিন্ট করতে পারবেন।</p>
+        </details>
+        <details class="faq-item">
+          <summary>প্রোফাইলের নম্বর বা ছবি বদলাতে চাই?</summary>
+          <p>উপরে 👤 → প্রোফাইল-এ গিয়ে ছবি যোগ করতে পারবেন। মোবাইল নম্বরসহ অন্য তথ্য অ্যাডমিনের দেওয়া অনুমতি থাকলে সেখানেই সম্পাদনা করা যায়।</p>
+        </details>
+      </div>`
     };
 
     const moreHost = document.getElementById('more-content');
@@ -576,11 +810,11 @@ export function initStudentHome() {
         <button type="button" class="btn btn-secondary btn-block" id="more-back" style="margin-bottom:.75rem">← ফিরে যান</button>
         ${panels[only]}`;
     } else {
-      /* Clean menu — no dump of every card, no second shortcut row. */
+      /* Clean icon-grid menu — no dump of every card, no second shortcut row. */
       moreHost.innerHTML = `
         <div class="hcard" id="more-menu">
           <div class="h-title">আরও</div>
-          <div class="more-list">
+          <div class="more-grid">
             ${menuItems.map((f) => `
               <button type="button" class="more-item" data-act="${f.act}">
                 <span class="ico" aria-hidden="true">${f.ico}</span>
@@ -614,7 +848,7 @@ export function initStudentHome() {
        is not the only way in (Enter/Space open the same row). */
     moreHost.onkeydown = (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
-      const row = e.target.closest('[role="button"][data-asg], [role="button"][data-mat2]');
+      const row = e.target.closest('[role="button"][data-asg], [role="button"][data-mat2], [role="button"][data-notice]');
       if (!row) return;
       e.preventDefault();
       row.click();
@@ -632,6 +866,22 @@ export function initStudentHome() {
       }
       const calDay = e.target.closest('[data-cal-day]');
       if (calDay) { openCalendarDay(Number(calDay.dataset.calDay)); return; }
+      /* Settings segmented switches: apply, then repaint pressed states. */
+      const prefBtn = e.target.closest('[data-pref]');
+      if (prefBtn) {
+        const key = prefBtn.dataset.pref;
+        const value = key === 'sound' ? prefBtn.dataset.value === 'true' : prefBtn.dataset.value;
+        setPref(key, value);
+        renderMore(only);
+        renderHomeSafe();
+        refreshExams?.();
+        showToast('সেটিং সংরক্ষিত হয়েছে।', 'success');
+        return;
+      }
+      const rcp = e.target.closest('[data-receipt]');
+      if (rcp) { openReceipt(payments[Number(rcp.dataset.receipt)]); return; }
+      const nt = e.target.closest('[data-notice]');
+      if (nt) { openNotice(noticeRows[Number(nt.dataset.notice)]); return; }
       const asg = e.target.closest('[data-asg]');
       if (asg) { openAssignment(asg.dataset.asg); return; }
       const mat = e.target.closest('[data-mat2]');
@@ -642,6 +892,45 @@ export function initStudentHome() {
       if (!tileEl) return;
       openMore(tileEl.dataset.act);
     };
+
+    /* Profile photo: picked file → downscaled JPEG → the student's record. */
+    const photoInput = document.getElementById('profile-photo-input');
+    photoInput?.addEventListener('change', () => {
+      const file = photoInput.files?.[0];
+      if (!file) return;
+      if (!me) { showToast('আপনার শিক্ষার্থী রেকর্ড পাওয়া যায়নি।', 'error'); return; }
+      if (!navigator.onLine) { showToast('অফলাইনে ছবি বদলানো যাবে না।', 'error'); return; }
+      if (!/^image\//.test(file.type || '')) { showToast('একটি ছবির ফাইল বাছুন।', 'error'); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const LIMIT = 320;
+            const scale = Math.min(1, LIMIT / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const url = canvas.toDataURL('image/jpeg', 0.82);
+            db.students.update(student.id, { photo: url });
+            me.photo = url;
+            const av = document.getElementById('avatar');
+            if (av) av.innerHTML = `<img src="${escapeHtml(url)}" alt="${escapeHtml(session.name)}">`;
+            const pmAv = document.getElementById('pm-avatar');
+            if (pmAv) pmAv.innerHTML = `<img src="${escapeHtml(url)}" alt="">`;
+            showToast('প্রোফাইল ছবি বদলে গেছে।', 'success');
+          } catch (err) {
+            showToast('ছবিটি ব্যবহার করা গেল না।', 'error');
+          }
+          renderMore(only);
+        };
+        img.onerror = () => showToast('ছবিটি খোলা যায়নি।', 'error');
+        img.src = String(reader.result || '');
+      };
+      reader.onerror = () => showToast('ছবিটি পড়া যায়নি।', 'error');
+      reader.readAsDataURL(file);
+    });
 
     const editForm = document.getElementById('profile-edit-form');
     editForm?.addEventListener('submit', (e) => {
@@ -669,13 +958,50 @@ export function initStudentHome() {
   }
 
   /* ---------- Study / Exam / Result ---------- */
+
+  /* Study toolbox state: subject filter + the text the student is searching. */
+  const studyFilter = { subject: '', q: '' };
+
   function renderStudy() {
-    const mats = classMaterials();
-    document.getElementById('material-list').innerHTML = mats.length
-      ? mats.map((m) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(m.title)}</div><div class="li-sub">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')} · ${escapeHtml(formatBnDate(m.date))}</div></div>
+    const all = classMaterials();
+    const doneIds = completedMaterialIds(student);
+    const subjects = [...new Set(all.map((m) => m.subject).filter(Boolean))];
+    if (studyFilter.subject && !subjects.includes(studyFilter.subject)) studyFilter.subject = '';
+    const q = studyFilter.q.trim().toLowerCase();
+    const mats = all.filter((m) => {
+      if (studyFilter.subject && m.subject !== studyFilter.subject) return false;
+      if (q && !`${m.title} ${m.subject} ${m.type || ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    /* Search box + subject chips ride above the list every time. */
+    const tools = `
+      <div class="study-tools">
+        <input type="search" id="study-search" class="study-search" placeholder="ম্যাটেরিয়াল খুঁজুন…" value="${escapeHtml(studyFilter.q)}" aria-label="ম্যাটেরিয়াল খুঁজুন">
+        ${subjects.length ? `<div class="fchip-row" role="group" aria-label="বিষয় বাছুন">
+          <button type="button" class="fchip" data-fsubj="" aria-pressed="${String(!studyFilter.subject)}">সব বিষয়</button>
+          ${subjects.map((s) => `<button type="button" class="fchip" data-fsubj="${escapeHtml(s)}" aria-pressed="${String(studyFilter.subject === s)}">${escapeHtml(s)}</button>`).join('')}
+        </div>` : ''}
+      </div>`;
+
+    document.getElementById('material-list').innerHTML = tools + (mats.length
+      ? mats.map((m) => `<div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(m.title)}${doneIds.includes(m.id) ? '<span class="mat-done-chip">✓ সম্পন্ন</span>' : ''}</div><div class="li-sub">${escapeHtml(m.subject)} · ${escapeHtml(m.type || '')} · ${escapeHtml(formatBnDate(m.date))}</div></div>
         <button type="button" class="btn btn-small" data-mat="${escapeHtml(m.id)}">খুলুন</button></div>`).join('')
-      : '<div class="empty-state">কোনো ম্যাটেরিয়াল নেই।</div>';
+      : `<div class="empty-state">${all.length ? 'খুঁজে কিছু পাওয়া যায়নি — অন্য নাম বা বিষয় চেষ্টা করুন।' : 'কোনো ম্যাটেরিয়াল নেই।'}</div>`);
+
+    const search = document.getElementById('study-search');
+    search?.addEventListener('input', () => {
+      studyFilter.q = String(search.value || '');
+      renderStudy();
+      /* Re-rendering rebuilds the input: put the caret back where typing was. */
+      const reborn = document.getElementById('study-search');
+      reborn?.focus();
+      reborn?.setSelectionRange?.(reborn.value.length, reborn.value.length);
+    });
+
     document.getElementById('material-list').onclick = (e) => {
+      const chip = e.target.closest('[data-fsubj]');
+      if (chip) { studyFilter.subject = chip.dataset.fsubj; renderStudy(); return; }
       const b = e.target.closest('[data-mat]');
       if (b) openMaterial(b.dataset.mat);
     };
@@ -700,6 +1026,7 @@ export function initStudentHome() {
         <div class="info-row"><span class="l">সেরা</span><span class="v">${bn(perf.best)}%</span></div>
         <div class="info-row"><span class="l">টেস্ট</span><span class="v">${bn(perf.tests)}</span></div>
         <div class="info-row"><span class="l">র‍্যাঙ্ক</span><span class="v">#${bn(perf.rank)}</span></div></div>` : ''}
+      ${trendCard()}
       ${subjectChart()}
       <div class="hcard" id="result-list"><div class="h-title">🏆 সব ফলাফল</div>${
         mine.length ? mine.map((r) => {
@@ -718,6 +1045,46 @@ export function initStudentHome() {
             <span class="v">${reviewable ? ` <button type="button" class="btn btn-small btn-secondary" data-act="review" data-exam="${escapeHtml(r.examId)}">উত্তর দেখুন</button>` : ''}</span></div>`;
         }).join('') : '<p>কোনো ফলাফল নেই।</p>'}</div>
       ${leaderboardCard()}`;
+  }
+
+  /**
+   * The last few papers as a line — is the graph climbing? Points are pure
+   * inline SVG: no chart library, no network, works offline like everything.
+   */
+  function trendCard() {
+    const recent = db.examResults.list().filter((r) => r.studentId === student.id).slice(-8);
+    if (recent.length < 2) return '';
+    const pts = recent.map((r) => (r.total ? Math.round((r.score / r.total) * 100) : 0));
+    const W = 320; const H = 96; const PAD = 14;
+    const stepX = (W - PAD * 2) / Math.max(1, pts.length - 1);
+    const yOf = (p) => H - PAD - (Math.max(0, Math.min(100, p)) / 100) * (H - PAD * 2);
+    const coords = pts.map((p, i) => [PAD + i * stepX, yOf(p)]);
+    const pointStr = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+    const last = pts[pts.length - 1];
+    const delta = last - pts[pts.length - 2];
+    const deltaLabel = delta > 0 ? ` · আগের পরীক্ষার চেয়ে +${bn(delta)}% ↑`
+      : delta < 0 ? ` · আগের পরীক্ষার চেয়ে ${bn(delta)}% ↓` : '';
+    return `<div class="hcard" id="result-trend">
+      <div class="h-title">📈 অগ্রগতির ধারা</div>
+      <div class="trend-wrap">
+        <svg class="trend-chart" viewBox="0 0 ${W} ${H}" role="img"
+             aria-label="সর্বশেষ ${bn(pts.length)}টি পরীক্ষার স্কোর ধারা: ${pts.map((p) => `${bn(p)}%`).join(', ')}">
+          <defs>
+            <linearGradient id="trend-grad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#6366f1"></stop>
+              <stop offset="0.5" stop-color="#a855f7"></stop>
+              <stop offset="1" stop-color="#ec4899"></stop>
+            </linearGradient>
+          </defs>
+          <polyline points="${pointStr}" fill="none" stroke="url(#trend-grad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          ${coords.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="#c4b5fd" stroke="#8b5cf6" stroke-width="1"></circle>`).join('')}
+        </svg>
+        <div class="trend-foot">
+          <span>পুরোনো → নতুন · ${bn(pts.length)}টি পরীক্ষা</span>
+          <span>সর্বশেষ ${bn(last)}%${deltaLabel}</span>
+        </div>
+      </div>
+    </div>`;
   }
 
   /** Subject-wise bars — where the student is strong and where to revise. */
@@ -742,7 +1109,8 @@ export function initStudentHome() {
   }
 
   /** Class merit list. Names stay hidden: position + roll is enough to find
-      yourself without publishing a classmate's marks next to their name. */
+      yourself without publishing a classmate's marks next to their name.
+      The top three stand on a little podium; the rest keep the plain list. */
   function leaderboardCard() {
     if (!leaderboardEnabled()) return '';
     const mine = leaderboard().filter((r) => r.className === student.className);
@@ -753,11 +1121,26 @@ export function initStudentHome() {
       const who = db.students.find(row.studentId);
       return `রোল ${escapeHtml(String(who?.roll || who?.id || row.studentId))}`;
     };
+    /* Podium order on screen: silver left, gold centre (tallest), bronze right. */
+    const steps = [
+      { row: top[1], cls: 'second', medal: '🥈' },
+      { row: top[0], cls: 'first', medal: '🥇' },
+      { row: top[2], cls: 'third', medal: '🥉' }
+    ].filter((s) => s.row);
+    const podium = `<div class="lb-podium" role="img" aria-label="শীর্ষ ${bn(steps.length)} জনের পোডিয়াম">${steps.map((s) => `
+      <div class="lb-step ${s.cls}${s.row.studentId === student.id ? ' me' : ''}">
+        <span class="lb-medal" aria-hidden="true">${s.medal}</span>
+        <span class="lb-roll">${label(s.row)}</span>
+        <span class="lb-pct">${bn(s.row.pct)}%</span>
+        <span class="lb-box" aria-hidden="true"></span>
+      </div>`).join('')}
+    </div>`;
     const row = (r) => `<div class="info-row${r.studentId === student.id ? ' me' : ''}">
         <span class="l">${bn(r.position)}. ${label(r)}${r.studentId === student.id ? ' (আপনি)' : ''}</span>
         <span class="v">${bn(r.pct)}%</span></div>`;
     return `<div class="hcard" id="result-leaderboard"><div class="h-title">🏆 ক্লাস মেধা তালিকা</div>
       <p class="meta">${escapeHtml(student.className)} — নাম গোপন, শুধু রোল ও শতাংশ</p>
+      ${podium}
       ${top.map(row).join('')}
       ${myRow && myRow.position > 5 ? row(myRow) : ''}</div>`;
   }
@@ -811,6 +1194,27 @@ export function initStudentHome() {
     document.getElementById('cal-days').innerHTML = cells.join('');
   }
 
+  /* The whole month's exams + deadlines listed under the grid — the month at
+     a glance without tapping every day. */
+  function monthEventsHtml() {
+    const { y, m } = calState;
+    const exams = examsFor(student.className)
+      .filter((e) => { const p = dateParts(e.date); return p && p.y === y && p.m === m + 1; })
+      .map((e) => ({ d: dateParts(e.date).d, ico: '📝', title: e.title, sub: e.subject }));
+    const dues = db.assignments.list()
+      .filter((a) => a.className === student.className)
+      .filter((a) => { const p = dateParts(a.deadline); return p && p.y === y && p.m === m + 1; })
+      .map((a) => ({ d: dateParts(a.deadline).d, ico: '📋', title: a.title, sub: 'জমার শেষ দিন' }));
+    const events = [...exams, ...dues].sort((a, b) => a.d - b.d);
+    return `<div class="cal-events">
+      <div class="cal-events-title">${BN_MONTHS[m]} মাসের ইভেন্ট</div>
+      ${events.length
+        ? events.map((ev) => `<div class="info-row"><span class="l">${ev.ico} ${escapeHtml(ev.title)}<br><small class="meta">${escapeHtml(ev.sub)}</small></span>
+            <span class="v">${toBnDigits(ev.d)} ${BN_MONTHS[m]}</span></div>`).join('')
+        : '<p class="meta">এই মাসে কোনো পরীক্ষা বা ডেডলাইন নেই।</p>'}
+    </div>`;
+  }
+
   function calendarPanel() {
     return `
       <div class="hcard" id="more-calendar">
@@ -823,6 +1227,7 @@ export function initStudentHome() {
         <div class="cal-grid cal-week" aria-hidden="true">${CAL_SHORT.map((d) => `<span>${d}</span>`).join('')}</div>
         <div class="cal-grid" id="cal-days"></div>
         <p class="meta" style="margin-top:.5rem">📝 পরীক্ষা · 📚 ক্লাস · 📋 জমার শেষ দিন — যেকোনো দিনে চাপ দিলে বিস্তারিত দেখা যাবে।</p>
+        ${monthEventsHtml()}
       </div>`;
   }
 

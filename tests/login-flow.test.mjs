@@ -81,6 +81,6 @@ test('login from index.html hands off to the student home', async () => {
   await new Promise((r) => setTimeout(r, 400));
   const hdoc = home.dom.window.document;
   assert.equal(hdoc.getElementById('home-content').hidden, false, 'home rendered from the handed-off session');
-  assert.ok(hdoc.querySelectorAll('#home-content .hcard').length >= 4, 'full home, not an error state');
+  assert.ok(hdoc.querySelectorAll('#home-content .hcard').length >= 3, 'full home, not an error state');
   assert.equal(hdoc.getElementById('student-name').textContent, auth.currentSession().name);
 });

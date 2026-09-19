@@ -51,16 +51,17 @@ test('student home renders every priority section from live data', async () => {
 
   const html = doc.getElementById('home-content').innerHTML;
   const cards = doc.querySelectorAll('#home-content .hcard');
-  assert.ok(cards.length >= 4, `expected the four action cards, got ${cards.length}`);
+  assert.ok(cards.length >= 3, `expected the three action cards, got ${cards.length}`);
 
-  // Hero progress bar reflects todayProgress() exactly (not a hard-coded number).
-  const p = data.todayProgress(student);
-  assert.ok(html.includes(`width:${p.pct}%`), `progress bar shows ${p.pct}%`);
+  // The resume card's progress bar reflects materialProgressFor() exactly
+  // (not a hard-coded number).
+  const mp = data.materialProgressFor(student, student.className);
+  assert.ok(html.includes(`width:${mp.pct}%`), `progress bar shows ${mp.pct}%`);
 
-  // Compact home: visual hero, আজকের অবস্থা, then one card each for exam,
-  // study and fee — everything else moved to আরও.
+  // Compact home (v2): visual hero, then one card each for exam, study and
+  // fee — the "আজকের অবস্থা" overview was retired; streak now lives in অর্জন.
   assert.ok(doc.querySelector('.home-hero'), 'visual hero sits under the student info');
-  assert.ok(doc.getElementById('student-overview'), 'আজকের অবস্থা overview present');
+  assert.equal(doc.getElementById('student-overview'), null, 'আজকের অবস্থা overview removed');
   assert.ok(doc.getElementById('home-exam'), 'the exam card');
   assert.ok(doc.getElementById('home-resume'), 'the continue-learning card');
   assert.ok(doc.getElementById('home-fee'), 'the fee card');
@@ -140,22 +141,27 @@ test('logout from the top-bar profile menu ends the session', async () => {
 
 test('a render failure shows a friendly error with a working retry (no recursion)', async () => {
   const { doc, data } = await bootHome();
-  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 4, 'home rendered first');
+  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 3, 'home rendered first');
 
-  const original = data.db.routine;
+  const original = data.db.exams;
   const broken = { list() { throw new Error('boom'); }, find: () => null };
 
-  // Coming back online re-renders the home; with the data layer broken it must
+  // Coming back online re-renders the home; with the exam store broken it must
   // fall back to the error card instead of throwing or blanking the screen.
-  data.db.routine = broken;
-  doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
-  assert.ok(doc.getElementById('home-retry'), 'retry button offered');
-  assert.ok(doc.getElementById('home-content').innerHTML.length < 2000, 'small error state, not a stack overflow');
+  // (The router restores the store even if an assert fires, so no later test
+  // inherits the broken mock.)
+  data.db.exams = broken;
+  try {
+    doc.defaultView.dispatchEvent(new doc.defaultView.Event('online'));
+    assert.ok(doc.getElementById('home-retry'), 'retry button offered');
+    assert.ok(doc.getElementById('home-content').innerHTML.length < 2000, 'small error state, not a stack overflow');
+  } finally {
+    data.db.exams = original;
+  }
 
   // Restore the data layer and retry: the real home must come back.
-  data.db.routine = original;
   click(doc, '#home-retry');
-  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 4, 'retry restored the home');
+  assert.ok(doc.querySelectorAll('#home-content .hcard').length >= 3, 'retry restored the home');
 });
 
 test('offline shows the indicator and still lets the paper be sat', async () => {
@@ -281,9 +287,11 @@ test('More menu carries every secondary destination without dead links', async (
   click(doc, '.bottom-nav button[data-view="more"]');
   assert.ok(doc.getElementById('more-menu'), 'clean menu index');
   for (const act of ['assignments', 'routine', 'fees', 'notices', 'achievements',
-    'certificates', 'downloads', 'streak', 'help']) {
+    'certificates', 'downloads', 'help']) {
     assert.ok(doc.querySelector(`#more-menu [data-act="${act}"]`), `${act} in menu`);
   }
+  // The lone streak panel is merged into অর্জন (badge progress), not a menu row.
+  assert.equal(doc.querySelector('#more-menu [data-act="streak"]'), null, 'no separate streak row');
   // Profile/settings live on the top-bar profile menu, not dumped here.
   assert.equal(doc.querySelector('#more-menu [data-act="profile"]'), null, 'profile not duplicated in More');
   assert.equal(doc.querySelector('#more-menu [data-act="settings"]'), null, 'settings not duplicated in More');
@@ -330,8 +338,8 @@ test('a tile/tab tap shows ONLY the panel it names, with a way back', async () =
 
   // A menu row inside More → that panel alone.
   click(doc, '.bottom-nav button[data-view="more"]');
-  click(doc, '#more-menu [data-act="streak"]');
-  assert.ok(doc.getElementById('more-streak'), 'streak row shows the streak card');
+  click(doc, '#more-menu [data-act="achievements"]');
+  assert.ok(doc.getElementById('more-achievements'), 'achievements row shows the badges panel');
   assert.equal(doc.getElementById('more-fees'), null, 'fees stays hidden');
   assert.equal(doc.getElementById('more-help'), null, 'help stays hidden');
 
@@ -497,25 +505,24 @@ test('every row in the More menu actually opens its panel (no dead buttons)', as
   }
 });
 
-test('home follows the compact order: hero, overview, then one card each', async () => {
+test('home follows the compact order: hero, then one card each', async () => {
   const { doc } = await bootHome();
 
   const html = doc.getElementById('home-content').innerHTML;
   const at = (needle) => html.indexOf(needle);
   assert.ok(doc.querySelector('.home-hero'), 'visual hero first');
   const hero = at('home-hero');
-  const overview = at('আজকের অবস্থা');
   const exam = at('id="home-exam"');
   const resume = at('id="home-resume"');
   const fee = at('id="home-fee"');
   const more = at('home-more-link');
 
-  assert.ok(overview >= 0 && exam >= 0 && resume >= 0 && fee >= 0 && more >= 0, 'every card rendered');
-  assert.ok(hero < overview, 'hero sits above the overview');
-  assert.ok(overview < exam, 'overview before the exam card');
+  assert.ok(exam >= 0 && resume >= 0 && fee >= 0 && more >= 0, 'every card rendered');
+  assert.ok(hero >= 0 && hero < exam, 'hero sits above the exam card');
   assert.ok(exam < resume, 'exam before continue-learning');
   assert.ok(resume < fee, 'study before the fee card');
   assert.ok(fee < more, 'the আরও door sits last');
+  assert.equal(html.includes('আজকের অবস্থা'), false, 'the retired overview does not sneak back');
 
   // Nothing that moved into আরও is repeated on the home.
   for (const id of ['home-next-class', 'home-assignments', 'home-result', 'home-notice-banner']) {
@@ -625,14 +632,21 @@ test('the notification centre shows relative time, not a raw date', async () => 
 
 test('status is never conveyed by colour alone', async () => {
   const { doc } = await bootHome();
-  const cells = [...doc.querySelectorAll('#home-content .week .d')];
+  // The weekly streak strip moved from the retired home overview into অর্জন.
+  click(doc, '.bottom-nav button[data-view="more"]');
+  click(doc, '#more-menu [data-act="achievements"]');
+  const cells = [...doc.querySelectorAll('#more-achievements .week .d')];
   assert.equal(cells.length, 7, 'weekly calendar rendered');
   for (const c of cells) {
     assert.ok(c.getAttribute('aria-label'), 'each day cell has a text alternative');
     assert.match(c.getAttribute('aria-label'), /পড়াশোনা/, 'label says whether study happened');
   }
+
   // assignment chips pair colour with words
-  const chips = [...doc.querySelectorAll('#home-content .chip')];
+  click(doc, '#more-back');
+  click(doc, '#more-menu [data-act="assignments"]');
+  const chips = [...doc.querySelectorAll('#more-assignments .chip')];
+  assert.ok(chips.length > 0, 'status chips rendered');
   for (const chip of chips) assert.ok(chip.textContent.trim().length > 0, 'chip has text');
 
   const skeleton = doc.getElementById('home-skeleton');
@@ -652,7 +666,7 @@ test('admin controls which secondary features students see', async () => {
   assert.ok(doc.querySelector('#more-menu [data-act="routine"]'), 'routine always available');
   assert.ok(doc.querySelector('#more-menu [data-act="help"]'), 'help stays when enabled');
   assert.equal(doc.querySelector('#more-menu [data-act="downloads"]'), null, 'downloads hidden when disabled');
-  assert.equal(doc.querySelector('#more-menu [data-act="streak"]'), null, 'streak hidden when disabled');
+  assert.equal(doc.querySelector('#more-menu [data-act="achievements"]'), null, 'achievements hidden when disabled');
 
   data.setHomeFeatures(['progress', 'achievements', 'certificates', 'downloads', 'streak', 'profile', 'settings', 'help']);
 });
