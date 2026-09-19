@@ -210,6 +210,10 @@ export function mountCrud(cfg) {
     cfg.onSaved && cfg.onSaved();
   });
 
+  // A write from another screen (Student App Control) must not leave this list
+  // showing rows that no longer exist or that changed state.
+  window.addEventListener('admin:data-changed', render);
+
   render();
   return { render, openAdd: () => openModalFor(null) };
 }

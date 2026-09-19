@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v28';   // Admin Panel v2: component modules under js/admin/ + light panel theme
+const CACHE_NAME = 'active-plus-v29';   // + Student App Control (js/admin/student-app.js)
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -52,6 +52,7 @@ const PRECACHE_URLS = [
   'js/admin/search.js',
   'js/admin/autobackup.js',
   'js/admin/export-csv.js',
+  'js/admin/student-app.js',
   'js/student-home.js',
   'js/student-prefs.js',
   'js/teacher-home.js',

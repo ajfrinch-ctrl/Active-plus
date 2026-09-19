@@ -25,6 +25,7 @@
       import { mountGlobalSearch } from './search.js';
       import { mountAutoBackup } from './autobackup.js';
       import { mountAdminExports } from './export-csv.js';
+      import { mountStudentAppControl } from './student-app.js';
 
 export async function bootAdminPanel() {
 
@@ -1373,6 +1374,13 @@ export async function bootAdminPanel() {
       mountGlobalSearch({ session, tabs });
       mountAutoBackup(session);
       mountAdminExports(session);
+      /* Student App Control: the live mirror of the student portal. A publish
+         there also moves the counts on the dashboard and the students list, so
+         both are repainted instead of going stale behind the preview. */
+      mountStudentAppControl({
+        session, tabs,
+        onChange: () => { renderStudents(); renderOverview(); }
+      });
 
       // The home render writes the header too — repaint it as institution-first.
       syncTopbar();
