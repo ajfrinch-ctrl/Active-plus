@@ -1,12 +1,12 @@
 /**
  * Admin ERP modules — wires the extended admin tabs on top of the base
- * admin.html wiring. Everything reads/writes the layered data store and logs
- * activity, and every stat is computed live (nothing hard-coded).
+ * admin.html wiring. Everything reads/writes the layered data store, and
+ * every stat is computed live (nothing hard-coded).
  */
 
 import {
   db, analytics, examSummary, leaderboard, exportBackup, importBackup,
-  parseMcqPaste, parseMcqCsv, toCSV, downloadText, logActivity, activityLogs,
+  parseMcqPaste, parseMcqCsv, toCSV, downloadText,
   todayBn, newId, CLASS_OPTIONS, ALL_CLASSES, dueFees, checkSubmission, submissionsFor,
   bnMonthLabel, isThisMonth,
   PERMISSIONS, DEFAULT_PERMISSIONS, getDbStatus,
@@ -26,29 +26,28 @@ const bn = (n) => String(n).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮�
 const onlineFor = (action) => requireOnline(action, getDbStatus);
 
 export function mountExtraAdmin(session) {
-  mountDashboard(session);
-  mountClasses(session);
-  mountSubjects(session);
+  mountDashboard();
+  mountClasses();
+  mountSubjects();
   mountMaterials(session);
   mountAssignments(session);
-  mountRoutine(session);
-  mountSubmissions(session);
+  mountRoutine();
+  mountSubmissions();
   mountTips(session);
   mountBanners(session);
-  mountQuestionBank(session);
-  mountResults(session);
-  mountNotifications(session);
+  mountQuestionBank();
+  mountResults();
+  mountNotifications();
   // No analytics/chart dashboard: the report centre is the only place numbers
   // are summarised, and it exports documents instead of drawing graphs.
-  mountReports(session);
-  mountUsers(session);
-  mountActivity();
-  mountBackup(session, onlineFor);
+  mountReports();
+  mountUsers();
+  mountBackup(onlineFor);
   mountProfile();
 }
 
 /* ---------------- Dashboard: quick actions + live sections ---------------- */
-function mountDashboard(session) {
+function mountDashboard() {
   const host = document.getElementById('overview-extra');
   const quick = document.getElementById('quick-actions');
   if (quick) {
@@ -74,7 +73,6 @@ function mountDashboard(session) {
       <div class="card"><h3>সাম্প্রতিক ভর্তি</h3><p>${recent(db.students.list(), 3).map((s) => escapeHtml(s.name)).join(' · ') || '—'}</p></div>
       <div class="card"><h3>সাম্প্রতিক পেমেন্ট</h3><p>${recent(db.payments.list(), 3).map((p) => `৳${bn(p.amount)}`).join(' · ') || '—'}</p></div>
       <div class="card"><h3>ঝুলন্ত অ্যাসাইনমেন্ট</h3><p>${bn(analytics().pendingAssignments)}</p></div>
-      <div class="card"><h3>সাম্প্রতিক অ্যাডমিন কার্যক্রম</h3><p>${activityLogs().slice(0, 3).map((l) => escapeHtml(l.action)).join(' · ') || '—'}</p></div>
     </div>`;
 
   checkConnectionStatus().then((connected) => {
@@ -92,14 +90,13 @@ function mountDashboard(session) {
     const el = document.getElementById('db-status');
     if (el) { el.className = 'alert alert-error'; el.textContent = 'ডেটাবেস: সংযোগ যাচাই করা যায়নি'; }
   });
-  logActivity({ user: session.name, role: session.role, action: 'viewed dashboard' });
 }
 
 /* ---------------- Simple CRUD modules ---------------- */
-function mountClasses(session) {
+function mountClasses() {
   mountCrud({
     container: 'classes-crud', collection: 'classes', keyField: 'id', singular: 'ক্লাস', idPrefix: 'c',
-    searchKeys: ['name'], searchPlaceholder: 'ক্লাস খুঁজুন…', session,
+    searchKeys: ['name'], searchPlaceholder: 'ক্লাস খুঁজুন…',
     columns: [
       { key: 'name', label: 'ক্লাস' },
       { key: 'active', label: 'অবস্থা', render: (r) => `<span class="badge ${r.active ? 'success' : 'warning'}">${r.active ? 'সক্রিয়' : 'নিষ্ক্রিয়'}</span>` },
@@ -114,10 +111,10 @@ function mountClasses(session) {
   });
 }
 
-function mountSubjects(session) {
+function mountSubjects() {
   mountCrud({
     container: 'subjects-crud', collection: 'subjects', keyField: 'id', singular: 'বিষয়', idPrefix: 'sub',
-    searchKeys: ['name', 'className'], session,
+    searchKeys: ['name', 'className'],
     columns: [
       { key: 'name', label: 'বিষয়' }, { key: 'className', label: 'ক্লাস' }, { key: 'teacher', label: 'শিক্ষক' }
     ],
@@ -132,7 +129,7 @@ function mountSubjects(session) {
 function mountMaterials(session) {
   mountCrud({
     container: 'materials-crud', collection: 'materials', keyField: 'id', singular: 'স্টাডি ম্যাটেরিয়াল', idPrefix: 'mat',
-    searchKeys: ['title', 'subject'], session,
+    searchKeys: ['title', 'subject'],
     columns: [
       { key: 'title', label: 'শিরোনাম' }, { key: 'subject', label: 'বিষয়' }, { key: 'className', label: 'ক্লাস' },
       { key: 'published', label: 'অবস্থা', render: (r) => `<span class="badge ${r.published ? 'success' : 'warning'}">${r.published ? 'প্রকাশিত' : 'খসড়া'}</span>` }
@@ -153,7 +150,7 @@ function mountMaterials(session) {
 function mountAssignments(session) {
   mountCrud({
     container: 'assignments-crud', collection: 'assignments', keyField: 'id', singular: 'অ্যাসাইনমেন্ট', idPrefix: 'asg',
-    searchKeys: ['title', 'subject'], session,
+    searchKeys: ['title', 'subject'],
     columns: [
       { key: 'title', label: 'শিরোনাম' }, { key: 'className', label: 'ক্লাস' }, { key: 'deadline', label: 'ডেডলাইন' },
       { key: 'submitted', label: 'জমা', render: (r) => bn(db.submissions.list().filter((s) => s.assignmentId === r.id).length) }
@@ -170,10 +167,10 @@ function mountAssignments(session) {
   });
 }
 
-function mountRoutine(session) {
+function mountRoutine() {
   mountCrud({
     container: 'routine-crud', collection: 'routine', keyField: 'id', singular: 'রুটিন', idPrefix: 'rt',
-    searchKeys: ['subject', 'day'], session,
+    searchKeys: ['subject', 'day'],
     columns: [
       { key: 'day', label: 'দিন' }, { key: 'time', label: 'সময়' }, { key: 'subject', label: 'বিষয়' },
       { key: 'teacher', label: 'শিক্ষক' }, { key: 'room', label: 'কক্ষ' }
@@ -189,7 +186,7 @@ function mountRoutine(session) {
 }
 
 /* ---------------- Submitted assignments: review + mark checked ---------------- */
-function mountSubmissions(session) {
+function mountSubmissions() {
   const host = document.getElementById('submissions-crud');
   if (!host) return;
 
@@ -216,7 +213,6 @@ function mountSubmissions(session) {
     if (!onlineFor('কাজ চেক করা')) return;
     const feedback = window.prompt('শিক্ষকের মন্তব্য (ঐচ্ছিক):') || '';
     checkSubmission(btn.dataset.check, feedback);
-    logActivity({ user: session.name, role: session.role, action: 'checked submission', target: btn.dataset.check });
     render();
     showToast('কাজ চেক হিসেবে চিহ্নিত হয়েছে।', 'success');
   });
@@ -229,7 +225,7 @@ function mountSubmissions(session) {
 function mountTips(session) {
   mountCrud({
     container: 'tips-crud', collection: 'tips', keyField: 'id', singular: '\u099F\u09BF\u09AA', idPrefix: 'tip',
-    searchKeys: ['text'], session,
+    searchKeys: ['text'],
     columns: [
       { key: 'text', label: '\u099F\u09BF\u09AA' },
       { key: 'active', label: '\u0985\u09AC\u09B8\u09CD\u09A5\u09BE', render: (r) => `<span class="badge ${r.active ? 'success' : 'warning'}">${r.active ? '\u09A8\u09BE\u09B0\u09C0\u09AD' : '\u0985\u09A8\u09BF\u09B7\u09CD\u0995\u09CD\u09B0\u09BF\u09AF\u09BC'}</span>` },
@@ -250,7 +246,7 @@ function mountTips(session) {
 function mountBanners(session) {
   mountCrud({
     container: 'banners-crud', collection: 'banners', keyField: 'id', singular: '\u09AC\u09CD\u09AF\u09BE\u09A8\u09BE\u09B0', idPrefix: 'ban',
-    searchKeys: ['title', 'desc'], session,
+    searchKeys: ['title', 'desc'],
     columns: [
       { key: 'title', label: '\u09B6\u09BF\u09B0\u09CB\u09A8\u09BE\u09AE' },
       { key: 'cta', label: '\u09AC\u09BE\u099F\u09A8' },
@@ -272,7 +268,7 @@ function mountBanners(session) {
 }
 
 /* ---------------- Question Bank (paste + CSV import) ---------------- */
-function mountQuestionBank(session) {
+function mountQuestionBank() {
   const examSel = document.getElementById('qb-exam');
   if (!examSel) return;
   examSel.innerHTML = db.exams.list().map((e) => `<option value="${escapeHtml(e.id)}">${escapeHtml(e.title)}</option>`).join('') || '<option value="">কোনো পরীক্ষা নেই</option>';
@@ -329,7 +325,6 @@ function mountQuestionBank(session) {
     const existing = new Set(exam.questions.map((q) => q.q.trim()));
     const fresh = staged.filter((q) => !existing.has(q.q.trim()));
     db.exams.update(exam.id, { questions: [...exam.questions, ...fresh] });
-    logActivity({ user: session.name, role: session.role, action: 'imported questions', target: `${exam.title} (+${bn(fresh.length)})` });
     showToast(`${bn(fresh.length)}টি প্রশ্ন যোগ হয়েছে।`, 'success');
     staged = [];
     renderPreview(); renderList();
@@ -353,7 +348,7 @@ function mountQuestionBank(session) {
 }
 
 /* ---------------- Results + leaderboard ---------------- */
-function mountResults(session) {
+function mountResults() {
   const sel = document.getElementById('res-exam');
   if (!sel) return;
   const passMark = Number(db.settings.get().passMark) || 40;
@@ -413,7 +408,7 @@ function mountResults(session) {
 }
 
 /* ---------------- Notifications ---------------- */
-function mountNotifications(session) {
+function mountNotifications() {
   const list = document.getElementById('notif-list');
   const render = () => {
     // Newest 50 only; this collection grows for the life of the centre (spec 62).
@@ -433,7 +428,6 @@ function mountNotifications(session) {
     if (!onlineFor('নোটিফিকেশন পাঠানো')) return;
     const d = new FormData(e.target);
     db.notifications.add({ id: newId('ntf'), type: String(d.get('type')), title: String(d.get('title')), target: String(d.get('target')), date: todayBn(), createdAt: new Date().toISOString(), read: false });
-    logActivity({ user: session.name, role: session.role, action: 'sent notification', target: String(d.get('title')) });
     e.target.reset(); render(); showToast('নোটিফিকেশন পাঠানো হয়েছে।', 'success');
   });
   render();
@@ -459,7 +453,7 @@ function mountNotifications(session) {
  * shared preview (js/preview.js), which offers the PDF and the Excel (CSV)
  * download side by side.
  */
-function mountReports(session) {
+function mountReports() {
   const host = document.getElementById('report-groups');
   const classSel = document.getElementById('report-class');
   if (!host || !classSel) return;
@@ -793,7 +787,6 @@ function mountReports(session) {
         excel: { filename: `${base}.csv`, csv: toCSV(r.cols, rows) },
         shareable: false
       });
-      logActivity({ user: session.name, role: session.role, action: 'generated report', target: `${r.label} · ${cls}` });
     } catch (e) {
       console.error('[Active Plus] report failed:', (e && e.stack) || e);
       showToast('রিপোর্ট তৈরি করা যায়নি।', 'error');
@@ -805,7 +798,7 @@ function mountReports(session) {
 }
 
 /* ---------------- Users & permissions ---------------- */
-function mountUsers(session) {
+function mountUsers() {
   document.getElementById('users-list').innerHTML = listUsers().map((u) => `
     <div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(u.name)}</div><div class="li-sub">${escapeHtml(u.username)}</div></div>
     <span class="badge accent">${escapeHtml(u.role)}</span></div>`).join('');
@@ -826,32 +819,14 @@ function mountUsers(session) {
       (updated[cb.dataset.role] = updated[cb.dataset.role] || []).push(...(cb.checked ? [cb.dataset.perm] : []));
     });
     db.settings.update({ permissions: updated });
-    logActivity({ user: session.name, role: session.role, action: 'updated permissions' });
     showToast('অনুমতি সংরক্ষিত হয়েছে।', 'success');
   });
 }
 
-/* ---------------- Activity log ---------------- */
-function mountActivity() {
-  const input = document.getElementById('activity-filter');
-  const render = () => {
-    const term = (input?.value || '').toLowerCase();
-    const rows = activityLogs().filter((l) => !term || JSON.stringify(l).toLowerCase().includes(term));
-    renderTable('#activity-table', [
-      { key: 'date', label: 'তারিখ' }, { key: 'user', label: 'ব্যবহারকারী' }, { key: 'role', label: 'রোল' },
-      { key: 'action', label: 'কাজ' }, { key: 'target', label: 'টার্গেট' }
-    ], rows.slice(0, 50));
-  };
-  input?.addEventListener('input', render);
-  render();
-}
-
 /* ---------------- Backup & restore ---------------- */
-function mountBackup(session, onlineFor) {
-  const who = { user: session?.name || 'admin', role: session?.role || 'admin' };
+function mountBackup(onlineFor) {
   document.getElementById('backup-export').addEventListener('click', () => {
     downloadText(`active-plus-backup-${Date.now()}.json`, exportBackup(), 'application/json');
-    logActivity({ ...who, action: 'exported backup' });
     showToast('ব্যাকআপ ডাউনলোড হয়েছে।', 'success');
   });
   document.getElementById('backup-import').addEventListener('change', (e) => {
@@ -864,7 +839,6 @@ function mountBackup(session, onlineFor) {
       if (!window.confirm('বর্তমান ডেটা এই ব্যাকআপ দিয়ে প্রতিস্থাপিত হবে। আপনি কি নিশ্চিত?')) return;
       const result = importBackup(String(reader.result));
       if (result.ok) {
-        logActivity({ ...who, action: 'restored backup', target: `${result.restored} collections` });
         showToast(`রিস্টোর সফল (${bn(result.restored)} কালেকশন)।`, 'success');
       } else {
         showToast(result.error, 'error');

@@ -178,7 +178,7 @@ admin.html          admin panel (v2) — light-themed dashboard (quick actions,
                     teachers, classes, batches, subjects, exams, question
                     bank, materials, assignments, submissions, routine,
                     results, fees & payments, notices, notifications, the
-                    report centre, users & permissions, activity log,
+                    report centre, users & permissions,
                     institute profile settings, backup/restore (incl.
                     scheduled auto-backup) and Student App Control. Hybrid
                     navigation: grouped bilingual sidebar on desktop, bottom
@@ -203,7 +203,7 @@ js/teacher-home.js  the teacher Home: today's teaching hero, feature grid,
 js/admin-home.js    the admin dashboard: quick actions first, overview,
                     dues alert, institute card, feature folds
 js/admin-modules.js admin widgets: question bank, report centre,
-                    users + permission matrix, activity log, backup;
+                    users + permission matrix, backup;
                     re-exports bootAdminPanel for the page shell
 js/admin/           Admin Panel v2 components:
                       boot.js      the page's complete wiring (extracted
@@ -443,9 +443,16 @@ Beyond CRUD for every collection, the panel includes:
   sheet also carry a "হোয়াটসঅ্যাপে পাঠান" button (uses the `wa.me` deep link,
   no API key/backend).
 - **Users & permissions** — a 24-key permission matrix per role.
-- **Activity log** — who did what, when. Ordinary users cannot delete entries.
 - **Backup / restore** — export and import with validation and an explicit
   confirmation, never a silent overwrite.
+
+The **অ্যাক্টিভিটি লগ · Activity Log** was removed completely (২০২৬-০৯): no
+section, no `activityLogs` collection, no `logActivity()` writer, no Firebase
+path and no Realtime Database rule — nothing about an admin's or a teacher's
+edits is recorded any more. The 🔔 in the admin top bar, which used to open the
+log, now opens **নোটিফিকেশন** and counts the notifications published since the
+admin last looked (the "seen" mark lives in this device's `localStorage`, so
+reading it there never marks a teacher's or a student's notification as read).
 
 ### Permission model
 
@@ -477,9 +484,9 @@ identity is written and edited:
 
 `orgInfo()` / `saveOrgInfo()` in `js/data.js` own these four values: the form
 saves nothing unless every field passes, the failure is reported per field in
-Bengali (message under the form, red outline on the offending input, toast),
-and every accepted edit is written to the activity log. A live letterhead
-preview under the fields mirrors what a document will print as the admin types.
+Bengali (message under the form, red outline on the offending input, toast).
+A live letterhead preview under the fields mirrors what a document will print
+as the admin types.
 
 The saved profile is then reused everywhere the institute appears — the print
 letterhead (`ph-org` / `ph-addr` / `ph-contact`), receipts, reports, admission
@@ -511,7 +518,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 252 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 255 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class

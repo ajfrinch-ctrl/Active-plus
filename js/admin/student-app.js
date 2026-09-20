@@ -25,7 +25,7 @@ import {
   db, ALL_CLASSES, studentsOfClass, newId, todayBn, formatBnDate,
   homeCards, setHomeCards, homeFeatures, setHomeFeatures,
   upcomingExam, examsFor, examWindow, feeStatusFor, latestTip, activeBanners,
-  performanceFor, can, logActivity, getDbStatus
+  performanceFor, can, getDbStatus
 } from '../data.js';
 import { escapeHtml, showToast, requireOnline } from '../app.js';
 
@@ -185,8 +185,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
     return true;
   };
 
-  const afterWrite = (action, target) => {
-    logActivity({ user: session?.name, role: session?.role, action, target });
+  const afterWrite = () => {
     // One event does the repainting: this panel hears it too (it renders only
     // while visible), and so does every CRUD table on the other tabs.
     window.dispatchEvent(new window.Event('admin:data-changed'));
@@ -553,7 +552,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
     if (!requireOnline('হোম কার্ড বদল', getDbStatus)) return;
     setHomeCards({ [key]: on });
     const label = HOME_CARD_LABELS[key] || key;
-    afterWrite(on ? 'enabled home card' : 'disabled home card', `${label} (শিক্ষার্থীর হোম)`);
+    afterWrite();
     showToast(`${label} ${on ? 'চালু' : 'বন্ধ'} — শিক্ষার্থীর হোম এখন তাই দেখাচ্ছে।`, 'success');
   };
 
@@ -562,7 +561,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
     const enabled = new Set(homeFeatures());
     if (on) enabled.add(flag); else enabled.delete(flag);
     setHomeFeatures([...enabled]);
-    afterWrite(on ? 'enabled app feature' : 'disabled app feature', `${flag} (আরও মেনু)`);
+    afterWrite();
   };
 
   const saveSetting = (key, raw) => {
@@ -575,7 +574,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
       return;
     }
     db.settings.update({ [key]: value });
-    afterWrite('updated setting', `${key} = ${value}`);
+    afterWrite();
     showToast('সেটিংস সংরক্ষিত — নতুন ফলাফলেই এটা লাগু হবে।', 'success');
   };
 
@@ -585,7 +584,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
     if (!collection) return;
     if (!writable(kind === 'material' ? 'manageMaterials' : 'manageNotices', 'প্রকাশ বদল')) return;
     db[collection].update(id, { [field]: on });
-    afterWrite(on ? 'published' : 'unpublished', `${collection} ${id}`);
+    afterWrite();
     showToast(on ? 'প্রকাশিত — শিক্ষার্থী এখন দেখতে পাবে।' : 'লুকানো — শিক্ষার্থীর স্ক্রিন থেকে উঠে গেছে।', on ? 'success' : 'warning');
   };
 
@@ -596,7 +595,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
     if (!writable(kind === 'material' || kind === 'suggestion' ? 'manageMaterials' : 'manageNotices', 'মুছে ফেলা')) return;
     if (!window.confirm('শিক্ষার্থীর অ্যাপ থেকেও এটি উঠে যাবে। মুছে ফেলবেন?')) return;
     db[collection].remove(id);
-    afterWrite('deleted', `${collection} ${id}`);
+    afterWrite();
     showToast('মুছে ফেলা হয়েছে।', 'warning');
   };
 
@@ -643,7 +642,7 @@ export function mountStudentAppControl({ session, tabs, onChange } = {}) {
     const record = spec.build(values, scope, session);
     db[kind].add(record);
     form.reset();
-    afterWrite('added', `${spec.singular} ${record.id}`);
+    afterWrite();
     showToast(`${spec.singular} যোগ হয়েছে — প্রিভিউতে দেখুন।`, 'success');
   });
 

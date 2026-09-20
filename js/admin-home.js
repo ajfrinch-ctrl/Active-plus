@@ -60,7 +60,6 @@ const GROUPS = [
       { key: 'notices', icon: '📢', label: 'নোটিশ' },
       { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
       { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি' },
-      { key: 'activity', icon: '🕘', label: 'কার্যক্রম' },
       { key: 'settings', icon: '⚙️', label: 'সেটিংস' }
     ]
   }
@@ -195,7 +194,6 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout, o
               ${cell('🏆', bn(results.length), 'পরীক্ষার ফলাফল')}
               ${cell('📈', avgResult ? `${bn(avgResult)}%` : '—', 'গড় ফলাফল')}
               ${cell('⚠️', bn(dueStudents), 'বকেয়া শিক্ষার্থী')}
-              ${cell('🧾', bn(db.activityLogs.list().length), 'সাম্প্রতিক কার্যক্রম')}
             </div>
           </details>
         </div>

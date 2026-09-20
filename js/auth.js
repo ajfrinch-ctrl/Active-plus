@@ -23,7 +23,6 @@ import {
   validateStudentId,
   setUserRole as persistRole,
   getUserRole as rememberedRole,
-  addActivityLog,
   showToast
 } from './firebase.js';
 import { storeGet, storeSet, storeRemove, readJSON, writeJSON } from './store.js';
@@ -364,7 +363,6 @@ export async function signIn(identifier, password, hint) {
         role,
         provider: 'firebase'
       });
-      addActivityLog('login', 'auth');
       return session;
     } catch (error) {
       throw new AuthError(error.code || 'auth-failed', friendlyFirebaseError(error));
@@ -373,7 +371,6 @@ export async function signIn(identifier, password, hint) {
 
   const session = await localSignIn(id, pass);
   forgetRememberedTabs();
-  addActivityLog('login', 'auth');
   return session;
 }
 
@@ -391,7 +388,6 @@ function friendlyFirebaseError(error) {
 
 export async function signOut({ redirect = true } = {}) {
   const session = currentSession();
-  addActivityLog('logout', 'auth');
   if (getAuthMode() === 'firebase') { try { await firebaseSignOut(); } catch (e) { /* ignore */ } }
   storeRemove(SESSION_KEY);
   storeRemove('activeplus_user');

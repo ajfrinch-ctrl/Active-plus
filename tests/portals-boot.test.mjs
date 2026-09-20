@@ -113,7 +113,7 @@ test('admin portal boots and wires the home-content tabs', async () => {
   assert.ok(adminHome && adminHome.innerHTML.length > 200, 'admin home rendered');
   assert.ok(doc.getElementById('admin-overview'), 'সামগ্রিক অবস্থা overview card present');
   assert.ok(doc.querySelector('.analytics-grid'), 'academic analytics grid present');
-  assert.ok(doc.querySelectorAll('.analytics-cell').length >= 11, 'analytics summary cells rendered');
+  assert.ok(doc.querySelectorAll('.analytics-cell').length >= 10, 'analytics summary cells rendered');
   assert.ok(doc.querySelectorAll('#admin-home .feature-grid .tile').length >= 8, 'feature grid rendered');
   assert.ok(doc.querySelectorAll('#admin-quick .chip').length >= 4, 'quick shortcuts rendered');
 
@@ -137,7 +137,7 @@ test('admin portal boots and wires the home-content tabs', async () => {
   const homeText = adminHome.textContent;
   assert.ok(homeText.includes('৪'), 'real counts shown in Bengali digits');
   assert.equal((homeText.match(/মোট বকেয়া/g) || []).length, 1, 'no duplicated due-total figure');
-  for (const key of ['reports', 'dues', 'notices', 'activity']) {
+  for (const key of ['reports', 'dues', 'notices', 'notifications']) {
     assert.ok(doc.querySelector(`#admin-home [data-goto="${key}"]`), `navigation card routes to "${key}"`);
   }
   // database status chip is present and never exposes credentials
@@ -403,6 +403,42 @@ test('the analytics dashboard and its charts are gone from the admin panel', asy
   assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
 });
 
+test('the activity log is gone from the admin panel', async () => {
+  const { doc, errors } = await bootPage('admin.html', {
+    username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'noactivity'
+  });
+
+  // the screen itself, and every route that used to lead to it
+  assert.equal(doc.getElementById('tab-activity'), null, 'the panel was removed');
+  assert.equal(doc.getElementById('activity-table'), null, 'so was its table');
+  assert.equal(doc.querySelector('#admin-side-nav [data-side-tab="activity"]'), null,
+    'the desktop sidebar no longer lists it');
+  assert.equal(doc.querySelector('#admin-home [data-goto="activity"]'), null,
+    'nor does the phone menu');
+  assert.ok(doc.querySelector('#admin-home [data-goto="notifications"]'),
+    'নোটিফিকেশন — the panel the bell now opens — is still one tap away');
+
+  const { ADMIN_SECTIONS } = await import('../js/admin/registry.js');
+  assert.equal(ADMIN_SECTIONS.some((s) => s.key === 'activity'), false,
+    'the section registry has no activity entry');
+
+  // nothing is recorded any more, either: the store, the writer and the
+  // Remote Database path all went with the screen
+  const data = await import('../js/data.js');
+  assert.equal(data.logActivity, undefined, 'logActivity() is gone from the data layer');
+  assert.equal(data.activityLogs, undefined, 'and its reader');
+  assert.equal(data.db.activityLogs, undefined, 'the collection is no longer part of the store');
+  const { dbRefs } = await import('../js/firebase.js');
+  assert.equal(dbRefs.activityLogs, undefined, 'firebase.js mirrors no activity path');
+
+  // the 🔔 in the top bar used to open the log; now it opens নোটিফিকেশন
+  assert.equal(doc.getElementById('admin-bell').dataset.tab, 'notifications',
+    'the bell points at the notification panel instead');
+
+  const fatal = errors.filter((e) => !/Service worker|Firebase|firebase/i.test(e));
+  assert.deepEqual(fatal, [], `no console errors: ${fatal.join(' | ')}`);
+});
+
 test('student profile sheet shows ID card, fee ledger and results', async () => {
   const { doc, errors } = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'profile'
@@ -557,28 +593,33 @@ test('notification bells count unread items and clear on open', async () => {
   assert.equal(badge.hidden, true, 'badge clears after the notifications are read');
   assert.equal(badge.textContent, '০');
 
-  // admin: no activity yet, so the badge starts hidden
+  // admin: the bell is a shortcut to the নোটিফিকেশন panel, and a fresh
+  // install has nothing the admin has not seen yet, so it starts quiet
   out = await bootPage('admin.html', {
     username: 'admin@activeplus.edu', password: 'Admin@123', role: 'admin', nonce: 'bell-a'
   });
   doc = out.dom.window.document;
   const adminBadge = doc.getElementById('admin-bell-count');
   assert.ok(adminBadge, 'admin bell has a badge');
-  assert.equal(adminBadge.hidden, true, 'no unread alerts on a fresh install');
+  assert.equal(adminBadge.hidden, true, 'no unread notifications on a fresh install');
 
-  // once an action is logged, the bell reports it
+  // a notification published after that moment lights the bell up
   // Same module instance the page uses — a query string would fork the store.
-  const { logActivity, db } = await import('../js/data.js');
-  logActivity({ user: 'অ্যাডমিন', role: 'admin', action: 'added student', target: 'পরীক্ষা' });
+  const { db } = await import('../js/data.js');
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  db.notifications.add({
+    id: 'ntf-bell', type: 'সাধারণ', title: 'নতুন বার্তা', target: 'সবাই',
+    date: '২০২৬-০৯-২০', read: false, createdAt: new Date().toISOString()
+  });
   // switching tabs re-reads the alert count
   doc.querySelector('[data-tab="students"]').dispatchEvent(new out.dom.window.MouseEvent('click', { bubbles: true }));
-  assert.equal(adminBadge.hidden, false, 'bell reports the new activity');
+  assert.equal(adminBadge.hidden, false, 'bell reports the new notification');
   assert.notEqual(adminBadge.textContent, '০', 'count is not zero');
 
-  // clicking the bell marks everything seen
+  // clicking the bell opens the panel and marks everything there as seen
   doc.getElementById('admin-bell').dispatchEvent(new out.dom.window.MouseEvent('click', { bubbles: true }));
   assert.equal(adminBadge.hidden, true, 'badge clears once the admin has looked');
-  assert.ok(db.activityLogs.list().length >= 1, 'the action was really logged');
+  assert.equal(doc.getElementById('tab-notifications').hidden, false, 'the bell opens নোটিফিকেশন');
 });
 
 test('attendance is saved and limited to the teacher own classes', async () => {
@@ -589,7 +630,7 @@ test('attendance is saved and limited to the teacher own classes', async () => {
   const picker = doc.getElementById('attendance-picker');
   assert.ok(picker, 'the attendance picker rendered');
 
-  const { db, teacherStudents, activityLogs } = await import('../js/data.js');
+  const { db, teacherStudents } = await import('../js/data.js');
   const own = teacherStudents('রাহেলা আক্তার');
   assert.ok(own.length > 0, 'the teacher has students of her own');
 
@@ -610,8 +651,6 @@ test('attendance is saved and limited to the teacher own classes', async () => {
   const saved = db.attendance.list().find((a) => a.studentId === target);
   assert.ok(saved, 'an attendance row was created');
   assert.equal(saved.status, 'অনুপস্থিত', 'the first tap records absent');
-  assert.ok(activityLogs().some((l) => l.action === 'marked absent'),
-    'the action was logged');
 
   // and the new state survives a re-render
   assert.equal(picker.querySelector(`button[data-student="${target}"]`).getAttribute('aria-pressed'),

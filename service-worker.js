@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v32';   // + responsive, user-friendly Admin global search results
+const CACHE_NAME = 'active-plus-v33';   // admin panel: the activity log section is removed
 const PRECACHE_URLS = [
   './',
   'index.html',

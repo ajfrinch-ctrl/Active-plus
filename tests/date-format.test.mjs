@@ -92,7 +92,7 @@ test('the admin portal never prints a raw date in any tab', async () => {
   const doc = dom.window.document;
   try {
     const bad = rawDates(doc);
-    for (const tab of ['students', 'teachers', 'exams', 'fees', 'notices', 'reports', 'activity', 'settings', 'questions']) {
+    for (const tab of ['students', 'teachers', 'exams', 'fees', 'notices', 'reports', 'notifications', 'settings', 'questions']) {
       const btn = doc.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
       click(dom, btn);

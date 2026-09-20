@@ -63,7 +63,7 @@ test('js/firebase.js exposes the named exports the pages import', async () => {
     'initFirebase', 'isFirebaseConfigured', 'getAuthMode', 'checkConnectionStatus',
     'isAuthenticated', 'signInWithEmailAndPassword', 'signOut',
     'showToast', 'generateStudentId', 'validateStudentId',
-    'setUserRole', 'getUserRole', 'addActivityLog'
+    'setUserRole', 'getUserRole'
   ]) {
     assert.equal(typeof fb[name], 'function', `missing export: ${name}`);
   }

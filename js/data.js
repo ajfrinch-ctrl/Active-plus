@@ -14,7 +14,7 @@ import { readJSON, writeJSON, onStoreReset } from './store.js';
 import { isFirebaseConfigured, ref as fbRef, showToast } from './firebase.js';
 
 const DATA_KEY = 'activeplus_data';
-export const DATA_VERSION = 8; // institution pad: logo, website, footerText + consistent branding
+export const DATA_VERSION = 9; // the activity log is gone: no section, no collection, no stored rows
 
 export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'একাদশ', 'দ্বাদশ'];
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };
@@ -207,7 +207,6 @@ const SEED = {
   notifications: [
     { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০২৬-০৯-০১', createdAt: new Date().toISOString(), read: false }
   ],
-  activityLogs: [],
   tips: [
     { id: 'tip-1', text: 'প্রতিদিন কমপক্ষে ৩০ মিনিট গণিত অনুশীলন কর।', active: true, by: 'কামরুল ইসলাম', date: '২০২৬-০৯-০১' }
   ],
@@ -262,6 +261,9 @@ function migrateStore(old) {
   const collections = clone(SEED);
   for (const [key, value] of Object.entries(old.collections || {})) {
     if (value === null || value === undefined) continue;
+    // The one thing that is deliberately not carried forward: the activity log
+    // was removed, so its stored rows are dropped instead of haunting the store.
+    if (key === 'activityLogs') continue;
     if (key === 'settings') collections.settings = { ...collections.settings, ...clone(value) };
     else collections[key] = clone(value);
   }
@@ -427,7 +429,6 @@ export const db = {
   assignments: makeCollection('assignments', { keyField: 'id' }),
   submissions: makeCollection('submissions', { keyField: 'id' }),
   notifications: makeCollection('notifications', { keyField: 'id' }),
-  activityLogs: makeCollection('activityLogs', { keyField: 'id' }),
   tips: makeCollection('tips', { keyField: 'id' }),
   banners: makeCollection('banners', { keyField: 'id' }),
   materialProgress: makeCollection('materialProgress', { keyField: 'id' }),
@@ -546,7 +547,7 @@ export function orgInfo() {
  * Required: orgName, address, mobile, email
  * Optional: website, footerText, orgLogo
  */
-export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}) {
+export function saveOrgInfo(input = {}) {
   const name = String(input.orgName ?? '').trim();
   const address = String(input.address ?? '').trim();
   const mobile = String(input.mobile ?? '').trim();
@@ -578,14 +579,12 @@ export function saveOrgInfo(input = {}, { user = 'system', role = 'admin' } = {}
   if (orgLogo !== undefined) patch.orgLogo = orgLogo ? String(orgLogo).trim() : null;
 
   db.settings.update(patch);
-  logActivity({ user, role, action: 'updated institute profile', target: name });
   return { ok: true, errors: [], org: orgInfo() };
 }
 
-export function saveOrgLogo(dataUrl, { user = 'system', role = 'admin' } = {}) {
+export function saveOrgLogo(dataUrl) {
   if (!dataUrl) {
     db.settings.update({ orgLogo: null });
-    logActivity({ user, role, action: 'removed institute logo' });
     return { ok: true, errors: [], org: orgInfo() };
   }
   if (!isValidLogoDataUrl(dataUrl)) {
@@ -595,7 +594,6 @@ export function saveOrgLogo(dataUrl, { user = 'system', role = 'admin' } = {}) {
     return { ok: false, errors: [{ field: 'orgLogo', message: 'লোগো ফাইলটি খুব বড় — ২MB এর কম ছবি ব্যবহার করুন।' }], org: orgInfo() };
   }
   db.settings.update({ orgLogo: String(dataUrl) });
-  logActivity({ user, role, action: 'updated institute logo' });
   return { ok: true, errors: [], org: orgInfo() };
 }
 
@@ -997,20 +995,10 @@ export function examsFor(className) {
   return db.exams.list().filter((e) => !e.className || e.className === ALL_CLASSES || e.className === className);
 }
 /* ------------------------------------------------------------------ */
-/* ERP helpers: activity log, analytics, leaderboard, backup,          */
-/* MCQ paste parsing, CSV export, global search                        */
+/* ERP helpers: analytics, leaderboard, backup, MCQ paste parsing,    */
+/* CSV export, global search                                          */
 /* ------------------------------------------------------------------ */
-
-export function logActivity({ user = 'system', role = 'system', action, target = '' }) {
-  db.activityLogs.add({
-    id: newId('log'), user, role, action, target,
-    timestamp: new Date().toISOString(), date: todayBn()
-  });
-}
-
-export function activityLogs() {
-  return [...db.activityLogs.list()].reverse();
-}
+/* ------------------------------------------------------------------ */
 
 /** Exam result summary: attempts, avg/highest/lowest, pass rate. */
 export function examSummary(examId) {
@@ -1094,6 +1082,7 @@ export function importBackup(text) {
   const collections = {};
   for (const [key, value] of Object.entries(parsed.collections || {})) {
     if (value === null || value === undefined) continue;
+    if (key === 'activityLogs') continue;   // removed with the activity log
     if (Array.isArray(value) || (value && typeof value === 'object')) collections[key] = value;
   }
   const store = load();
@@ -1669,12 +1658,12 @@ export function markResultsSynced() {
 }
 
 /**
- * Incoming alerts for the admin (spec 43): activity-log entries newer than the
- * last time the admin looked. `since` is a millisecond timestamp.
+ * Incoming alerts for the admin (spec 43): notifications published since the
+ * last time the admin looked at the bell. `since` is a millisecond timestamp.
  */
 export function adminAlerts(since = 0) {
-  // logActivity() stamps entries with `timestamp`.
-  return activityLogs().filter((l) => new Date(l.timestamp || l.at || 0).getTime() > since);
+  return db.notifications.list()
+    .filter((n) => new Date(n.createdAt || n.date || 0).getTime() > since);
 }
 
 /** Unread notifications addressed to teachers (spec 57). */
@@ -2130,9 +2119,6 @@ export function recentActivity(limit = 6) {
   db.exams.list().forEach((e) => items.push({
     icon: '📝', text: `পরীক্ষা তৈরি: ${e.title}`, meta: `${e.className || ''} · ${formatBnDate(e.startDate)}`,
     at: e.startDate || ''
-  }));
-  db.activityLogs.list().forEach((l) => items.push({
-    icon: '🧾', text: `${l.user || 'system'} — ${l.action || ''}`, meta: l.target || '', at: l.date || ''
   }));
   return items
     .sort((a, b) => String(b.at).localeCompare(String(a.at)))
