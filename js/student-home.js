@@ -242,8 +242,11 @@ export function initStudentHome() {
   const host = document.getElementById('home-content');
   let refreshExams = null;
 
-  const classMaterials = () =>
-    db.materials.list().filter((m) => !m.className || m.className === student.className);
+    // published !== false: the admin's "খসড়া" switch has to mean something.
+    // This list is the student's only door to materials (home resume, study
+    // view, downloads), so filtering here is what makes a draft invisible.
+    const classMaterials = () =>
+      db.materials.list().filter((m) => m.published !== false && (!m.className || m.className === student.className));
 
   /**
    * Home = glance only. No shortcuts (bottom nav), no folds, no “more features”.

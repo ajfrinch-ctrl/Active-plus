@@ -212,6 +212,9 @@ js/admin/           Admin Panel v2 components:
                       autobackup.js scheduled automatic backup (daily/weekly)
                       export-csv.js one-tap CSV exports (students, dues,
                                    payments)
+                      student-app.js Student App Control — a live mirror of the
+                                   student portal (class + student scoped, all
+                                   five tabs) with the publish switches beside it
 js/crud.js          generic CRUD panel builder shared by every collection
 js/exams.js         shared suggestion/MCQ authoring + exam-taking UI
 js/store.js         layered storage (localStorage + in-memory fallback)
@@ -295,6 +298,27 @@ active students, teachers, batches, today's and monthly collection, total due,
 inactive students, subjects, upcoming exams, pending assignments, published
 results — with no hard-coded numbers anywhere.
 
+### Student App Control (2026-09)
+
+Built after auditing what the student portal actually reads. Two of the panel's
+existing controls were decorative, and they are now honest instead:
+
+- `settings.homeCards` holds 13 flags, but the student home only gates on six
+  (`exam`, `materials`, `fee`, `banners`, `tip`, plus `leaderboard` in the
+  result view). The other seven are dead keys. The control panel lists all 13
+  and disables the seven with a note saying nothing reads them — a switch that
+  changes nothing is worse than no switch.
+- `materials.published` was written by the admin UI and displayed as a
+  প্রকাশিত/খসড়া badge, but `js/student-home.js` never filtered on it, so a draft
+  was visible to students anyway. `classMaterials()` now honours
+  `published !== false`, which is what makes publish/hide in the panel mean
+  something.
+- `passMark` and `negativeMarking` existed in the store, scored every exam, and
+  had no control anywhere in the panel; they are editable here now, with range
+  validation. (`autoPublishResult`, `notificationsEnabled` and
+  `leaderboardEnabled` are read by nothing — left alone rather than wired to a
+  half-built feature.)
+
 ### Admin Panel v2 restructure (2026-09)
 
 The panel was restructured around a short product questionnaire. What changed:
@@ -312,7 +336,15 @@ The panel was restructured around a short product questionnaire. What changed:
   alert and the institute card.
 - **Global search** — the top-bar box finds students, teachers, batches and
   panel sections; picking a student isolates and flashes their row.
-- **Student quick search + filters** on the student list itself.
+- **Student quick search + filters** on the student list itself, plus a sort,
+  an in-field clear button, a live `N / M` count and icon row actions — the four
+  full-text buttons that used to widen every row are gone.
+- **Student App Control** (`শিক্ষার্থীর অ্যাপ`) — a phone-shaped preview of the
+  real student portal inside the admin panel, scoped to one class (or one
+  student) and switched by the same five bottom tabs. The switches next to it
+  write through `setHomeCards` / `setHomeFeatures` / `db.*`, so the preview is
+  never a mock, and quick-add forms publish materials, notices, banners, tips
+  and suggestions for that class without leaving the screen.
 - **Role-aware sections** — the registry gates each section on the permission
   matrix, so narrowing a role hides its sections automatically.
 - **One-tap exports** — CSV downloads for students, dues and payments; the

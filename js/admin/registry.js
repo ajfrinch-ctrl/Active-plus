@@ -29,6 +29,9 @@ export const ADMIN_GROUPS = [
 export const ADMIN_SECTIONS = [
   { key: 'home', icon: '🏠', label: 'ড্যাশবোর্ড', en: 'Dashboard', group: 'dashboard' },
   { key: 'overview', icon: '📈', label: 'সংক্ষিপ্ত পরিসংখ্যান', en: 'Overview', group: 'dashboard' },
+  // A live window into the student portal: see what a class sees, publish the
+  // content behind each card, without leaving the panel.
+  { key: 'studentapp', icon: '📱', label: 'শিক্ষার্থীর অ্যাপ', en: 'Student App Control', group: 'dashboard', perm: 'manageSettings' },
 
   { key: 'students', icon: '👨‍🎓', label: 'শিক্ষার্থী', en: 'Students', group: 'people', perm: 'viewStudents' },
   { key: 'teachers', icon: '👨‍🏫', label: 'শিক্ষক', en: 'Teachers', group: 'people', perm: 'viewTeachers' },

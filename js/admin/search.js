@@ -105,12 +105,20 @@ export function mountGlobalSearch({ session, tabs }) {
     if (student && search) {
       search.value = student.name || id;
       search.dispatchEvent(new Event('input', { bubbles: true }));
-      setTimeout(() => {
+      // The list repaints on a debounce, so a fixed delay could look for the
+      // row before it exists — wait for it to show up instead.
+      let tries = 0;
+      const flashRow = () => {
         const row = document.querySelector(`[data-profile-student="${id}"]`)?.closest('tr');
-        row?.classList.add('row-flash');
-        row?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-        setTimeout(() => row?.classList.remove('row-flash'), 2200);
-      }, 60);
+        if (row) {
+          row.classList.add('row-flash');
+          row.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+          setTimeout(() => row.classList.remove('row-flash'), 2200);
+          return;
+        }
+        if (tries++ < 20) setTimeout(flashRow, 50);
+      };
+      flashRow();
     }
   };
 
