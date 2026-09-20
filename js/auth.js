@@ -35,31 +35,21 @@ export const HOME_BY_ROLE = {
   admin: 'admin.html'
 };
 
-/** Accounts created on first run so the app can be signed into immediately. */
+/**
+ * The one account a local-mode install is created with, so the owner can sign
+ * in and start working. There are no sample teachers or students any more
+ * (`js/demo-data.js` holds the fixture the tests use); the admin opens further
+ * accounts from Admin → ইউজার ও অনুমতি → লোকাল অ্যাকাউন্ট, or the app switches
+ * to Firebase Auth and its user management.
+ */
 export const DEMO_ACCOUNTS = [
   {
     username: 'admin@activeplus.edu',
     password: 'Admin@123',
     role: 'admin',
-    name: 'মাহমুদুল হাসান',
+    name: 'অ্যাডমিন',
     label: 'Admin',
     detail: 'প্রতিষ্ঠান প্রধান'
-  },
-  {
-    username: 'teacher@activeplus.edu',
-    password: 'Teacher@123',
-    role: 'teacher',
-    name: 'রাহেলা আক্তার',
-    label: 'Teacher',
-    detail: 'পদার্থবিজ্ঞান'
-  },
-  {
-    username: '2026-09-001',
-    password: 'Student@123',
-    role: 'student',
-    name: 'আরিয়ান হাসান',
-    label: 'Student',
-    detail: 'নবম শ্রেণি · রোল ০১'
   }
 ];
 
@@ -235,6 +225,53 @@ export async function seedUsers({ force = false } = {}) {
   const store = { users, seededAt: new Date().toISOString(), version: 1 };
   writeJSON(USERS_KEY, store);
   return store;
+}
+
+/**
+ * Open a local-mode account (Admin → ইউজার ও অনুমতি). Firebase mode manages its
+ * own users, so this writes only the browser store — and refuses anything that
+ * could not sign in later: a taken username, a short password, or a student ID
+ * that is not an ID. `persisted: false` means storage refused the write (the
+ * account lives in this page load only), which the caller must say out loud.
+ *
+ * @returns {Promise<{uid:string,username:string,role:string,name:string,persisted:boolean}>}
+ */
+export async function createLocalAccount({ username, password, role, name, detail = '' } = {}) {
+  const id = String(username || '').trim().toLowerCase();
+  if (getAuthMode() === 'firebase') {
+    throw new AuthError('firebase-mode', 'Firebase চালু থাকলে অ্যাকাউন্ট সেখান থেকেই তৈরি করতে হবে — এখান থেকে নয়।');
+  }
+  if (!id) throw new AuthError('no-username', 'ইউজারনেইম বা শিক্ষার্থীর আইডি দিন।');
+  if (!ROLES.includes(role)) throw new AuthError('bad-role', 'রোল নির্বাচন করুন (অ্যাডমিন / শিক্ষক / শিক্ষার্থী)।');
+  if (!password || String(password).length < 6) throw new AuthError('weak-password', 'কমপক্ষে ৬ অক্ষরের পাসওয়ার্ড দিন।');
+  if (role === 'student' && !validateStudentId(id)) {
+    throw new AuthError('bad-student-id', 'শিক্ষার্থীর অ্যাকাউন্ট তার আইডি দিয়েই খুলতে হয় (যেমন ২৬০৯০০১)।');
+  }
+
+  const store = readJSON(USERS_KEY, { users: [] });
+  const users = store.users || [];
+  if (users.some((user) => String(user.username || '').toLowerCase() === id)) {
+    throw new AuthError('username-taken', 'এই ইউজারনেইম/আইডি দিয়ে অ্যাকাউন্ট আগে থেকেই আছে।');
+  }
+
+  let n = users.length + 1;
+  while (users.some((user) => user.uid === `local-${role}-${n}`)) n += 1;
+  const salt = randomSalt();
+  const user = {
+    uid: `local-${role}-${n}`,
+    username: id,
+    email: id.includes('@') ? id : null,
+    name: String(name || '').trim() || id,
+    role,
+    detail: String(detail || '').trim(),
+    salt,
+    passwordHash: await hashPassword(password, salt),
+    createdAt: new Date().toISOString(),
+    provider: 'local'
+  };
+  users.push(user);
+  const persisted = writeJSON(USERS_KEY, { users, seededAt: store.seededAt || user.createdAt, version: 1 });
+  return { uid: user.uid, username: user.username, role: user.role, name: user.name, persisted };
 }
 
 export function listUsers() {

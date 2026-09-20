@@ -5,24 +5,25 @@
  * survive reloads wherever storage is allowed — and still work for the current
  * page load when it is blocked.
  *
- * Collections: settings, students, teachers, batches, notices, routine,
- * attendance, results, fees (per student), payments, suggestions, exams,
- * examResults.
+ * The store starts EMPTY: settings, the class list and the subject list are all
+ * a new centre begins with. Every other collection — students, teachers,
+ * batches, notices, routine, attendance, results, fees, payments, suggestions,
+ * exams, examResults, materials, assignments, submissions, notifications, tips,
+ * banners — holds nothing until the institute writes it itself. The sample
+ * records that used to be seeded here live in `js/demo-data.js`, which no page
+ * imports.
  */
 
 import { readJSON, writeJSON, onStoreReset } from './store.js';
 import { isFirebaseConfigured, ref as fbRef, showToast } from './firebase.js';
 
 const DATA_KEY = 'activeplus_data';
-export const DATA_VERSION = 9; // the activity log is gone: no section, no collection, no stored rows
+export const DATA_VERSION = 10; // the demo records are gone: a new store starts empty
 
 export const CLASS_OPTIONS = ['অষ্টম', 'নবম', 'দশম', 'একাদশ', 'দ্বাদশ'];
 export const CLASS_TO_NUMBER = { 'অষ্টম': 8, 'নবম': 9, 'দশম': 10, 'একাদশ': 11, 'দ্বাদশ': 12 };
 export const ALL_CLASSES = 'সব';
 
-/* Seed dates are derived from today. Hard-coded Bengali dates go stale within
-   days — a September deadline turns every "pending" assignment into "overdue"
-   and closes the demo exam window — so the sample centre always looks alive. */
 const SEED_DIGITS = '০১২৩৪৫৬৭৮৯';
 export const BN_MONTHS = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
   'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
@@ -49,38 +50,15 @@ export const toBnDigits = (value) =>
 export const toAsciiDigits = (value) => String(value ?? '')
   .replace(/[০-৯]/g, (d) => String(SEED_DIGITS.indexOf(d)));
 
-/** 2026-09-12 → ২০২৬-০৯-১২ (UTC based, exactly like todayBn()). */
-function seedDay(date) {
-  return toBnDigits(date.toISOString().slice(0, 10));
-}
-
-/** A Bengali ISO date `offsetDays` away from today. */
-function daysFromNow(offsetDays) {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + offsetDays);
-  return seedDay(d);
-}
-
-/** A day in a month relative to this one, clamped so it never lands in the future. */
-function monthDay(monthOffset, day) {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset, 1));
-  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  d.setUTCDate(Math.min(day, lastDay));
-  if (d.getTime() > now.getTime()) d.setTime(now.getTime());
-  return seedDay(d);
-}
-
-/** 'সেপ্টেম্বর ২০২৬' for a month relative to this one. */
-function monthLabel(monthOffset = 0) {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthOffset, 1));
-  return `${BN_MONTHS[d.getUTCMonth()]} ${toBnDigits(d.getUTCFullYear())}`;
-}
-
-const MONTH_AGO = monthLabel(-1);
-const MONTH_NOW = monthLabel(0);
-
+/*
+ * The app ships EMPTY. A brand-new centre opens with its own settings (the
+ * defaults below), the class list and the subject list — and nothing else:
+ * no sample student, no fake teacher, no invented fees or notices.
+ *
+ * The sample institute that used to live here is now in `js/demo-data.js`,
+ * which no page imports; only the test suite (and anyone who deliberately
+ * asks for it) loads those records.
+ */
 const SEED = {
   settings: {
     orgName: 'Active Plus Coaching',
@@ -109,110 +87,37 @@ const SEED = {
       banners: true, tip: true, notices: true, leaderboard: true
     }
   },
-  students: [
-    { id: '2026-09-001', name: 'আরিয়ান হাসান', className: 'নবম', section: 'A', batch: 'A', roll: '০১', phone: '০১৭১১-০০০০০১', school: 'মিরপুর বেঙ্গল উচ্চ বিদ্যালয়', status: 'সক্রিয়', guardian: 'করিম হাসান', guardianPhone: '০১৮১১-০০০০০১', admissionDate: '২০২৬-০১-০৫', photo: '' },
-    { id: '2026-09-002', name: 'সুমাইয়া ইসলাম', className: 'নবম', section: 'A', batch: 'A', roll: '০২', phone: '০১৭১১-০০০০০২', school: 'ভিকারুননিসা নূন স্কুল অ্যান্ড কলেজ', status: 'সক্রিয়', guardian: 'জাহিদ ইসলাম', guardianPhone: '০১৮১১-০০০০০২', admissionDate: '২০২৬-০১-০৫', photo: '' },
-    { id: '2026-10-014', name: 'নাফিস ইকবাল', className: 'দশম', section: 'B', batch: 'B', roll: '১৪', phone: '০১৭১১-০০০০১৪', school: 'মতিঝিল সরকারি বালক উচ্চ বিদ্যালয়', status: 'বকেয়া', guardian: 'ইকবাল হোসেন', guardianPhone: '০১৮১১-০০০০১৪', admissionDate: '২০২৬-০১-০৮', photo: '' },
-    { id: '2026-08-007', name: 'তাসনিম জাহান', className: 'অষ্টম', section: 'A', batch: 'A', roll: '০৭', phone: '০১৭১১-০০০০০৭', school: 'লালমাটিয়া বালিকা বিদ্যালয়', status: 'সক্রিয়', guardian: 'জাহান আলম', guardianPhone: '০১৮১১-০০০০০৭', admissionDate: '২০২৬-০১-১০', photo: '' }
-  ],
-  teachers: [
-    { id: 'রাহেলা১১', name: 'রাহেলা আক্তার', subject: 'পদার্থবিজ্ঞান', phone: '০১৮১১-১১১১১১', classes: 6 },
-    { id: 'কামরুল২২', name: 'কামরুল ইসলাম', subject: 'গণিত', phone: '০১১১-২২২২২২', classes: 8 },
-    { id: 'নুসরাত৩৩', name: 'নুসরাত জাহান', subject: 'রসায়ন', phone: '০১১১-৩৩৩৩৩৩', classes: 5 },
-    { id: 'সাদিয়া৪৪', name: 'সাদিয়া রহমান', subject: 'ইংরেজি', phone: '০১১১-৪৪৪৪৪', classes: 4 }
-  ],
-  batches: [
-    { name: 'নবম (বিজ্ঞান)', students: 42, teacher: 'রাহেলা আক্তার', time: 'সকাল ৮টা' },
-    { name: 'দশম (বিজ্ঞান)', students: 38, teacher: 'কামরুল ইসলাম', time: 'সকাল ৯টা' },
-    { name: 'অষ্টম', students: 30, teacher: 'সাদিয়া রহমান', time: 'বিকাল ৪টা' }
-  ],
-  notices: [
-    { id: 'n-1', title: 'অর্ধবার্ষিক পরীক্ষার রুটিন প্রকাশ', date: '২০২৬-০৯-০১', audience: 'সবাই', className: ALL_CLASSES },
-    { id: 'n-2', title: 'সেপ্টেম্বর মাসের বেতন পরিশোধের শেষ তারিখ ১০ সেপ্টেম্বর', date: '২০২৬-০৮-২৮', audience: 'অভিভাবক', className: ALL_CLASSES },
-    { id: 'n-3', title: 'নবম শ্রেণির পদার্থবিজ্ঞান ক্লাস শনিবার সকাল ৮টায়', date: '২০২৬-০৮-২৫', audience: 'শিক্ষার্থী', className: 'নবম' }
-  ],
-  routine: [
-    { id: 'rt-1', day: 'শনিবার', subject: 'গণিত', teacher: 'রাহেলা আক্তার', time: '০৮:০০ – ০৯:০০', room: 'কক্ষ ২০১' },
-    { id: 'rt-2', day: 'রবিবার', subject: 'পদার্থবিজ্ঞান', teacher: 'কামরুল ইসলাম', time: '০৯:০০ – ১০:০০', room: 'কক্ষ ১০৫' },
-    { id: 'rt-3', day: 'সোমবার', subject: 'রসায়ন', teacher: 'নুসরাত জাহান', time: '০৮:০০ – ০৯:০০', room: 'ল্যাব ১' },
-    { id: 'rt-4', day: 'মঙ্গলবার', subject: 'ইংরেজি', teacher: 'সাদিয়া রহমান', time: '১০:০০ – ১১:০০', room: 'কক্ষ ৩০২' },
-    { id: 'rt-5', day: 'বুধবার', subject: 'জীববিজ্ঞান', teacher: 'তানভীর আহমেদ', time: '০৯:০০ – ১০:০০', room: 'ল্যাব ২' }
-  ],
-  attendance: [
-    { date: '২০২৬-০৯-০১', subject: 'গণিত', status: 'উপস্থিত' },
-    { date: '২০২৬-০৯-০২', subject: 'পদার্থবিজ্ঞান', status: 'উপস্থিত' },
-    { date: '২০২৬-০৯-০৩', subject: 'রসায়ন', status: 'অনুপস্থিত' },
-    { date: '২০২৬-০৯-০৪', subject: 'ইংরেজি', status: 'উপস্থিত' }
-  ],
-  results: [
-    { exam: 'প্রথম সাময়িক', subject: 'গণিত', marks: 82, grade: 'A-' },
-    { exam: 'প্রথম সাময়িক', subject: 'পদার্থবিজ্ঞান', marks: 74, grade: 'B' },
-    { exam: 'প্রথম সাময়িক', subject: 'রসায়ন', marks: 91, grade: 'A' },
-    { exam: 'প্রথম সাময়িক', subject: 'ইংরেজি', marks: 68, grade: 'B-' }
-  ],
-  /* Per-student monthly fees. status: পরিশোধিত | বকেয়া */
-  fees: [
-    { id: 'fee-001-ago', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 5) },
-    { id: 'fee-001-now', studentId: '2026-09-001', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: monthDay(0, 2) },
-    { id: 'fee-002-ago', studentId: '2026-09-002', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 6) },
-    { id: 'fee-002-now', studentId: '2026-09-002', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
-    { id: 'fee-014-ago', studentId: '2026-10-014', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 10) },
-    { id: 'fee-014-now', studentId: '2026-10-014', month: MONTH_NOW, amount: 1200, status: 'বকেয়া', date: '—' },
-    { id: 'fee-007-ago', studentId: '2026-08-007', month: MONTH_AGO, amount: 1200, status: 'পরিশোধিত', date: monthDay(-1, 4) },
-    { id: 'fee-007-now', studentId: '2026-08-007', month: MONTH_NOW, amount: 1200, status: 'পরিশোধিত', date: monthDay(0, 1) }
-  ],
-  payments: [
-    { id: 'pay-1', studentId: '2026-09-001', month: MONTH_AGO, amount: 1200, date: monthDay(0, 1), receivedBy: 'সিস্টেম' }
-  ],
-  suggestions: [
-    {
-      id: 'sug-1', title: 'পদার্থবিজ্ঞান সাজেশন — অর্ধবার্ষিক ২০২৬', className: 'নবম', subject: 'পদার্থবিজ্ঞান',
-      author: 'রাহেলা আক্তার', date: '২০২৬-০৯-০১',
-      content: '১) গতি ও বেগের সংজ্ঞা ও একক ভালোভাবে মুখস্থ কর। ২) নিউটনের সূত্রগুলো উদাহরণসহ ব্যাখ্যা করতে পারতে হবে। ৩) কাজ, শক্তি ও ক্ষমতার গাণিতিক অনুশীলন কর। ৪) বোর্ডের ২০২৫ সালের প্রশ্নপত্র সমাধান কর।'
-    }
-  ],
-  exams: [
-    {
-      id: 'exam-1', title: 'গণিত MCQ মডেল টেস্ট-১', className: 'নবম', subject: 'গণিত',
-      author: 'কামরুল ইসলাম', date: daysFromNow(0), time: '১৭:০০',
-      duration: 30, startDate: daysFromNow(-2), endDate: daysFromNow(5),
-      questions: [
-        { q: '৫ + ৩ × ২ = ?', options: ['১০', '১১', '১৬', ''], answer: 1 },
-        { q: 'একটি ত্রিভুজের তিন কোণের সমষ্টি কত?', options: ['৯০°', '১৮০°', '২৭০°', '৩৬০°'], answer: 1 },
-        { q: 'x + 2 = 7 হলে x = ?', options: ['৫', '৭', '৯', '২'], answer: 0 }
-      ]
-    }
-  ],
-  examResults: [],
+  /* Structure, not data: the classes and subjects an institute teaches. A new
+     centre edits these in the panel — they are only the starting point. */
   classes: [
     { id: 'c-8', name: 'অষ্টম', active: true },
     { id: 'c-9', name: 'নবম', active: true },
     { id: 'c-10', name: 'দশম', active: true }
   ],
   subjects: [
-    { id: 'sub-1', name: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম' },
-    { id: 'sub-2', name: 'পদার্থবিজ্ঞান', className: 'নবম', teacher: 'রাহেলা আক্তার' },
-    { id: 'sub-3', name: 'রসায়ন', className: 'নবম', teacher: 'নুসরাত জাহান' },
-    { id: 'sub-4', name: 'ইংরেজি', className: 'নবম', teacher: 'সাদিয়া রহমান' }
+    { id: 'sub-1', name: 'গণিত', className: 'নবম' },
+    { id: 'sub-2', name: 'পদার্থবিজ্ঞান', className: 'নবম' },
+    { id: 'sub-3', name: 'রসায়ন', className: 'নবম' },
+    { id: 'sub-4', name: 'ইংরেজি', className: 'নবম' }
   ],
-  materials: [
-    { id: 'mat-1', title: 'গণিত নোট — অধ্যায় ১', subject: 'গণিত', className: 'নবম', type: 'নোট', chapter: '১', description: 'স্বাভাবিক সংখ্যা ও ভগ্নাংশ', date: '২০২৬-০৯-০১', by: 'কামরুল ইসলাম', published: true }
-  ],
-  assignments: [
-    { id: 'asg-1', title: 'গণিত হোমওয়ার্ক-১', subject: 'গণিত', className: 'নবম', teacher: 'কামরুল ইসলাম', deadline: daysFromNow(5), marks: 20, description: 'অধ্যায় ১ এর অনুশীলনী' }
-  ],
-  submissions: [
-    { id: 'subm-1', assignmentId: 'asg-1', studentId: '2026-09-001', status: 'জমা হয়েছে', date: daysFromNow(-2), feedback: '' }
-  ],
-  notifications: [
-    { id: 'ntf-1', type: 'সাধারণ', title: 'সিস্টেম চালু হয়েছে', target: 'সবাই', date: '২০২৬-০৯-০১', createdAt: new Date().toISOString(), read: false }
-  ],
-  tips: [
-    { id: 'tip-1', text: 'প্রতিদিন কমপক্ষে ৩০ মিনিট গণিত অনুশীলন কর।', active: true, by: 'কামরুল ইসলাম', date: '২০২৬-০৯-০১' }
-  ],
-  banners: [
-    { id: 'ban-1', title: 'গ্র্যান্ড মডেল টেস্ট ২০২৬', desc: 'সব ক্লাসের জন্য বৃহৎ মডেল টেস্ট — নিবন্ধন চলছে।', cta: 'নোটিশ দেখুন', active: true, date: '২০২৬-০৯-০১' }
-  ],
+  students: [],
+  teachers: [],
+  batches: [],
+  notices: [],
+  routine: [],
+  attendance: [],
+  results: [],
+  fees: [],
+  payments: [],
+  suggestions: [],
+  exams: [],
+  examResults: [],
+  materials: [],
+  assignments: [],
+  submissions: [],
+  notifications: [],
+  tips: [],
+  banners: [],
   materialProgress: [],
   studyActivity: [],
   challenge: []
@@ -447,9 +352,25 @@ export const db = {
     }
   },
 
+  /**
+   * The empty slate: every record collection is cleared, while the institute
+   * keeps its settings (identity, fee, permissions, home configuration) and its
+   * structure — the class list and the subject list it has been maintaining.
+   * Nothing is "reseeded" with sample data any more: this store has none, and
+   * `js/demo-data.js` is only ever loaded on purpose (the test suite).
+   */
   reset() {
-    const fresh = { version: DATA_VERSION, seededAt: new Date().toISOString(), collections: clone(SEED) };
-    storeCache = fresh;
+    const current = load().collections;
+    const collections = {};
+    for (const [key, value] of Object.entries(SEED)) {
+      // Records go; the institute's own structure and settings stay. A centre
+      // that reset should still find its classes and subjects waiting for it.
+      const structural = key === 'classes' || key === 'subjects';
+      collections[key] = Array.isArray(value)
+        ? (structural ? clone(current[key] ?? value) : [])
+        : clone(current[key] ?? value);
+    }
+    const fresh = { version: DATA_VERSION, seededAt: new Date().toISOString(), collections };
     save(fresh);
     return fresh;
   },
@@ -997,7 +918,6 @@ export function examsFor(className) {
 /* ------------------------------------------------------------------ */
 /* ERP helpers: analytics, leaderboard, backup, MCQ paste parsing,    */
 /* CSV export, global search                                          */
-/* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
 
 /** Exam result summary: attempts, avg/highest/lowest, pass rate. */

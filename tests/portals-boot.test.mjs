@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { loadDemo } from './helpers/demo.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
@@ -72,8 +73,10 @@ async function bootPage(page, { username, password, role, nonce = '' }) {
   console.error = (...args) => { errors.push(args.map(String).join(' ')); };
 
   (await import('../js/store.js'))._clearMemoryStore();
+  // The store ships empty: load the demo institute and its accounts first, so
+  // these boots exercise a populated panel rather than an empty one.
+  await loadDemo();
   const auth = await import('../js/auth.js');
-  await auth.seedUsers({ force: true });
   await auth.signIn(username, password, role);
 
   const scripts = inlineModuleScripts(html);

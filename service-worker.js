@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v33';   // admin panel: the activity log section is removed
+const CACHE_NAME = 'active-plus-v34';   // no demo data any more: a new store starts empty
 const PRECACHE_URLS = [
   './',
   'index.html',

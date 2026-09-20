@@ -10,6 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { loadDemoData } from '../js/demo-data.js';
 
 function makeLocalStorage() {
   const store = new Map();
@@ -40,11 +41,18 @@ function installWindow(localStorage) {
   };
 }
 
-/** Fresh window + fresh store; the module instances stay, the data does not. */
+/**
+ * Fresh window + fresh store; the module instances stay, the data does not.
+ *
+ * `boot()` hands the test the demo institute (js/demo-data.js) rather than an
+ * empty store: these regressions are about money, exams and receipts, and the
+ * app itself ships with no sample records at all.
+ */
 async function boot(storage = makeLocalStorage()) {
   installWindow(storage);
   const store = await import('../js/store.js');
   store._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const app = await import('../js/app.js');
   return { data, app, store, storage };
@@ -161,6 +169,7 @@ test('a student cannot sit the same exam twice', async () => {
 
   const store = await import('../js/store.js');
   store._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamTaker } = await import('../js/exams.js');
 
@@ -310,7 +319,12 @@ test('a store from an older DATA_VERSION is migrated, not wiped', async () => {
   assert.equal(data.db.settings.get().orgName, 'পুরনো প্রতিষ্ঠান', 'their institute profile survived');
   assert.equal(data.db.payments.find('p-old').amount, 500, 'their money records survived');
   assert.equal(data.db.settings.get().monthlyFee, 1200, 'settings the old version lacked are filled in');
-  assert.ok(data.db.teachers.list().length > 0, 'collections the old version lacked are seeded');
+  // The app ships with no sample people, so an upgrade only has to make the
+  // missing collections EXIST; the structural defaults (class and subject list)
+  // are what a new version actually brings.
+  assert.ok(Array.isArray(data.db.teachers.list()), 'collections the old version lacked are created');
+  assert.equal(data.db.teachers.list().length, 0, 'but nothing is filled in with demo people');
+  assert.ok(data.db.classes.list().length > 0 && data.db.subjects.list().length > 0, 'the class and subject lists are added');
   assert.equal(JSON.parse(data.exportBackup()).version, data.DATA_VERSION, 'and the store is now current');
   assert.equal(JSON.parse(storage.getItem('activeplus_data')).version, data.DATA_VERSION, 'the migrated store was written back');
 });

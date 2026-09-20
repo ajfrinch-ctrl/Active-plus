@@ -13,7 +13,7 @@
       import { initAdminHome } from '../admin-home.js';
       import { mountInstallButton } from '../install.js';
       import { registerOverlay, noteOverlayOpened, noteOverlayClosed } from '../back-button.js';
-      import { listUsers, seedUsers } from '../auth.js';
+      import { seedUsers } from '../auth.js';
       import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, dueMonthKey, sharedNotices, receivePayment, receiveStudentPayments, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan, formatBnDate, parseBnDateInput, toAsciiDate, formatBnDateTime } from '../data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from '../exams.js';
       import { mountExtraAdmin } from '../admin-modules.js';
@@ -1254,10 +1254,12 @@ export async function bootAdminPanel() {
       });
 
       document.getElementById('reset-data').addEventListener('click', () => {
-        if (window.confirm('সব ডেটা মুছে ডেমো অবস্থায় ফিরে যাবেন?')) {
+        // No demo data to return to: this empties every record collection and
+        // keeps only the institute's own settings.
+        if (window.confirm('শিক্ষার্থী, শিক্ষক, ফি, পরীক্ষা, নোটিশ — সব রেকর্ড মুছে যাবে। প্রতিষ্ঠানের সেটিংস ও শ্রেণি-বিষয়ের তালিকা থাকবে। মুছে ফেলবেন?')) {
           db.reset();
           renderAll();
-          showToast('ডেটা রিসেট হয়েছে।', 'warning');
+          showToast('সব ডেটা মুছে ফেলা হয়েছে।', 'warning');
         }
       });
 
@@ -1304,15 +1306,9 @@ export async function bootAdminPanel() {
         renderSettings();
       };
 
+      // Local-mode accounts must exist before the panel paints its user lists
+      // (mountUsers() renders them, and it is a few lines below).
       await seedUsers();
-      document.getElementById('account-list').innerHTML = listUsers().map((user) => `
-        <div class="list-item">
-          <div class="li-main">
-            <div class="li-title">${escapeHtml(user.name)}</div>
-            <div class="li-sub">${escapeHtml(user.username)}</div>
-          </div>
-          <span class="badge accent">${escapeHtml(user.role)}</span>
-        </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
 
       renderAll();
       mountExtraAdmin(session);

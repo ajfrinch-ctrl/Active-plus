@@ -15,7 +15,7 @@ import {
 import { mountCrud } from './crud.js';
 import { escapeHtml, renderTable, showToast, openModal, closeModal, getAuthMode, requireOnline } from './app.js';
 import { checkConnectionStatus } from './firebase.js';
-import { listUsers, updateProfile, changePassword } from './auth.js';
+import { listUsers, createLocalAccount, updateProfile, changePassword } from './auth.js';
 import { previewDocument } from './preview.js';
 import { renderReportCanvases, classReportRows, CLASS_REPORT_COLUMNS, classFileLabel } from './docs.js';
 
@@ -798,10 +798,49 @@ function mountReports() {
 }
 
 /* ---------------- Users & permissions ---------------- */
-function mountUsers() {
-  document.getElementById('users-list').innerHTML = listUsers().map((u) => `
+/** The account list is shown twice — on the Users tab and on the Settings
+    card — so both are painted from one place and can never disagree. */
+function renderAccountLists() {
+  const rows = listUsers().map((u) => `
     <div class="list-item"><div class="li-main"><div class="li-title">${escapeHtml(u.name)}</div><div class="li-sub">${escapeHtml(u.username)}</div></div>
-    <span class="badge accent">${escapeHtml(u.role)}</span></div>`).join('');
+    <span class="badge accent">${escapeHtml(u.role)}</span></div>`).join('')
+    || '<div class="empty-state">এখনো কোনো অ্যাকাউন্ট নেই।</div>';
+  ['users-list', 'account-list'].forEach((id) => {
+    const host = document.getElementById(id);
+    if (host) host.innerHTML = rows;
+  });
+}
+
+function mountUsers() {
+  renderAccountLists();
+
+  /* Local-mode accounts. The app ships with the single admin the installer is
+     handed, so this form is how a teacher or a student gets a way in — and it
+     refuses anything that could not sign in later (taken username, a short
+     password, a "student" whose username is not an admission ID). */
+  const accountForm = document.getElementById('account-form');
+  accountForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(accountForm);
+    try {
+      const result = await createLocalAccount({
+        username: String(data.get('username') || ''),
+        password: String(data.get('password') || ''),
+        role: String(data.get('role') || 'teacher'),
+        name: String(data.get('name') || ''),
+        detail: String(data.get('detail') || '')
+      });
+      accountForm.reset();
+      renderAccountLists();
+      // A save that did not reach storage is not a save (spec 51).
+      showToast(result.persisted === false
+        ? 'অ্যাকাউন্ট এই পেজে খোলা হয়েছে, কিন্তু স্টোরেজ বন্ধ থাকায় সংরক্ষণ করা যায়নি — পেজ রিফ্রেশ করলে হারিয়ে যাবে।'
+        : 'অ্যাকাউন্ট খোলা হয়েছে — এখন এই ইউজারনেইম ও পাসওয়ার্ড দিয়ে ঢোকা যাবে।',
+        result.persisted === false ? 'warning' : 'success');
+    } catch (error) {
+      showToast(error?.message || 'অ্যাকাউন্ট খোলা যায়নি।', 'error');
+    }
+  });
   // The full, independently configurable permission set (spec 46).
   const settings = db.settings.get();
   const matrix = settings.permissions || { ...DEFAULT_PERMISSIONS };

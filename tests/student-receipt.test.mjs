@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { loadDemo } from './helpers/demo.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
@@ -69,8 +70,10 @@ async function bootHome() {
   globalThis.fetch = async () => { throw new Error('offline test'); };
 
   (await import('../js/store.js'))._clearMemoryStore();
+  // A receipt is only meaningful with fee rows behind it, so the demo centre
+  // (records and accounts) is loaded first — the app itself ships empty.
+  await loadDemo();
   const auth = await import('../js/auth.js');
-  await auth.seedUsers({ force: true });
   await auth.signIn('2026-09-001', 'Student@123', 'student');
   const mod = await import('../js/student-home.js');
   mod.initStudentHome();
