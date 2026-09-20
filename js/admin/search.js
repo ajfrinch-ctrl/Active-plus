@@ -29,9 +29,15 @@ export function mountGlobalSearch({ session, tabs }) {
     input.setAttribute('aria-expanded', 'true');
   };
 
-  const findSections = (q) => visibleSections(role).filter((s) =>
-    norm(s.label).includes(q) || norm(s.en).includes(q) || norm(s.key).includes(q)
-  ).slice(0, 4);
+  /* Section matching is word-based, not just substring: the owner asks for
+     "স্টুডেন্ট এপ ম্যানেজমেন্ট" while the section is labelled শিক্ষার্থীর অ্যাপ,
+     so a section matches when the whole phrase — or every word of it — is
+     found in its label, English name, key or `alias` spellings. */
+  const sectionHaystack = (s) => norm([s.label, s.en, s.key, ...(s.alias || [])].join(' '));
+  const findSections = (q) => visibleSections(role).filter((s) => {
+    const hay = sectionHaystack(s);
+    return hay.includes(q) || q.split(/\s+/).every((word) => hay.includes(word));
+  }).slice(0, 4);
 
   const findStudents = (q) => db.students.list().filter((s) =>
     [s.name, s.id, s.phone, s.guardian, s.school].some((v) => norm(v).includes(q))

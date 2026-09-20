@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v29';   // + Student App Control (js/admin/student-app.js)
+const CACHE_NAME = 'active-plus-v30';   // + Student App Control reachable from the phone menu (js/admin-home.js)
 const PRECACHE_URLS = [
   './',
   'index.html',

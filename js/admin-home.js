@@ -18,13 +18,20 @@ import { escapeHtml, safeUrl, mountConnectionStatus } from './app.js';
 import {
   db, analytics, dueFees, getDbStatus, DAY_BN, orgInfo, mobileDigits
 } from './data.js';
+import { visibleSections } from './admin/registry.js';
 
 const bn = (n) => String(n ?? '').replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 const taka = (n) => `৳${bn(Number(n || 0).toLocaleString('en-US'))}`;
 
 /* Every feature, folded away behind a tap. Duplicate routes are removed:
    শিক্ষার্থী/পেমেন্ট additions live on the bottom-nav ＋ button, প্রোফাইল and
-   লগআউট live on the top-bar profile menu. */
+   লগআউট live on the top-bar profile menu.
+
+   This list is also the phone's only menu: below 1024px the grouped sidebar is
+   hidden by CSS (css/admin-panel.css) and the bottom navigation carries just
+   হোম/শিক্ষার্থী/পেমেন্ট/রিপোর্ট — so a section that is missing here is missing
+   from the app on a phone, no matter what js/admin/registry.js says. Every key
+   must exist in the registry; tilesFor() drops the ones the role cannot see. */
 const GROUPS = [
   {
     title: '🎓 একাডেমিক',
@@ -46,6 +53,10 @@ const GROUPS = [
   {
     title: '🗂️ ম্যানেজমেন্ট',
     tiles: [
+      // Student App Control (js/admin/student-app.js). It used to live only in
+      // the desktop sidebar, which CSS hides below 1024px — on a phone there
+      // was no way to reach it at all.
+      { key: 'studentapp', icon: '📱', label: 'শিক্ষার্থীর অ্যাপ' },
       { key: 'notices', icon: '📢', label: 'নোটিশ' },
       { key: 'notifications', icon: '🔔', label: 'নোটিফিকেশন' },
       { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি' },
@@ -66,6 +77,9 @@ const DASH_ACTIONS = [
   { act: 'add-teacher', icon: '👨‍🏫', label: 'শিক্ষক যোগ', en: 'Add Teacher' },
   { act: 'create-exam', icon: '📝', label: 'নতুন পরীক্ষা', en: 'New Exam' },
   { act: 'create-notice', icon: '📢', label: 'নোটিশ দিন', en: 'New Notice' },
+  // Student App Control, one tap from the first screen. Without this tile the
+  // section was only in the desktop sidebar — invisible on a phone.
+  { act: 'studentapp', section: 'studentapp', icon: '📱', label: 'শিক্ষার্থীর অ্যাপ', en: 'Student App' },
   // The ☰ menu left the top bar, so the extra-features grid keeps its own
   // one-tap entry right here on the first screen.
   { act: 'more', icon: '⊞', label: 'সব ফিচার', en: 'All Features' }
@@ -88,6 +102,14 @@ const MORE_ITEMS = [
 export function initAdminHome({ session, tabs, openModal, showToast, onLogout, onAttendance }) {
   const host = document.getElementById('admin-home');
   if (!host) return null;
+
+  /* These tiles ARE the phone's menu (the sidebar is hidden below 1024px), so
+     they are filtered by the very same registry the sidebar reads — a role
+     that lost a permission in the matrix loses the tile too, and a section
+     added to the registry can never be offered here by accident. */
+  const role = session?.role || 'admin';
+  const reachable = new Set(visibleSections(role).map((s) => s.key));
+  const tilesFor = (tiles) => tiles.filter((t) => reachable.has(t.key));
 
   const goto = (key) => {
     if (key === 'logout') { onLogout?.(); return; }
@@ -187,7 +209,7 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout, o
     <section class="home-section" aria-label="কুইক অ্যাকশন">
       <h2 class="sec-title">⚡ কুইক অ্যাকশন · Quick Actions</h2>
       <div class="quick-row dash-actions" id="admin-quick">
-        ${DASH_ACTIONS.map((q) => `
+        ${DASH_ACTIONS.filter((q) => !q.section || reachable.has(q.section)).map((q) => `
           <button type="button" class="chip dash-action" data-act="${q.act}">
             <span class="da-ico" aria-hidden="true">${q.icon}</span>
             <span class="da-label">${escapeHtml(q.label)}</span>
@@ -239,12 +261,19 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout, o
       <button type="button" class="tile" data-goto="${t.key}"><span class="ico">${t.icon}</span>${escapeHtml(t.label)}</button>`).join('')}
     </div>`;
 
-  const featureFolds = () => `
+  /* Groups whose every tile the role lost disappear instead of rendering an
+     empty collapsible. */
+  const featureFolds = () => {
+    const groups = GROUPS
+      .map((g) => ({ ...g, tiles: tilesFor(g.tiles) }))
+      .filter((g) => g.tiles.length);
+    return `
     <section class="home-section" aria-label="সব ফিচার">
       <h2 class="sec-title">🧭 সব ফিচার · All Features</h2>
-      ${GROUPS.map((g) => fold(`${g.title}`, tileGrid(g.tiles))).join('')}
-      ${fold('✨ আরও ফিচার · More', tileGrid(MORE_ITEMS, 'admin-more-grid'), 'admin-more-sec')}
+      ${groups.map((g) => fold(`${g.title}`, tileGrid(g.tiles))).join('')}
+      ${fold('✨ আরও ফিচার · More', tileGrid(tilesFor(MORE_ITEMS), 'admin-more-grid'), 'admin-more-sec')}
     </section>`;
+  };
 
   function render() {
     const headerSub = document.getElementById('user-role');
@@ -267,6 +296,10 @@ export function initAdminHome({ session, tabs, openModal, showToast, onLogout, o
     const action = e.target.closest('[data-act]');
     if (!action) return;
     const act = action.dataset.act;
+    // Quick actions that only open a panel (শিক্ষার্থীর অ্যাপ) declare the
+    // registry key they lead to, so no new branch is needed per section.
+    const quickSection = DASH_ACTIONS.find((q) => q.act === act)?.section;
+    if (quickSection) { tabs?.activate?.(quickSection); return; }
     if (act === 'admission') { tabs?.activate?.('students'); openModal?.('student-modal'); }
     else if (act === 'payment') { tabs?.activate?.('dues'); }
     else if (act === 'attendance') { onAttendance?.(); }
