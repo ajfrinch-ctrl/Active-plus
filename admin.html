@@ -51,12 +51,21 @@
         <!-- Global search (গ্লোবাল সার্চ): reaches students, teachers, batches
              and panel sections from anywhere in the admin panel. -->
         <div class="admin-search" role="search">
-          <span class="admin-search-ico" aria-hidden="true">🔍</span>
-          <input id="admin-global-search" class="admin-search-input" type="search"
-            placeholder="খুঁজুন — শিক্ষার্থী, শিক্ষক, ব্যাচ, মেনু… (Search)"
-            aria-label="গ্লোবাল সার্চ — শিক্ষার্থী, শিক্ষক, ব্যাচ বা মেনু খুঁজুন"
-            aria-expanded="false" autocomplete="off">
+          <div class="admin-search-field">
+            <span class="admin-search-ico" aria-hidden="true">🔍</span>
+            <input id="admin-global-search" class="admin-search-input" type="search"
+              placeholder="খুঁজুন — শিক্ষার্থী, শিক্ষক, ব্যাচ, মেনু… (Search)"
+              aria-label="গ্লোবাল সার্চ — শিক্ষার্থী, শিক্ষক, ব্যাচ বা মেনু খুঁজুন"
+              role="combobox" aria-autocomplete="list" aria-haspopup="listbox"
+              aria-controls="admin-search-results" aria-expanded="false"
+              autocomplete="off" spellcheck="false">
+            <button type="button" class="admin-search-clear" id="admin-search-clear" hidden
+              aria-label="সার্চ মুছুন" title="সার্চ মুছুন">×</button>
+          </div>
+          <button type="button" class="admin-search-dismiss" id="admin-search-dismiss"
+            aria-label="সার্চ বন্ধ করুন">বন্ধ</button>
           <div id="admin-search-results" class="admin-search-results" hidden role="listbox" aria-label="সার্চ ফলাফল"></div>
+          <span class="sr-only" id="admin-search-status" role="status" aria-live="polite"></span>
         </div>
         <button type="button" class="icon-btn notif-btn topbar-btn" id="admin-bell" data-tab="activity" aria-label="নোটিফিকেশন">🔔<span class="notif-badge" id="admin-bell-count" hidden>০</span></button>
         <button type="button" class="icon-btn topbar-btn" id="admin-profile-btn" aria-label="অ্যাডমিন প্রোফাইল" aria-haspopup="true" aria-expanded="false" title="অ্যাডমিন প্রোফাইল">👤</button>

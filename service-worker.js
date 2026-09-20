@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v31';   // + the Back button keeps its own screen stack (js/back-button.js)
+const CACHE_NAME = 'active-plus-v32';   // + responsive, user-friendly Admin global search results
 const PRECACHE_URLS = [
   './',
   'index.html',
