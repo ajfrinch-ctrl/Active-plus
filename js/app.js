@@ -6,8 +6,15 @@
 import { requireRole, currentSession, logoutButton, homeFor, ROLES, enteredFromLogin } from './auth.js';
 import { showToast, getAuthMode } from './firebase.js';
 import { formatBnDate, looksLikeDate } from './data.js';
+/* The phone's Back button: every portal keeps its own screen stack, so Back
+   returns to the previous screen instead of throwing the user out of the app. */
+import {
+  BackButtonController, activeBackController, noteModalOpened, noteModalClosed,
+  attachBackButton, setModalBridge
+} from './back-button.js';
 
 export { showToast, getAuthMode, ROLES, homeFor };
+export { BackButtonController, activeBackController, attachBackButton };
 /**
  * Registers the PWA service worker. Safe to call on every page: module scripts
  * run after parsing, so 'load' may already have fired — registering only inside
@@ -61,6 +68,13 @@ export function initTabs({ storageKey = 'activeplus_tab' } = {}) {
 
   const page = window.location.pathname.split('/').pop() || 'page';
   const memoryKey = `${storageKey}:${page}`;
+  /* The app's root screen: tapping it gives up the whole back walk. */
+  const homeTab = tabNames.includes('home') ? 'home' : tabNames[0];
+  /* Set while the Back button is the thing switching tabs, so the switch is
+     not written back into the history stack it was just popped from. */
+  let restoring = false;
+  /* The portal's Back controller (created at the end of this function). */
+  let backNav = null;
 
   const activate = (name, { focus = false } = {}) => {
     const target = tabNames.includes(name) ? name : tabNames[0];
@@ -78,6 +92,13 @@ export function initTabs({ storageKey = 'activeplus_tab' } = {}) {
       if (focus) targetBtn.focus();
     }
     try { window.localStorage.setItem(memoryKey, target); } catch (e) { /* ignore */ }
+    /* Every tab is a screen the phone's Back can return to: switching tabs
+       stacks them, and Back walks back through what was visited. হোম is the
+       root — tapping it gives the walk up, so the stack cannot grow forever. */
+    if (backNav && !restoring) {
+      if (target === homeTab) backNav.root(target);
+      else backNav.push(target);
+    }
     // Let app-style shells (bottom nav, grids) stay in sync with the active tab.
     window.dispatchEvent(new window.CustomEvent('tabchange', { detail: { tab: target } }));
     return target;
@@ -105,11 +126,30 @@ export function initTabs({ storageKey = 'activeplus_tab' } = {}) {
     try { initial = window.localStorage.getItem(memoryKey); } catch (e) { /* ignore */ }
     if (!initial && window.location.hash.startsWith('#')) initial = window.location.hash.slice(1);
   }
-  const homeTab = tabNames.includes('home') ? 'home' : tabNames[0];
   const current = activate(initial || homeTab);
+
+  /* ---------------- Hardware / browser Back ----------------
+     Pressing Back used to leave the installed app, because switching panels
+     never wrote anything to the history. Now the controller owns the stack:
+     Back returns to the previous tab (or closes an open sheet first), and only
+     at the root does the first Back warn and the second one exit. */
+  backNav = new BackButtonController({
+    route: (route) => {
+      restoring = true;
+      try { activate(route); } finally { restoring = false; }
+    },
+    toast: (message, kind, ms) => { try { showToast(message, kind, ms); } catch (e) { /* no host */ } }
+  });
+  backNav.start();
+  /* `activate()` above already resolved where this session starts (a remembered
+     tab, a deep link in the fragment, or Home), so that screen becomes the root
+     of the Back stack — one entry of ours sits between it and the browser's own
+     Back, which is what keeps the first press from closing the app. */
+  backNav.root(current);
+
   // Expose the switcher so app-style shells (bottom nav, feature grids, More
   // menu) can drive the very same panels instead of duplicating them.
-  return { activate, current, buttons };
+  return { activate, current, buttons, back: backNav };
 }
 
 /* ------------------------------------------------------------------ */
@@ -292,6 +332,7 @@ export function openModal(id) {
     if (!heading.id) heading.id = `${id}-title`;
     content.setAttribute('aria-labelledby', heading.id);
   }
+  const wasOpen = modal.classList.contains('active');
   modal.classList.add('active');
   modal.setAttribute('aria-hidden', 'false');
   document.body.classList.add('modal-open'); // print uses this to drop the app shell
@@ -299,6 +340,9 @@ export function openModal(id) {
   if (!openModals.has(id)) {
     openModals.set(id, { opener: document.activeElement || null, release: trapFocus(modal) });
   }
+  /* The sheet becomes a step of the Back stack: the phone's Back closes it
+     instead of leaving the screen it was opened from. */
+  if (!wasOpen) noteModalOpened();
   const focusable = modal.querySelector('input, select, textarea, button:not(.modal-close)');
   if (focusable) setTimeout(() => focusable.focus(), 120);
   return modal;
@@ -307,6 +351,7 @@ export function openModal(id) {
 export function closeModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return null;
+  const wasOpen = modal.classList.contains('active');
   modal.classList.remove('active');
   modal.setAttribute('aria-hidden', 'true');
   const opened = openModals.get(id);
@@ -324,13 +369,31 @@ export function closeModal(id) {
     document.body.classList.remove('modal-open');
     document.body.style.overflow = '';
   }
+  /* However the sheet was closed (×, backdrop, Escape, a saved form), give its
+     Back-stack entry back so the stack and the address bar never drift. */
+  if (wasOpen) noteModalClosed();
   return modal;
+}
+
+/** The topmost open sheet, closed through this module's own closeModal. */
+function closeTopSheet() {
+  const open = Array.from(document.querySelectorAll('.modal-overlay.active'));
+  const top = open[open.length - 1];
+  if (!top) return false;
+  closeModal(top.id);
+  return true;
 }
 
 export function initModals() {
   // Wire the overlays that are already in the document. Overlays created
   // later are wired by openModal(), so their close button is never a dead end.
   document.querySelectorAll('.modal-overlay').forEach(wireModal);
+  /* The Back controller closes sheets through app.js, so focus, the focus trap
+     and the scroll lock are released exactly as a × press would release them. */
+  setModalBridge({
+    list: () => Array.from(document.querySelectorAll('.modal-overlay.active')),
+    closeTop: closeTopSheet
+  });
   if (escapeDocuments.has(document)) return;
   escapeDocuments.add(document);
   document.addEventListener('keydown', (event) => {

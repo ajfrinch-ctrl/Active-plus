@@ -5,6 +5,7 @@
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "handle_links": "preferred",
   "lang": "bn",
   "dir": "ltr",
   "theme_color": "#05070a",

@@ -58,6 +58,7 @@ test('module imports resolve to real exported names', () => {
     './js/firebase.js': read('js/firebase.js'),
     './js/auth.js': read('js/auth.js'),
     './js/app.js': read('js/app.js'),
+    './js/back-button.js': read('js/back-button.js'),
     './js/data.js': read('js/data.js'),
     './js/store.js': read('js/store.js'),
     './js/exams.js': read('js/exams.js'),

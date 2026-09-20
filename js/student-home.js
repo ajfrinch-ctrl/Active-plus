@@ -7,6 +7,10 @@
 import { initApp, escapeHtml, safeUrl, showToast, openModal, closeModal, getAuthMode } from './app.js';
 import { signOut } from './auth.js';
 import {
+  BackButtonController, attachBackButton, registerOverlay,
+  noteOverlayOpened, noteOverlayClosed
+} from './back-button.js';
+import {
   db, noticesFor, ALL_CLASSES,
   greetingByHour, studyStreak, upcomingExam,
   performanceFor, feeStatusFor,
@@ -93,6 +97,9 @@ export function initStudentHome() {
     if (!profileMenu || profileMenu.hidden) return;
     profileMenu.hidden = true;
     profileBtn?.setAttribute('aria-expanded', 'false');
+    /* However it was closed (a tap outside, Escape, a menu row), the Back step
+       the dropdown took is given back. */
+    noteOverlayClosed();
   };
   profileBtn?.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -100,6 +107,9 @@ export function initStudentHome() {
     const willOpen = profileMenu.hidden;
     profileMenu.hidden = !willOpen;
     profileBtn.setAttribute('aria-expanded', String(willOpen));
+    /* The open dropdown is a layer of its own: the phone's Back closes it
+       instead of leaving the Home screen. */
+    if (willOpen) noteOverlayOpened();
   });
   document.addEventListener('click', (event) => {
     if (!profileMenu || profileMenu.hidden) return;
@@ -172,7 +182,11 @@ export function initStudentHome() {
     const index = Object.keys(views).indexOf(name);
     if (index >= 0) navInk.style.transform = `translateX(${index * 100}%)`;
   };
-  const switchView = (name) => {
+  /**
+   * Paints one view. `history: false` paints without touching the Back stack —
+   * used while the Back button itself is restoring a screen.
+   */
+  const switchView = (name, { history = true } = {}) => {
     Object.entries(views).forEach(([k, id]) => { document.getElementById(id).hidden = k !== name; });
     document.querySelectorAll('.bottom-nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === name)));
     moveNavInk(name);
@@ -181,12 +195,77 @@ export function initStudentHome() {
     else if (name === 'more') renderMore();
     else if (name === 'study') renderStudy();
     else if (name === 'result') renderResult();
+    /* Every view is a screen the phone's Back can return to: হোম → স্টাডি →
+       পরীক্ষা then Back walks স্টাডি → হোম, and only from হোম does it ask
+       "আবার ব্যাক চাপলে অ্যাপ বন্ধ হবে". হোম is the root, so tapping it gives
+       the walk up and the stack can never grow without limit. */
+    if (history && nav && !restoring) {
+      if (name === 'home') nav.root('home');
+      else nav.push(name);
+    }
     window.scrollTo({ top: 0 });
   };
   moveNavInk('home');
   document.querySelector('.bottom-nav').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-view]');
     if (b) switchView(b.dataset.view);
+  });
+
+  /* ---------------- The phone's Back button ----------------
+     Back used to close the whole app: every screen here is painted in place, so
+     the browser history stayed empty and the installed PWA had nothing to go
+     back *to*. Now each screen is a real step of the history:
+
+       • a sheet is open (রিসিট, নোটিশ, অ্যাসাইনমেন্ট …) → Back closes the sheet,
+       • a drill-down (আরও → ফি, পরীক্ষার খাতা)        → Back returns to the
+         screen it was opened from,
+       • the five tabs                                  → Back walks back through
+         the screens the student actually visited,
+       • হোম (the root)                                 → the first Back only
+         warns ("আবার ব্যাক চাপুন"), the second one exits — and an in-app
+         ← button exits when it is pressed and held. */
+  let restoring = false;
+  const isMoreRoute = (route) => String(route || '').startsWith('more/');
+  const isExamRoute = (route) => String(route || '').startsWith('exam/');
+
+  /** Paints whatever a route names. Called by Back, so it never writes history. */
+  const applyRoute = (route) => {
+    restoring = true;
+    try {
+      const id = String(route || '');
+      if (isMoreRoute(id)) { switchView('more', { history: false }); renderMore(id.slice(5)); return; }
+      if (id === 'more') { switchView('more', { history: false }); renderMore(); return; }
+      if (isExamRoute(id)) {
+        switchView('exam', { history: false });
+        const [, kind, examId] = id.split('/');
+        if (kind === 'paper') refreshExams?.start?.(examId);
+        else if (kind === 'review') refreshExams?.review?.(examId);
+        return;
+      }
+      if (id === 'exam') {
+        /* Back from a paper/review step: the list must actually come back, so
+           the player is put away rather than only re-rendered. */
+        switchView('exam', { history: false });
+        refreshExams?.toList?.();
+        return;
+      }
+      switchView(views[id] ? id : 'home', { history: false });
+    } finally { restoring = false; }
+  };
+
+  const nav = new BackButtonController({
+    route: applyRoute,
+    toast: (message, kind, ms) => { try { showToast(message, kind, ms); } catch (e) { /* no host yet */ } }
+  });
+  nav.start();
+  /* The student portal always opens on Home (that is the rule the login handoff
+     enforces), so Home is the root of the Back stack. */
+  nav.root('home');
+  /* The profile dropdown is not a .modal-overlay sheet, so it is registered as
+     its own dismissible layer: Back closes the menu before it leaves a screen. */
+  registerOverlay({
+    isOpen: () => Boolean(profileMenu && !profileMenu.hidden),
+    close: () => { closeProfileMenu(); return true; }
   });
 
   /* ---------- Notification centre — every event, not only notices ---------- */
@@ -824,7 +903,16 @@ export function initStudentHome() {
         </div>`;
     }
 
-    document.getElementById('more-back')?.addEventListener('click', () => renderMore());
+    /* ← ফিরে যান: one press goes back to the আরও menu, pressing and holding it
+       exits the app (the same gesture the phone's Back button asks for). */
+    const moreBack = document.getElementById('more-back');
+    if (moreBack) {
+      moreBack.title = 'ফিরে যান — চেপে ধরে রাখলে অ্যাপ বন্ধ হবে';
+      attachBackButton(moreBack, {
+        onShort: backToMoreMenu,
+        onHold: () => nav?.exit()
+      });
+    }
 
     document.getElementById('clear-cache')?.addEventListener('click', async () => {
       try {
@@ -951,10 +1039,30 @@ export function initStudentHome() {
     });
   }
 
+  /**
+   * Opens আরও — the menu, or one of its panels.
+   *
+   * A panel is a *step* of the Back stack: coming from হোম → আরও → ফি, Back
+   * returns to the আরও menu, and from হোম → ফি (a home card) Back returns to
+   * হোম. Moving sideways between two panels replaces the step instead of
+   * stacking, so the stack never grows while the student browses আরও.
+   */
   function openMore(section) {
-    switchView('more');
+    const route = section ? `more/${section}` : 'more';
+    const fromBack = restoring;
+    switchView('more', { history: false });
     if (section) renderMore(section);
+    if (!nav || fromBack || nav.top === route) return;
+    if (!section) nav.replace('more');
+    else if (isMoreRoute(nav.top)) nav.replace(route);
+    else nav.push(route);
   }
+
+  /** The in-app ← of an আরও panel: back to the আরও menu (hold = exit the app). */
+  const backToMoreMenu = () => {
+    if (nav && isMoreRoute(nav.top)) nav.replace('more');
+    renderMore();
+  };
 
   /* ---------- Study / Exam / Result ---------- */
 
@@ -1248,6 +1356,22 @@ export function initStudentHome() {
     document.getElementById('home-skeleton').hidden = true;
     host.hidden = false;
     renderHomeSafe();
-    refreshExams = mountExamTaker({ listSelector: '#student-exam-list', student });
+    /* The running paper / a review sheet are steps of their own: Back returns
+       to the exam list instead of closing the app mid-paper. */
+    refreshExams = mountExamTaker({
+      listSelector: '#student-exam-list',
+      student,
+      onScreenChange: ({ screen, examId } = {}) => {
+        if (!nav || restoring) return;
+        if (screen === 'list') {
+          if (isExamRoute(nav.top)) nav.back();
+          return;
+        }
+        const route = `exam/${screen === 'review' ? 'review' : 'paper'}/${examId || ''}`;
+        if (nav.top === route) return;
+        if (isExamRoute(nav.top)) nav.replace(route);
+        else nav.push(route);
+      }
+    });
   }, 300);
 }

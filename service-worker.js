@@ -11,7 +11,7 @@
  *   - Anything else (Firebase, external requests): pass through untouched.
  */
 
-const CACHE_NAME = 'active-plus-v30';   // + Student App Control reachable from the phone menu (js/admin-home.js)
+const CACHE_NAME = 'active-plus-v31';   // + the Back button keeps its own screen stack (js/back-button.js)
 const PRECACHE_URLS = [
   './',
   'index.html',
@@ -42,6 +42,8 @@ const PRECACHE_URLS = [
   'js/data.js',
   'js/auth.js',
   'js/app.js',
+  // Back button: every portal's screen stack, so Back never closes the app
+  'js/back-button.js',
   'js/exams.js',
   'js/crud.js',
   'js/admin-modules.js',

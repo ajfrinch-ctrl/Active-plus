@@ -189,6 +189,10 @@ css/style.css       single mobile-first stylesheet
 js/firebase.js      Firebase integration + offline fallback + toasts
 js/auth.js          local sign-in, sessions, route guards
 js/app.js           shared shell: header, tabs, tables, modals
+js/back-button.js   BackButtonController — the phone's Back button: every
+                    portal's screen stack, sheets as steps of their own, the
+                    "press Back again to close" root guard, and press-and-hold
+                    on the in-app ← buttons
 js/data.js          persistent data layer (versioned CRUD collections +
                     payments/suggestions/exams/material progress + the
                     institute profile orgInfo/saveOrgInfo + domain helpers such
@@ -224,6 +228,47 @@ manifest.json       PWA manifest
 assets/             generated icons (see tools/generate-icons.py)
 tests/              Node test suite (`npm test`)
 ```
+
+## Back button (ব্যাক বাটন)
+
+> মালিকের অভিযোগ ছিল: *"ব্যাক বটম ক্লিক করলে এপ্স থেকে বের হয়ে যাচ্ছে … ব্যাক এ ক্লিক
+> করলে আগের টাস্ক এ ফিরে যাবে। ব্যাক বটম প্রেস করে রাখলে এক্সিট হবে।"*
+
+Every screen in the portals is painted in place — the bottom navigation, the
+আরও panels, the exam paper, the receipts. Nothing used to be written to the
+browser history, so on a phone the Back key had nothing to go back *to* and the
+installed app simply closed. `js/back-button.js` (`BackButtonController`, one
+instance per portal) now owns a stack of screens and gives Back something to
+walk:
+
+| What is on screen | Back does this |
+| ----------------- | -------------- |
+| A sheet/modal (রিসিট, নোটিশ, অ্যাসাইনমেন্ট, CRUD form) | closes the sheet — the screen behind it does not move |
+| A dropdown (👤 প্রোফাইল মেনু) | closes the menu first, the screen stays |
+| A drill-down (আরও → ফি, a running exam paper, a review) | returns to the screen it was opened from |
+| Bottom-nav / tab screens the student walked through | returns to the previous one, in reverse order |
+| The root screen (হোম) | **first press only warns** — "আবার ব্যাক চাপুন"; the second press is handed to the browser, which is what closes the app |
+
+Details worth knowing:
+
+- **হোম is the root.** Tapping it gives the whole walk up, so a long session
+  cannot turn Back into an endless walk; the stack also stops growing at
+  `MAX_DEPTH` (12) screens.
+- **Each entry carries its own position** (`history.state.n`), so the stack
+  re-syncs itself from the browser on every traversal instead of counting
+  presses — a restored tab or a swallowed event cannot desynchronise it.
+- **Press and hold to exit** works on the app's own ← buttons (আরও → *← ফিরে যান*,
+  the exam paper's *ফিরে যান*): a short press goes back one screen, holding it
+  fills the button in red (`[data-back-hold]` + `body.back-hold`, with a hint
+  pill) and leaves the app. The *hardware* Back key cannot be held from a web
+  page — Android keeps that gesture for the system — which is why the root
+  screen asks for a second press instead.
+- **Leaving an exam half-way** is safe: the paper stays saved on the device and
+  Back tells the student to press *চালিয়ে যান* to sit it again.
+- `manifest.json` sets `"handle_links": "preferred"`, so in the installed app
+  links inside the scope stay in the app window and keep using this stack.
+- The login page keeps the browser's own behaviour — leaving from there is what
+  a signed-out user expects.
 
 ## Student Home
 
@@ -466,7 +511,7 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 226 Node tests: data-layer helpers, the permission matrix, the
+`npm test` runs 252 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class
@@ -476,8 +521,12 @@ login → home handoff. The newest files cover the Bengali date format on every
 rendered portal view *and* in the generated documents (receipts, reports, ID
 cards — the canvases are read back and scanned), the paste-template exam flow
 end to end (paste → publish → sit → countdown → auto-submit → review), and the
-top bar / entry-home rules, and the printed question paper with its answer key
-(the painted sheets are read back string by string).
+top bar / entry-home rules, the printed question paper with its answer key
+(the painted sheets are read back string by string), and the Back button
+(`tests/back-button.test.mjs`: drill-downs, sheets, the profile dropdown, the
+tab walk, the depth cap, the warn-then-exit root guard, the hold-to-exit ←
+button, the exam paper step, and the same behaviour on the teacher and admin
+portals).
 
 ## Configuring Firebase (optional)
 
