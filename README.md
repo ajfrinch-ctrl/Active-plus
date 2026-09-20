@@ -180,8 +180,9 @@ admin.html          admin panel (v2) — light-themed dashboard (quick actions,
                     results, fees & payments, notices, notifications, the
                     report centre, users & permissions, activity log,
                     institute profile settings, backup/restore (incl.
-                    scheduled auto-backup). Hybrid navigation: grouped
-                    bilingual sidebar on desktop, bottom nav on mobile
+                    scheduled auto-backup) and Student App Control. Hybrid
+                    navigation: grouped bilingual sidebar on desktop, bottom
+                    nav + the admin-home tiles on mobile
 css/admin-panel.css admin-only light theme, hybrid layout, global search,
                     responsive card tables
 css/style.css       single mobile-first stylesheet
@@ -326,14 +327,17 @@ The panel was restructured around a short product questionnaire. What changed:
 - **Hybrid navigation** — a grouped sidebar (একাডেমিক / পরীক্ষা / ফাইন্যান্স /
   যোগাযোগ / সিস্টেম) on desktop, the familiar bottom nav on phones. Both are
   rendered from one registry (`js/admin/registry.js`) and stay in sync with the
-  tab router.
+  tab router. CSS hides the sidebar below 1024px, so on a phone the dashboard
+  tiles (`js/admin-home.js`: কুইক অ্যাকশন + সব ফিচার) *are* the menu — every
+  registry section needs a tile there or it is desktop-only in practice
+  (`tests/admin-navigation.test.mjs` fails the build if one goes missing).
 - **Bilingual labels** — Bengali primary with English alongside in the sidebar,
   dashboard and every section title.
 - **Light theme** — `css/admin-panel.css` scopes a light palette to
   `body.admin-portal`; the student/teacher portals keep the dark look.
 - **Dashboard-first home** — quick actions (ভর্তি / পেমেন্ট / হাজিরা / শিক্ষক /
-  পরীক্ষা / নোটিশ) lead the screen, followed by the overview numbers, a dues
-  alert and the institute card.
+  পরীক্ষা / নোটিশ / শিক্ষার্থীর অ্যাপ) lead the screen, followed by the overview
+  numbers, a dues alert and the institute card.
 - **Global search** — the top-bar box finds students, teachers, batches and
   panel sections; picking a student isolates and flashes their row.
 - **Student quick search + filters** on the student list itself, plus a sort,
@@ -344,7 +348,10 @@ The panel was restructured around a short product questionnaire. What changed:
   student) and switched by the same five bottom tabs. The switches next to it
   write through `setHomeCards` / `setHomeFeatures` / `db.*`, so the preview is
   never a mock, and quick-add forms publish materials, notices, banners, tips
-  and suggestions for that class without leaving the screen.
+  and suggestions for that class without leaving the screen. Reach it from the
+  **শিক্ষার্থীর অ্যাপ** quick action on the dashboard, from **সব ফিচার →
+  ম্যানেজমেন্ট**, from the desktop sidebar (ড্যাশবোর্ড group), or by searching
+  “স্টুডেন্ট এপ” / “student app”.
 - **Role-aware sections** — the registry gates each section on the permission
   matrix, so narrowing a role hides its sections automatically.
 - **One-tap exports** — CSV downloads for students, dues and payments; the

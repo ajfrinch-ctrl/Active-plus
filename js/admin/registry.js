@@ -24,14 +24,26 @@ export const ADMIN_GROUPS = [
 /**
  * Every admin section. `key` is the tab key (panel id = `tab-<key>`),
  * `perm` is a key from PERMISSIONS in data.js — sections without a `perm`
- * are visible to every signed-in role of this portal.
+ * are visible to every signed-in role of this portal, and `alias` lists extra
+ * spellings the global search matches (the name users type is not always the
+ * label on screen).
+ *
+ * NOTE: on a phone the grouped sidebar is hidden (css/admin-panel.css, below
+ * 1024px) and js/admin-home.js renders the menu instead — so a new section
+ * needs a tile there too, or it is desktop-only in practice.
  */
 export const ADMIN_SECTIONS = [
   { key: 'home', icon: '🏠', label: 'ড্যাশবোর্ড', en: 'Dashboard', group: 'dashboard' },
   { key: 'overview', icon: '📈', label: 'সংক্ষিপ্ত পরিসংখ্যান', en: 'Overview', group: 'dashboard' },
   // A live window into the student portal: see what a class sees, publish the
   // content behind each card, without leaving the panel.
-  { key: 'studentapp', icon: '📱', label: 'শিক্ষার্থীর অ্যাপ', en: 'Student App Control', group: 'dashboard', perm: 'manageSettings' },
+  {
+    key: 'studentapp', icon: '📱', label: 'শিক্ষার্থীর অ্যাপ', en: 'Student App Control',
+    group: 'dashboard', perm: 'manageSettings',
+    // People ask for it as "student app management", typed in Bengali script —
+    // the global search matches these spellings too, not just the label.
+    alias: ['স্টুডেন্ট অ্যাপ', 'স্টুডেন্ট এপ', 'student app management', 'শিক্ষার্থীর অ্যাপ ম্যানেজমেন্ট']
+  },
 
   { key: 'students', icon: '👨‍🎓', label: 'শিক্ষার্থী', en: 'Students', group: 'people', perm: 'viewStudents' },
   { key: 'teachers', icon: '👨‍🏫', label: 'শিক্ষক', en: 'Teachers', group: 'people', perm: 'viewTeachers' },
