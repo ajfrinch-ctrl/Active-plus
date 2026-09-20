@@ -88,6 +88,7 @@
       import { signIn, homeFor, currentSession, handoffUrl } from './js/auth.js';
       import { orgInfo } from './js/data.js';
       import { mountInstallButton } from './js/install.js';
+      import { mountExitGuard } from './js/back-button.js';
 
       const ALLOWED_PAGES = ['student.html', 'teacher.html', 'admin.html'];
 
@@ -173,6 +174,10 @@
       const boot = async () => {
         renderOrgLine();
         mountInstallButton('#install-btn');
+        /* The login page has no screens of its own, but Back must not close the
+           installed app by accident either: the first press warns, the second
+           one leaves. */
+        mountExitGuard({ toast: (message, kind, ms) => showToast(message, kind, ms) });
 
         const session = currentSession();
         if (session) {

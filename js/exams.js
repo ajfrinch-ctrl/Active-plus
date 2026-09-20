@@ -14,6 +14,7 @@ import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './a
 import { previewDocument } from './preview.js';
 import { renderQuestionPaperCanvases } from './docs.js';
 import { beepWarn5, beepWarn1, beepTimeUp, confettiBurst } from './student-prefs.js';
+import { attachBackButton, activeBackController } from './back-button.js';
 
 // Spec 51: never report a saved record that could not be saved.
 const onlineFor = (action) => requireOnline(action, getDbStatus);
@@ -400,13 +401,28 @@ export function renderStudentSuggestions(selector, className) {
     : '<div class="empty-state">আপনার ক্লাসের কোনো সাজেশন নেই।</div>';
 }
 
-export function mountExamTaker({ listSelector, student }) {
+export function mountExamTaker({ listSelector, student, onScreenChange = null }) {
   const list = document.querySelector(listSelector);
   const player = document.getElementById('exam-player');
+  /**
+   * Tells the portal which screen of the exam flow is showing, so the phone's
+   * Back button can treat the running paper (and a review sheet) as a step of
+   * its own: Back returns to the exam list instead of closing the app.
+   */
+  const tellScreen = (screen, examId = null) => {
+    if (typeof onScreenChange !== 'function') return;
+    try { onScreenChange({ screen, examId }); } catch (e) { console.error('[Active Plus] exam screen hook:', e); }
+  };
+  /** The portal's ← behaviour for the paper's own "ফিরে যান" button. */
+  const wireBack = (el, shortPress) => attachBackButton(el, {
+    onShort: shortPress,
+    onHold: () => activeBackController()?.exit()
+  });
   /* Digits follow the student's Settings → সংখ্যা preference (toBnDigits). */
   const bn = toBnDigits;
   let ticker = null;
   let onScreen = false;
+  let onScreenExamId = null;   // the paper/review currently painted in the player
 
   /* ------------------------------------------------------------------ */
   /* The running paper is remembered per student+exam, so closing the tab */
@@ -435,11 +451,15 @@ export function mountExamTaker({ listSelector, student }) {
   const showList = (message, type = 'warning') => {
     stopTimer();
     onScreen = false;
+    onScreenExamId = null;
     player.hidden = true;
     player.innerHTML = '';
     list.hidden = false;
     if (message) showToast(message, type);
     render();
+    /* The exam list is showing again: the paper's Back step is given up. The
+       portal ignores this while no paper step is on the stack. */
+    tellScreen('list');
   };
 
   /** '২৯:৫৮' left on a sitting that is already running, or '' when none is. */
@@ -504,6 +524,7 @@ export function mountExamTaker({ listSelector, student }) {
     const answers = Array.isArray(result.answers) ? result.answers : null;
     const pct = result.total ? Math.round((result.score / result.total) * 100) : 0;
     onScreen = true;
+    onScreenExamId = examId;
     list.hidden = true;
     player.hidden = false;
     player.innerHTML = `
@@ -517,7 +538,8 @@ export function mountExamTaker({ listSelector, student }) {
         <div class="mini-body">${reviewHtml(exam, answers)}</div></details>`
         : '<div class="alert alert-info">এই পরীক্ষার উত্তরগুলো সংরক্ষিত হয়নি — শুধু ফলাফল আছে।</div>'}
       <button type="button" class="btn btn-block" id="back-to-exams">ফিরে যান</button>`;
-    player.querySelector('#back-to-exams').addEventListener('click', () => showList('', 'info'));
+    wireBack(player.querySelector('#back-to-exams'), () => showList('', 'info'));
+    tellScreen('review', examId);
   }
 
   list.addEventListener('click', (e) => {
@@ -567,8 +589,10 @@ export function mountExamTaker({ listSelector, student }) {
     const answers = saved?.answers || {};
 
     onScreen = true;
+    onScreenExamId = examId;
     list.hidden = true;
     player.hidden = false;
+    tellScreen('paper', examId);
     /* Every question on one scrollable page: the palette dots stay as quick
        jumps (and as the answered checklist), the submit button is pinned to
        the bottom of the screen so it is never out of reach. */
@@ -697,7 +721,7 @@ export function mountExamTaker({ listSelector, student }) {
           <div class="mini-body">${reviewHtml(exam, chosen)}</div>
         </details>
         <button type="button" class="btn btn-block" id="back-to-exams">ফিরে যান</button>`;
-      player.querySelector('#back-to-exams').addEventListener('click', () => showList('', 'info'));
+      wireBack(player.querySelector('#back-to-exams'), () => showList('', 'info'));
       /* A pass deserves confetti; a timed-out paper just gets the calm tone. */
       if (auto) beepTimeUp();
       else if (pct >= 50) confettiBurst(player);
@@ -771,6 +795,32 @@ export function mountExamTaker({ listSelector, student }) {
     if (target) takeExam(target);
   };
   render.stop = stopTimer;
+  /**
+   * Back to the exam list — the phone's Back button uses this when the running
+   * paper (or a review sheet) is the step being given up. A paper left half-way
+   * is still saved on the device, so the student is told how to sit it again
+   * instead of wondering where their answers went.
+   */
+  render.toList = () => {
+    if (onScreen) {
+      const saved = onScreenExamId ? loadSession(onScreenExamId) : null;
+      const resumable = Boolean(saved && saved.deadline && saved.deadline - Date.now() > 0);
+      showList(
+        resumable ? 'পরীক্ষা ছেড়ে বেরিয়েছেন — উত্তরপত্র সংরক্ষিত আছে। তালিকা থেকে “চালিয়ে যান” চেপে আবার বসুন।' : '',
+        'info'
+      );
+      return;
+    }
+    /* A submitted result may still be painted in the player — put it away so
+       the list is really what the student sees after the Back press. */
+    if (!player.hidden) {
+      stopTimer();
+      player.hidden = true;
+      player.innerHTML = '';
+      list.hidden = false;
+    }
+    render();
+  };
   // The Result view can open a past paper's review through this.
   render.review = (examId) => showReview(examId);
   return render;

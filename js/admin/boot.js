@@ -12,6 +12,7 @@
       import { mountCrud } from '../crud.js';
       import { initAdminHome } from '../admin-home.js';
       import { mountInstallButton } from '../install.js';
+      import { registerOverlay, noteOverlayOpened, noteOverlayClosed } from '../back-button.js';
       import { listUsers, seedUsers } from '../auth.js';
       import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, dueMonthKey, sharedNotices, receivePayment, receiveStudentPayments, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan, formatBnDate, parseBnDateInput, toAsciiDate, formatBnDateTime } from '../data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from '../exams.js';
@@ -1395,12 +1396,21 @@ export async function bootAdminPanel() {
         if (!profileMenu || profileMenu.hidden) return;
         profileMenu.hidden = true;
         profileBtn?.setAttribute('aria-expanded', 'false');
+        // The Back step the dropdown took is given back, however it closed.
+        noteOverlayClosed();
       };
       profileBtn?.addEventListener('click', (event) => {
         event.stopPropagation();
         const willOpen = profileMenu.hidden;
         profileMenu.hidden = !willOpen;
         profileBtn.setAttribute('aria-expanded', String(willOpen));
+        // The phone's Back closes the open menu before it leaves the panel.
+        if (willOpen) noteOverlayOpened();
+      });
+      // The dropdown is not a .modal-overlay, so it registers as its own layer.
+      registerOverlay({
+        isOpen: () => Boolean(profileMenu && !profileMenu.hidden),
+        close: () => { closeProfileMenu(); return true; }
       });
       document.addEventListener('click', (event) => {
         if (!profileMenu || profileMenu.hidden) return;
