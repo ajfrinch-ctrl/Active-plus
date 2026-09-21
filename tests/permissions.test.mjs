@@ -1,6 +1,9 @@
 /**
  * Role permissions must be enforced at the data layer, not just hidden in the
  * UI (spec 46 + 61). These tests call the real helpers directly.
+ *
+ * js/data.js seeds an EMPTY store, so these tests load js/demo-data.js
+ * (`loadDemoData()`) whenever they need a real row to point at.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,6 +13,7 @@ import {
   teacherProfile, teacherStudents, teacherMaterials, teacherExams,
   checkSubmission, submitAssignment, getDbStatus, _setRemoteTransport
 } from '../js/data.js';
+import { loadDemoData } from '../js/demo-data.js';
 
 const TEACHER = { role: 'teacher', name: 'রাহেলা আক্তার' };
 const ADMIN = { role: 'admin', name: 'অ্যাডমিন' };
@@ -58,6 +62,10 @@ test('assertCan throws a clear, non-technical error when denied', () => {
 });
 
 test('a teacher only reaches the classes assigned to them', () => {
+  // Which classes a teacher owns is a row in the store, so the demo teachers
+  // have to be there before the helper can answer.
+  _clearMemoryStore();
+  loadDemoData();
   const mine = teacherProfile(TEACHER.name).classNames;
   assert.ok(mine.includes('নবম'), 'assigned class');
   assert.equal(teacherCanAccessClass(TEACHER, 'নবম'), true);
@@ -76,6 +84,7 @@ test('teacher data helpers never return rows from other classes', () => {
 
 test('checking a submission records marks and feedback', () => {
   _clearMemoryStore();
+  loadDemoData();
   const student = db.students.find('2026-09-001');
   const asg = db.assignments.find('asg-1');
   submitAssignment(asg, student, 'কাজ শেষ');
@@ -100,6 +109,7 @@ test('database status never exposes credentials', () => {
 
 test('database status reports a failed sync honestly', () => {
   _clearMemoryStore();
+  loadDemoData();
   _setRemoteTransport(() => { throw new Error('offline'); });
   db.settings.update({ orgName: 'Active Plus' });
   const status = getDbStatus();

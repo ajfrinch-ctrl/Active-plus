@@ -2,10 +2,14 @@
  * The exam system: the paste template that turns a copied paper into ready
  * MCQs, the running paper with its countdown, and the one Bengali date format
  * the whole app is required to print.
+ *
+ * js/data.js seeds an EMPTY store, so these tests load js/demo-data.js
+ * (`loadDemoData()`) whenever they need a real row to point at.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { loadDemoData } from '../js/demo-data.js';
 
 function installDom(html) {
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
@@ -203,6 +207,7 @@ test('mountExamAuthoring turns a pasted paper into a published exam', async () =
     </div></div>`);
   const doc = dom.window.document;
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamAuthoring } = await import('../js/exams.js');
 
@@ -287,6 +292,7 @@ test('the exam template can be inserted, copied and downloaded', async () => {
     </form></div></div>`);
   const doc = dom.window.document;
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamAuthoring } = await import('../js/exams.js');
 
@@ -338,6 +344,7 @@ test('an incomplete paste is reported instead of saved', async () => {
     </form></div></div>`);
   const doc = dom.window.document;
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamAuthoring } = await import('../js/exams.js');
   mountExamAuthoring({ session: { role: 'admin', name: 'অ্যাডমিন' } });
@@ -362,6 +369,7 @@ test('the paper shows a countdown and submits itself when time is up', async () 
   const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
   const doc = dom.window.document;
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamTaker } = await import('../js/exams.js');
 
@@ -401,6 +409,7 @@ test('a fresh sitting keeps its own deadline and grades the answers given', asyn
   const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
   const doc = dom.window.document;
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamTaker } = await import('../js/exams.js');
 
@@ -447,6 +456,7 @@ test('a wrong answer is shown against the right one in the review', async () => 
   const dom = installDom('<div id="exam-list"></div><div id="exam-player" hidden></div>');
   const doc = dom.window.document;
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamTaker } = await import('../js/exams.js');
 

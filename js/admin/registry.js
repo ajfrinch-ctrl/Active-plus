@@ -70,7 +70,6 @@ export const ADMIN_SECTIONS = [
   { key: 'tips', icon: '💡', label: 'শিক্ষকের টিপ', en: 'Tips', group: 'comms', perm: 'manageNotices' },
 
   { key: 'users', icon: '🔐', label: 'ইউজার ও অনুমতি', en: 'Users & Roles', group: 'system', perm: 'manageUsers' },
-  { key: 'activity', icon: '🕘', label: 'অ্যাক্টিভিটি লগ', en: 'Activity Log', group: 'system' },
   { key: 'backup', icon: '💾', label: 'ব্যাকআপ ও রিস্টোর', en: 'Backup & Restore', group: 'system', perm: 'backup' },
   { key: 'settings', icon: '⚙️', label: 'সেটিংস', en: 'Settings', group: 'system', perm: 'manageSettings' },
   { key: 'profile', icon: '👤', label: 'অ্যাডমিন প্রোফাইল', en: 'Profile', group: 'system' }

@@ -4,10 +4,14 @@
  * back every string drawn and checks the paper says what a paper must say:
  * the institution pad, class/subject/time/marks, the Bengali date, every
  * question with its options — and no answer anywhere on the student's copy.
+ *
+ * js/data.js seeds an EMPTY store, so these tests load js/demo-data.js
+ * (`loadDemoData()`) whenever they need a real row to point at.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { loadDemoData } from '../js/demo-data.js';
 
 const RAW_DATE = /\d{4}-\d{2}-\d{2}(?!\d)|[০-৯]{4}-[০-৯]{2}-[০-৯]{2}(?![০-৯])/u;
 
@@ -69,6 +73,7 @@ const painted = (pages) => pages.map(text).join(' || ');
 test('the printed paper carries the pad, the heading and every question', async () => {
   const rec = installRecordingCanvas();
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const docs = await import('../js/docs.js');
 
@@ -116,6 +121,7 @@ test('the printed paper carries the pad, the heading and every question', async 
 test('the answer key is a separate sheet, marked for the teacher only', async () => {
   const rec = installRecordingCanvas();
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const docs = await import('../js/docs.js');
 
@@ -146,6 +152,7 @@ test('the answer key is a separate sheet, marked for the teacher only', async ()
 test('an empty exam still produces a usable sheet instead of throwing', async () => {
   const rec = installRecordingCanvas();
   (await import('../js/store.js'))._clearMemoryStore();
+  // deliberately NO demo rows: the whole point is a paper with nothing on it
   const data = await import('../js/data.js');
   const docs = await import('../js/docs.js');
 

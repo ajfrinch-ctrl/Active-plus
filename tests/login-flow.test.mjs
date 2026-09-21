@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM, VirtualConsole } from 'jsdom';
+import { loadDemo } from './helpers/demo.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
@@ -47,8 +48,10 @@ test('login from index.html hands off to the student home', async () => {
   const { dom, navigations } = makeDom('index.html', 'http://localhost:8080/index.html');
   bindGlobals(dom);
   (await import('../js/store.js'))._clearMemoryStore();
+  // Load the demo accounts so the ID typed below exists; the page's own boot
+  // keeps them (seedUsers() never overwrites accounts that are already there).
+  await loadDemo();
   const auth = await import('../js/auth.js');
-  await auth.seedUsers({ force: true });
 
   // run the page's real inline module
   const tmp = path.join(ROOT, '.boot-index.mjs');

@@ -7,11 +7,10 @@
  * All three reuse the shared toCSV()/downloadText() helpers, so the files
  * they produce are exactly what the rest of the app exports.
  */
-import { db, dueFees, toCSV, downloadText, logActivity } from '../data.js';
+import { db, dueFees, toCSV, downloadText } from '../data.js';
 import { showToast } from '../app.js';
 
-export function mountAdminExports(session) {
-  const who = { user: session?.name || 'admin', role: session?.role || 'admin' };
+export function mountAdminExports() {
   const stamp = () => new Date().toISOString().slice(0, 10);
 
   const studentsBtn = document.getElementById('students-csv');
@@ -30,7 +29,6 @@ export function mountAdminExports(session) {
       { label: 'অবস্থা', key: 'status' }
     ], rows);
     downloadText(`students-${stamp()}.csv`, csv, 'text/csv');
-    logActivity({ ...who, action: 'exported students CSV', target: `${rows.length} rows` });
     showToast('শিক্ষার্থী তালিকা (CSV) ডাউনলোড হয়েছে।', 'success');
   });
 
@@ -53,7 +51,6 @@ export function mountAdminExports(session) {
       { label: 'অবস্থা', key: 'status' }
     ], rows);
     downloadText(`dues-${stamp()}.csv`, csv, 'text/csv');
-    logActivity({ ...who, action: 'exported dues CSV', target: `${rows.length} rows` });
     showToast('বকেয়া তালিকা (CSV) ডাউনলোড হয়েছে।', 'success');
   });
 
@@ -81,7 +78,6 @@ export function mountAdminExports(session) {
       { label: 'মাধ্যম', key: 'method' }
     ], rows);
     downloadText(`payments-${stamp()}.csv`, csv, 'text/csv');
-    logActivity({ ...who, action: 'exported payments CSV', target: `${rows.length} rows` });
     showToast('পেমেন্ট তালিকা (CSV) ডাউনলোড হয়েছে।', 'success');
   });
 }

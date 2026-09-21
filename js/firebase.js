@@ -170,8 +170,7 @@ const dbRefs = {
   attendance: 'attendance',
   fees: 'fees',
   results: 'results',
-  notices: 'notices',
-  activityLogs: 'activityLogs'
+  notices: 'notices'
 };
 
 function ref(path) {
@@ -224,20 +223,6 @@ function setUserRole(role) {
 }
 function getUserRole() {
   try { return storage()?.getItem('activeplus_role'); } catch (e) { return null; }
-}
-
-/* ------------------------------------------------------------------ */
-/* Activity log (best effort)                                          */
-/* ------------------------------------------------------------------ */
-function addActivityLog(action, module = 'system') {
-  const db = getDatabase();
-  if (!db) return Promise.resolve(null);
-  const user = getCurrentUser();
-  const uid = user?.uid || 'anonymous';
-  const role = getUserRole() || 'student';
-  return db.ref(dbRefs.activityLogs)
-    .push({ userId: uid, userRole: role, action, module, timestamp: new Date().toISOString() })
-    .catch(() => null);
 }
 
 /* ------------------------------------------------------------------ */
@@ -298,6 +283,5 @@ export {
   clearUserSession,
   setUserRole,
   getUserRole,
-  addActivityLog,
   showToast
 };

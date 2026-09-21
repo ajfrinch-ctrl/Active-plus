@@ -8,6 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { loadDemoData } from '../js/demo-data.js';
 
 function installDom(html) {
   const dom = new JSDOM(`<!doctype html><html><body>${html}</body></html>`, {
@@ -33,6 +34,7 @@ const BN_TIME = /^⏱ [০-৯]{2}:[০-৯]{2}$/;
 async function openExam(dom, studentId) {
   const store = await import('../js/store.js');
   store._clearMemoryStore();
+  loadDemoData(); // the store ships empty; the papers under test come from the fixture
   const data = await import('../js/data.js');
   const { mountExamTaker } = await import('../js/exams.js');
   const student = data.db.students.find(studentId);
@@ -127,6 +129,7 @@ test('an interrupted sitting is offered as চালিয়ে যান with 
   // The paper is already running when the student comes back to this screen.
   const store = await import('../js/store.js');
   store._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const { mountExamTaker } = await import('../js/exams.js');
   const student = data.db.students.find('2026-09-001');

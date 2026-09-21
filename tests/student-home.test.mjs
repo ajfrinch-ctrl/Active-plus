@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { loadDemo } from './helpers/demo.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
@@ -26,8 +27,10 @@ async function bootHome() {
   globalThis.CustomEvent = dom.window.CustomEvent;
   globalThis.MouseEvent = dom.window.MouseEvent;
   (await import('../js/store.js'))._clearMemoryStore();
+  // The app ships empty, so this file's "student with a life" is the demo
+  // institute: its records plus the student account the home signs into.
+  await loadDemo();
   const auth = await import('../js/auth.js');
-  await auth.seedUsers({ force: true });
   await auth.signIn('2026-09-001', 'Student@123', 'student');
   // Same specifier the page uses, so the test mutates the very instance the home reads.
   const data = await import('../js/data.js');
@@ -550,8 +553,10 @@ test('the student home registers the service worker (PWA install/offline)', asyn
   globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
   (await import('../js/store.js'))._clearMemoryStore();
+  // The app ships empty, so this file's "student with a life" is the demo
+  // institute: its records plus the student account the home signs into.
+  await loadDemo();
   const auth = await import('../js/auth.js');
-  await auth.seedUsers({ force: true });
   await auth.signIn('2026-09-001', 'Student@123', 'student');
   const mod = await import('../js/student-home.js');
   mod.initStudentHome();
@@ -758,10 +763,11 @@ test('a signed-in student with no profile row still gets a usable home', async (
   globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
 
   (await import('../js/store.js'))._clearMemoryStore();
+  // A login with nothing behind it (the first sign-in before admin has added
+  // the profile row): the fixture opens the account, the record is then removed.
+  await loadDemo();
   const auth = await import('../js/auth.js');
-  await auth.seedUsers({ force: true });
   const data = await import('../js/data.js');
-  // remove the student record but keep the login (first cloud login scenario)
   data.db.students.remove('2026-09-001');
   await auth.signIn('2026-09-001', 'Student@123', 'student');
 

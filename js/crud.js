@@ -1,12 +1,12 @@
 /**
  * Generic CRUD engine — one consistent, mobile-friendly list + modal used by
  * every admin module (classes, subjects, materials, assignments, routine…).
- * Handles search, validation, duplicate-ID guards, delete confirmation and
- * activity logging so each module stays tiny.
+ * Handles search, validation, duplicate-ID guards and delete confirmation,
+ * so each module stays tiny.
  */
 
 import {
-  db, logActivity, newId, getDbStatus, formatBnDate, parseBnDateInput, looksLikeDate, BN_DATE_PLACEHOLDER
+  db, newId, getDbStatus, formatBnDate, parseBnDateInput, looksLikeDate, BN_DATE_PLACEHOLDER
 } from './data.js';
 import { escapeHtml, openModal, closeModal, showToast, requireOnline } from './app.js';
 
@@ -44,7 +44,7 @@ export function mountCrud(cfg) {
   const {
     container, collection, keyField = 'id', singular = 'রেকর্ড',
     columns, fields, searchKeys = [], idPrefix = 'rec',
-    buildRecord = (form) => form, searchPlaceholder = 'খুঁজুন…', session
+    buildRecord = (form) => form, searchPlaceholder = 'খুঁজুন…'
   } = cfg;
 
   const host = document.getElementById(container);
@@ -152,7 +152,6 @@ export function mountCrud(cfg) {
       const msg = `"${label}" ${singular} মুছে ফেলতে চান?\n\nএই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।`;
       if (window.confirm(msg)) {
         collectionApi.remove(key);
-        logActivity({ user: session?.name, role: session?.role, action: 'deleted', target: `${singular} ${key}` });
         showToast(`${singular} মুছে ফেলা হয়েছে।`, 'warning');
         render();
       }
@@ -196,13 +195,11 @@ export function mountCrud(cfg) {
 
     if (editKey) {
       collectionApi.update(editKey, record);
-      logActivity({ user: session?.name, role: session?.role, action: 'updated', target: `${singular} ${editKey}` });
       showToast(`${singular} আপডেট হয়েছে।`, 'success');
     } else {
       const key = record[keyField] || newId(idPrefix);
       if (collectionApi.find(key)) { showToast('এই আইডি আগে থেকেই আছে।', 'error'); return; }
       collectionApi.add({ [keyField]: key, ...record });
-      logActivity({ user: session?.name, role: session?.role, action: 'added', target: `${singular} ${key}` });
       showToast(`${singular} যোগ করা হয়েছে।`, 'success');
     }
     closeModal(modalId);

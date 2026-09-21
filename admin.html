@@ -67,7 +67,7 @@
           <div id="admin-search-results" class="admin-search-results" hidden role="listbox" aria-label="সার্চ ফলাফল"></div>
           <span class="sr-only" id="admin-search-status" role="status" aria-live="polite"></span>
         </div>
-        <button type="button" class="icon-btn notif-btn topbar-btn" id="admin-bell" data-tab="activity" aria-label="নোটিফিকেশন">🔔<span class="notif-badge" id="admin-bell-count" hidden>০</span></button>
+        <button type="button" class="icon-btn notif-btn topbar-btn" id="admin-bell" data-tab="notifications" aria-label="নোটিফিকেশন">🔔<span class="notif-badge" id="admin-bell-count" hidden>০</span></button>
         <button type="button" class="icon-btn topbar-btn" id="admin-profile-btn" aria-label="অ্যাডমিন প্রোফাইল" aria-haspopup="true" aria-expanded="false" title="অ্যাডমিন প্রোফাইল">👤</button>
         <div class="profile-menu" id="admin-profile-menu" hidden>
           <div class="pm-head">
@@ -412,8 +412,8 @@
           </div>
           <div class="card">
             <h3>ডেঞ্জার জোন</h3>
-            <p style="margin-bottom:.75rem">ডেমো ডেটা মুছে প্রথম অবস্থায় ফিরে যাবে।</p>
-            <button type="button" class="btn btn-error btn-block" id="reset-data">ডেটা রিসেট করুন</button>
+            <p style="margin-bottom:.75rem">শিক্ষার্থী, শিক্ষক, ফি, পরীক্ষা, নোটিশ — সংরক্ষিত সব রেকর্ড মুছে যাবে। প্রতিষ্ঠানের সেটিংস আর শ্রেণি-বিষয়ের তালিকা থাকবে। অ্যাপে ডেমো ডেটা নেই, তাই কিছুই নতুন করে ভরে আসবে না।</p>
+            <button type="button" class="btn btn-error btn-block" id="reset-data">সব ডেটা মুছে ফেলুন</button>
           </div>
         </section>
 
@@ -484,12 +484,35 @@
           <h2 class="section-title" style="margin-top:1rem">অনুমতি ম্যাট্রিক্স</h2>
           <div id="perm-matrix"></div>
           <button type="button" class="btn btn-block" id="perm-save" style="margin-top:.75rem">অনুমতি সংরক্ষণ</button>
-        </section>
 
-        <section class="tab-panel" id="tab-activity" hidden>
-          <h2 class="section-title">অ্যাক্টিভিটি লগ · Activity Log</h2>
-          <div class="form-group"><input id="activity-filter" class="form-input" placeholder="ফিল্টার করুন…" aria-label="কার্যক্রম ফিল্টার করুন"></div>
-          <div class="table-wrap"><table class="table" id="activity-table"><thead><tr></tr></thead><tbody></tbody></table></div>
+          <!-- Local-mode accounts. The app ships with the admin only, so a
+               teacher or a student signs in with an account opened here (in
+               Firebase mode, users are managed there instead). -->
+          <h2 class="section-title" style="margin-top:1rem">লোকাল অ্যাকাউন্ট · Local Accounts</h2>
+          <form id="account-form" class="card" autocomplete="off">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="account-username">ইউজারনেইম / স্টুডেন্ট আইডি *</label>
+                <input id="account-username" name="username" class="form-input" required
+                  placeholder="যেমন: sir@school.edu বা ২৬০৯০০১" autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label for="account-role">রোল</label>
+                <select id="account-role" name="role" class="form-input form-select">
+                  <option value="teacher">শিক্ষক · Teacher</option>
+                  <option value="student">শিক্ষার্থী · Student</option>
+                  <option value="admin">অ্যাডমিন · Admin</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="account-name">নাম</label><input id="account-name" name="name" class="form-input" placeholder="যেমন: রফিকুল ইসলাম" autocomplete="off"></div>
+              <div class="form-group"><label for="account-detail">বিবরণ (ঐচ্ছিক)</label><input id="account-detail" name="detail" class="form-input" placeholder="যেমন: গণিত · নবম" autocomplete="off"></div>
+            </div>
+            <div class="form-group"><label for="account-password">পাসওয়ার্ড * (কমপক্ষে ৬ অক্ষর)</label><input id="account-password" name="password" type="password" class="form-input" required minlength="6" autocomplete="new-password"></div>
+            <p class="form-hint">শিক্ষার্থীর অ্যাকাউন্ট তার ভর্তি আইডি দিয়েই খুলুন — সেই আইডি দিয়েই সে নিজের পোর্টালে ঢুকবে।</p>
+            <button type="submit" class="btn btn-block">অ্যাকাউন্ট খুলুন</button>
+          </form>
         </section>
 
         <section class="tab-panel" id="tab-backup" hidden>

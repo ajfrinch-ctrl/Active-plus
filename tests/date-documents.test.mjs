@@ -3,10 +3,14 @@
  * hands out as a document. The reports, receipts, ID cards and ledgers are
  * painted onto canvases, so this test records every string the painters draw
  * and fails on any raw date ('2026-09-16', '১৬/০৯/২০২৬') among them.
+ *
+ * js/data.js seeds an EMPTY store, so these tests load js/demo-data.js
+ * (`loadDemoData()`) whenever they need a real row to point at.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { loadDemoData } from '../js/demo-data.js';
 
 const RAW_DATE = new RegExp([
   String.raw`\d{4}-\d{2}-\d{2}(?!\d)`,
@@ -58,6 +62,7 @@ function installRecordingCanvas() {
 test('the receipt and reports print the Bengali long date, never a raw one', async () => {
   const drawn = installRecordingCanvas();
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const docs = await import('../js/docs.js');
 
@@ -84,6 +89,7 @@ test('the receipt and reports print the Bengali long date, never a raw one', asy
 test('the receipt HTML and the report HTML use the same Bengali date', async () => {
   installRecordingCanvas();
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
   const docs = await import('../js/docs.js');
 
@@ -108,6 +114,7 @@ test('the receipt HTML and the report HTML use the same Bengali date', async () 
 test('recent activity and exam windows speak the same date', async () => {
   installRecordingCanvas();
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const data = await import('../js/data.js');
 
   const activity = data.recentActivity(20).map((item) => `${item.text} ${item.meta}`).join(' | ');

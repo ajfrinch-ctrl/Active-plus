@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { loadDemo } from './helpers/demo.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (file) => readFileSync(path.join(ROOT, file), 'utf8');
@@ -63,7 +64,7 @@ test('js/firebase.js exposes the named exports the pages import', async () => {
     'initFirebase', 'isFirebaseConfigured', 'getAuthMode', 'checkConnectionStatus',
     'isAuthenticated', 'signInWithEmailAndPassword', 'signOut',
     'showToast', 'generateStudentId', 'validateStudentId',
-    'setUserRole', 'getUserRole', 'addActivityLog'
+    'setUserRole', 'getUserRole'
   ]) {
     assert.equal(typeof fb[name], 'function', `missing export: ${name}`);
   }
@@ -87,6 +88,8 @@ test('local sign-in: valid, wrong password, and auto-detected role', async () =>
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
   await import('../js/firebase.js');
+  // Accounts the app no longer ships with: the test fixture opens them.
+  await loadDemo();
   // Fresh module instance per scenario (mirrors a fresh browser page load).
   const auth = await import('../js/auth.js?suite=signin');
 
@@ -116,6 +119,7 @@ test('requireRole guards: guest redirected, right role passes, wrong role bounce
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
   await import('../js/firebase.js');
+  await loadDemo();
   const auth = await import('../js/auth.js?suite=guard');
 
   // Guest on student.html -> redirected to the login page with ?next.
@@ -140,6 +144,7 @@ test('every portal is reachable only by its own role (spec 56)', async () => {
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
   await import('../js/firebase.js');
+  await loadDemo();
   const auth = await import('../js/auth.js?suite=routing');
 
   const cases = [

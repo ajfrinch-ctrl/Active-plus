@@ -23,17 +23,32 @@ npm run icons
 
 Open `http://localhost:8080` and log in.
 
-## Demo accounts (local mode)
+## First run (local mode)
 
-| Role     | Username             | Password      |
-| -------- | -------------------- | ------------- |
-| Student  | `2026-09-001`        | `Student@123` |
-| Teacher  | `teacher@activeplus.edu` | `Teacher@123` |
-| Admin    | `admin@activeplus.edu`   | `Admin@123`   |
+The app starts **empty**. A brand-new store holds the institute itself — its
+settings (name, address, mobile, monthly fee, pass mark, academic year, which
+home cards are on) — plus the class list and the subject list. No sample
+students, no fake notices, no invented exam results: every row a portal shows is
+real from the first login. `Admin → সেটিংস → ডেটা রিসেট করুন` goes back to that
+same state (records cleared, settings and the class/subject lists kept).
 
-These accounts are seeded in local mode, so the app can always be signed into
-even before Firebase is configured — they are deliberately not printed on the
-login screen.
+Local mode creates one sign-in on first load, and never prints it on the login
+screen:
+
+| Role  | Username               | Password    |
+| ----- | ---------------------- | ----------- |
+| Admin | `admin@activeplus.edu` | `Admin@123` |
+
+A teacher's or a student's account is opened by that admin —
+**Admin → ইউজার ও অনুমতি → লোকাল অ্যাকাউন্ট**. A student signs in with their
+admission ID, so open the account with that ID (`2609001`, not an email). With
+Firebase configured, users come from Firebase Authentication instead and the
+form refuses to write (it says so, rather than making a local account nobody can
+use).
+
+There is **no demo data to load.** The sample institute the test suite needs
+lives in `js/demo-data.js` and is pulled in only by `tests/helpers/demo.mjs`;
+`tests/local-accounts.test.mjs` fails if any page or module ever imports it.
 
 There is **one login form for everyone** — no role picker. `signIn()` detects
 the user type from the account itself and the app routes to the matching
@@ -44,8 +59,9 @@ portal (শিক্ষার্থী → `student.html`, শিক্ষক �
 
 - **Student** — a unique ID is generated automatically on admission as
   `YY + class-number + serial`, e.g. a 2026 admission to নবম (class 09) with
-  the 1st serial becomes `2609001`; the next becomes `2609002` and so on. The
-  legacy demo ID `2026-09-001` still signs in.
+  the 1st serial becomes `2609001`; the next becomes `2609002` and so on. That
+  ID is also the student's username: the admin opens the account with it, and
+  the student logs in with it.
 - **Teacher** — auto-generated from the first word of the name plus the last
   two digits of the mobile number, e.g. `রাহেলা আক্তার` + mobile ending `১১`
   → `রাহেলা১১`. If that would collide, a numeric suffix is appended.
@@ -178,7 +194,7 @@ admin.html          admin panel (v2) — light-themed dashboard (quick actions,
                     teachers, classes, batches, subjects, exams, question
                     bank, materials, assignments, submissions, routine,
                     results, fees & payments, notices, notifications, the
-                    report centre, users & permissions, activity log,
+                    report centre, users & permissions,
                     institute profile settings, backup/restore (incl.
                     scheduled auto-backup) and Student App Control. Hybrid
                     navigation: grouped bilingual sidebar on desktop, bottom
@@ -203,7 +219,7 @@ js/teacher-home.js  the teacher Home: today's teaching hero, feature grid,
 js/admin-home.js    the admin dashboard: quick actions first, overview,
                     dues alert, institute card, feature folds
 js/admin-modules.js admin widgets: question bank, report centre,
-                    users + permission matrix, activity log, backup;
+                    users + permission matrix, backup;
                     re-exports bootAdminPanel for the page shell
 js/admin/           Admin Panel v2 components:
                       boot.js      the page's complete wiring (extracted
@@ -443,9 +459,16 @@ Beyond CRUD for every collection, the panel includes:
   sheet also carry a "হোয়াটসঅ্যাপে পাঠান" button (uses the `wa.me` deep link,
   no API key/backend).
 - **Users & permissions** — a 24-key permission matrix per role.
-- **Activity log** — who did what, when. Ordinary users cannot delete entries.
 - **Backup / restore** — export and import with validation and an explicit
   confirmation, never a silent overwrite.
+
+The **অ্যাক্টিভিটি লগ · Activity Log** was removed completely (২০২৬-০৯): no
+section, no `activityLogs` collection, no `logActivity()` writer, no Firebase
+path and no Realtime Database rule — nothing about an admin's or a teacher's
+edits is recorded any more. The 🔔 in the admin top bar, which used to open the
+log, now opens **নোটিফিকেশন** and counts the notifications published since the
+admin last looked (the "seen" mark lives in this device's `localStorage`, so
+reading it there never marks a teacher's or a student's notification as read).
 
 ### Permission model
 
@@ -477,9 +500,9 @@ identity is written and edited:
 
 `orgInfo()` / `saveOrgInfo()` in `js/data.js` own these four values: the form
 saves nothing unless every field passes, the failure is reported per field in
-Bengali (message under the form, red outline on the offending input, toast),
-and every accepted edit is written to the activity log. A live letterhead
-preview under the fields mirrors what a document will print as the admin types.
+Bengali (message under the form, red outline on the offending input, toast).
+A live letterhead preview under the fields mirrors what a document will print
+as the admin types.
 
 The saved profile is then reused everywhere the institute appears — the print
 letterhead (`ph-org` / `ph-addr` / `ph-contact`), receipts, reports, admission
@@ -511,7 +534,14 @@ to check with feedback.
 
 ### Tests
 
-`npm test` runs 252 Node tests: data-layer helpers, the permission matrix, the
+Tests get their sample records from `js/demo-data.js` through
+`tests/helpers/demo.mjs` (`loadDemoData()` for the rows, `loadDemo()` when a
+portal also has to sign in) — the app itself boots empty, so the fixture is
+always an explicit choice. `tests/data.test.mjs` pins that empty start, and
+`tests/local-accounts.test.mjs` the account rules: one admin from the installer,
+everything else opened by that admin from the panel.
+
+`npm test` runs 263 Node tests: data-layer helpers, the permission matrix, the
 student Home rendered in jsdom (every card, empty states, and a dead-button
 sweep that clicks every interactive element), real boots of the admin and
 teacher portals, every report card (preview, PDF and Excel download, class

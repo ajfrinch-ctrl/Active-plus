@@ -3,6 +3,9 @@
  * dependency-free PDF/image utilities (js/pdf.js). These run in Node with no
  * DOM: the builders must produce clean HTML that never leaks the application
  * UI, and the hand-written PDF must be structurally valid.
+ *
+ * js/data.js seeds an EMPTY store, so these tests load js/demo-data.js
+ * (`loadDemoData()`) whenever they need a real row to point at.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +16,7 @@ import {
 } from '../js/docs.js';
 import { buildPdf } from '../js/pdf.js';
 import { db, dueFees, receivePayment, CLASS_OPTIONS, ALL_CLASSES } from '../js/data.js';
+import { loadDemoData } from '../js/demo-data.js';
 
 const strip = (html) => String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -66,6 +70,7 @@ test('buildReportHtml is a clean standalone document with no app UI', () => {
 
 test('buildReceiptHtml shows every required field and stays clean', () => {
   _clearMemoryStore();
+  loadDemoData();
   const fee = dueFees()[0];
   assert.ok(fee, 'seed has a due fee');
   const result = receivePayment(fee.id, 'অ্যাডমিন');
@@ -106,6 +111,7 @@ test('buildReceiptHtml shows every required field and stays clean', () => {
 
 test('receiptSummary computes previous due, paid and remaining from the store', () => {
   _clearMemoryStore();
+  loadDemoData();
   const fee = dueFees()[0];
   const result = receivePayment(fee.id, 'অ্যাডমিন');
   const pay = db.payments.find(result.payment.id);

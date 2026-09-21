@@ -118,14 +118,6 @@
       ".read": "auth !== null",
       ".write": "root.child('roles/' + auth.uid + '/role').val() === 'admin'"
     },
-    "activityLogs": {
-      ".read": "root.child('roles/' + auth.uid + '/role').val() === 'admin'",
-      ".write": "auth !== null",
-      "$logId": {
-        ".comment": "Ordinary users may add or edit their own entry but never delete logs.",
-        ".write": "auth !== null && (root.child('roles/' + auth.uid + '/role').val() === 'admin' || newData.exists())"
-      }
-    },
     "studyActivity": {
       "$studentId": {
         ".read": "auth !== null && (auth.uid === data.child('uid').val() || root.child('roles/' + auth.uid + '/role').val() !== 'student')",

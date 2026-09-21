@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
+import { loadDemo } from './demo.mjs';
 
 export const ROOT = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 export const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
@@ -56,8 +57,10 @@ export async function bootPortal(page, {
   globalThis.Blob = dom.window.Blob;
 
   (await import(new URL('../../js/store.js', import.meta.url).href))._clearMemoryStore();
+  // The store ships empty, so the demo institute (and its three accounts) is
+  // loaded before the page boots — js/demo-data.js, test-only by design.
+  await loadDemo();
   const auth = await import(new URL('../../js/auth.js', import.meta.url).href);
-  await auth.seedUsers({ force: true });
   await auth.signIn(username, password, role);
   beforeBoot(dom);
 

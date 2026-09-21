@@ -51,6 +51,10 @@ test('login + redirect work even when localStorage is completely blocked', async
   /* ---- Page load 1: the login page ---- */
   makeWindow({ pathname: '/index.html' });
   _clearMemoryStore(); // a real browser starts each page load with a fresh realm
+  // The demo accounts come from the test fixture (the app ships with one
+  // admin); with storage blocked they live only in store.js's memory map.
+  const { loadDemo } = await import('./helpers/demo.mjs');
+  await loadDemo();
   const auth1 = await import('../js/auth.js?load=1');
   await import('../js/firebase.js');
 

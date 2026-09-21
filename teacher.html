@@ -451,7 +451,7 @@
       import { initApp, activeTabs, renderTable, statGrid, escapeHtml, safeUrl, openModal, closeModal, showToast, requireOnline } from './js/app.js';
       import { db, newId, todayBn, teacherProfile, teacherStudents, teacherMaterials, teacherExams,
         teacherPendingResults, teacherPendingAssignments, submissionsFor, submitAssignment,
-        checkSubmission, assignmentStatus, logActivity, timeAgo, CLASS_OPTIONS,
+        checkSubmission, assignmentStatus, timeAgo, CLASS_OPTIONS,
         can, assertCan, teacherCanAccessClass, parseMcqPaste, parseMcqCsv,
         downloadText, PERMISSIONS, teacherUnreadCount, markTeacherNotificationsRead, getDbStatus,
         sharedNotices, formatBnDate, parseBnDateInput, formatBnDateTime } from './js/data.js';
@@ -549,7 +549,6 @@
           const existing = attendanceFor(student.id);
           if (existing) db.attendance.update((a) => a === existing, { status });
           else db.attendance.add({ id: newId('att'), studentId: student.id, date: todayBn(), status });
-          logActivity({ user: session.name, role: session.role, action: present ? 'marked present' : 'marked absent', target: student.id });
           renderPicker();
           showToast(`${student.name} — ${status}`, present ? 'success' : 'warning');
         });
@@ -614,7 +613,6 @@
           catch (err) { showToast(err.message, 'error'); return; }
           if (window.confirm('নোটিশটি মুছে ফেলবেন?')) {
             db.notices.remove(id);
-            logActivity({ user: session.name, role: session.role, action: 'deleted notice', target: id });
             renderNotices();
             showToast('নোটিশ মুছে ফেলা হয়েছে।', 'warning');
           }
@@ -636,7 +634,6 @@
             showToast('অনুমোদিত ক্লাস নয়।', 'error'); return;
           }
           db.notices.add({ id: newId('n'), title, audience: String(d.get('audience')), className: noticeClass, date: todayBn(), author: session.name });
-          logActivity({ user: session.name, role: session.role, action: 'published notice', target: title });
           closeModal('teacher-notice-modal');
           renderNotices();
           showToast('ক্লাস নোটিশ প্রকাশিত হয়েছে।', 'success');
@@ -682,7 +679,6 @@
             showToast('এই শিক্ষার্থী আপনার ক্লাসের নয়।', 'error'); return;
           }
           db.notifications.update(id, { reply, replyDate: todayBn(), read: false });
-          logActivity({ user: session.name, role: session.role, action: 'replied to query', target: id });
           renderQueries();
           showToast('উত্তর শিক্ষার্থীকে পাঠানো হয়েছে।', 'success');
         });
@@ -787,7 +783,6 @@
             id: newId('ntf'), title: `নতুন অ্যাসাইনমেন্ট: ${title}`, target: 'শিক্ষার্থী',
             className, date: todayBn(), createdAt: new Date().toISOString()
           });
-          logActivity({ user: session.name, role: 'teacher', action: 'created assignment', target: title });
           e.target.reset();
           renderSubmissions();
           showToast('অ্যাসাইনমেন্ট প্রকাশিত হয়েছে।', 'success');
@@ -826,7 +821,6 @@
           try { assertCan(session, 'manageAssignments', 'কাজ চেক করা'); }
           catch (err) { showToast(err.message, 'error'); return; }
           checkSubmission(form.dataset.checkForm, String(d.get('feedback') || ''), marks);
-          logActivity({ user: session.name, role: 'teacher', action: 'checked submission', target: form.dataset.checkForm });
           renderSubmissions();
           showToast('নম্বর সংরক্ষিত হয়েছে।', 'success');
         });
@@ -850,7 +844,6 @@
             chapter: String(d.get('chapter') || ''), description: String(d.get('description') || ''),
             link: String(d.get('link') || ''), teacher: session.name, date: todayBn()
           });
-          logActivity({ user: session.name, role: 'teacher', action: 'published material', target: title });
           e.target.reset();
           renderMaterials();
           showToast('ম্যাটেরিয়াল প্রকাশিত হয়েছে।', 'success');
@@ -900,7 +893,6 @@
             id: newId('ntf'), title: 'ফলাফল প্রকাশিত হয়েছে', target: 'শিক্ষার্থী',
             className: db.exams.find(btn.dataset.publish)?.className, date: todayBn(), createdAt: new Date().toISOString()
           });
-          logActivity({ user: session.name, role: 'teacher', action: 'published results', target: btn.dataset.publish });
           renderResults();
           showToast('ফলাফল প্রকাশিত হয়েছে।', 'success');
         });
@@ -1020,7 +1012,6 @@
           const existing = new Set((exam.questions || []).map((q) => q.q.trim()));
           const fresh = tqbStaged.filter((q) => !existing.has(q.q.trim()));
           db.exams.update(exam.id, { questions: [...(exam.questions || []), ...fresh] });
-          logActivity({ user: session.name, role: 'teacher', action: 'imported questions', target: `${exam.title} (+${fresh.length})` });
           showToast(`${bn(fresh.length)}টি প্রশ্ন যোগ হয়েছে।`, 'success');
           tqbStaged = [];
           tqbRenderPreview(); tqbRenderList();
@@ -1037,7 +1028,6 @@
           const name = String(tsetName.value || '').trim();
           if (!name) { showToast('নাম লিখুন।', 'error'); return; }
           updateProfile({ name, detail: String(tsetDetail.value || '').trim() });
-          logActivity({ user: name, role: 'teacher', action: 'updated profile' });
           showToast('প্রোফাইল সংরক্ষিত হয়েছে।', 'success');
         });
         const permList = document.getElementById('teacher-perm-list');

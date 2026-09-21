@@ -13,8 +13,8 @@
       import { initAdminHome } from '../admin-home.js';
       import { mountInstallButton } from '../install.js';
       import { registerOverlay, noteOverlayOpened, noteOverlayClosed } from '../back-button.js';
-      import { listUsers, seedUsers } from '../auth.js';
-      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, dueMonthKey, sharedNotices, receivePayment, receiveStudentPayments, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, logActivity, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan, formatBnDate, parseBnDateInput, toAsciiDate, formatBnDateTime } from '../data.js';
+      import { seedUsers } from '../auth.js';
+      import { db, CLASS_OPTIONS, todayBn, newId, ALL_CLASSES, studentsOfClass, dueFees, dueRemaining, dueMonthKey, sharedNotices, receivePayment, receiveStudentPayments, adminAlerts, homeCards, setHomeCards, setHomeFeatures, performanceFor, getDbStatus, nextStudentId, nextTeacherId, nextReceiptNo, orgInfo, saveOrgInfo, assertCan, formatBnDate, parseBnDateInput, toAsciiDate, formatBnDateTime } from '../data.js';
       import { mountSuggestionAuthoring, mountExamAuthoring, setExamAuthor, classOptionsHtml } from '../exams.js';
       import { mountExtraAdmin } from '../admin-modules.js';
       import { shareReceiptAsImage, renderReceiptCanvas, receiptPreviewDoc, renderIdCardCanvas, renderLedgerCanvases, renderAdmissionFormCanvases, receiptPdfFileName } from '../docs.js';
@@ -74,7 +74,6 @@ export async function bootAdminPanel() {
         if (!waNumber(phone)) { showToast('মোবাইল নম্বর পাওয়া যায়নি।', 'error'); return; }
         const url = waLink(phone, admissionMessage(st));
         window.open(url, '_blank', 'noopener');
-        logActivity({ user: session.name, role: session.role, action: 'sent admission info via WhatsApp', target: `${st.id} ${st.name}` });
       };
 
       // Spec 51: never report a saved record that could not be saved.
@@ -473,7 +472,6 @@ export async function bootAdminPanel() {
             canvases,
             shareable: canvases.length === 1
           });
-          logActivity({ user: session.name, role: session.role, action: 'previewed admission form', target: `${st.id} ${st.name}` });
         } catch (e) {
           showToast('এডমিশন ফরম তৈরি করা যায়নি।', 'error');
         }
@@ -550,7 +548,6 @@ export async function bootAdminPanel() {
             canvases: [canvas],
             shareable: true
           });
-          logActivity({ user: session.name, role: session.role, action: 'previewed ID card', target: st.id });
         } catch (e) {
           showToast('আইডি কার্ড তৈরি করা যায়নি।', 'error');
         }
@@ -567,7 +564,6 @@ export async function bootAdminPanel() {
             canvases,
             shareable: canvases.length === 1
           });
-          logActivity({ user: session.name, role: session.role, action: 'previewed fee ledger', target: st.id });
         } catch (e) {
           showToast('লেজার তৈরি করা যায়নি।', 'error');
         }
@@ -934,7 +930,6 @@ export async function bootAdminPanel() {
             .reduce((sum, fee) => sum + fee.remaining, 0);
           showToast(`আংশিক পেমেন্ট সংরক্ষিত হয়েছে — এই শিক্ষার্থীর বাকি ৳${bn(leftOver)}।`, 'warning');
         }
-        logActivity({ user: session.name, role: session.role, action: 'recorded payment', target: `${studentId} ৳${amount} (${result.payments.length} মাস)` });
         closeModal('payment-modal');
         renderDues(); renderStudents(); renderOverview();
         showPaymentSuccess(result.payments.map((p) => p.id), result.total);
@@ -968,7 +963,6 @@ export async function bootAdminPanel() {
           const res = await shareReceiptAsImage(opts.pay, opts);
           if (res.shared) showToast('রিসিট ছবি শেয়ার করা হয়েছে।', 'success');
           else if (res.downloaded) showToast('রিসিট ছবি ডাউনলোড হয়েছে — WhatsApp থেকে শেয়ার করুন।', 'info');
-          logActivity({ user: session.name, role: session.role, action: 'shared receipt image', target: opts.pay.studentId });
         } catch (e) {
           if (!(e && e.name === 'AbortError')) showToast('রিসিট শেয়ার করা যায়নি।', 'error');
         }
@@ -1220,7 +1214,7 @@ export async function bootAdminPanel() {
           website: data.get('website'),
           footerText: data.get('footerText'),
           ...(logoToSave !== undefined ? { orgLogo: logoToSave } : {})
-        }, { user: session.name, role: session.role });
+        });
         if (!org.ok) {
           showOrgErrors(org.errors);
           showToast(org.errors[0].message, 'error');
@@ -1260,28 +1254,46 @@ export async function bootAdminPanel() {
       });
 
       document.getElementById('reset-data').addEventListener('click', () => {
-        if (window.confirm('সব ডেটা মুছে ডেমো অবস্থায় ফিরে যাবেন?')) {
+        // No demo data to return to: this empties every record collection and
+        // keeps only the institute's own settings.
+        if (window.confirm('শিক্ষার্থী, শিক্ষক, ফি, পরীক্ষা, নোটিশ — সব রেকর্ড মুছে যাবে। প্রতিষ্ঠানের সেটিংস ও শ্রেণি-বিষয়ের তালিকা থাকবে। মুছে ফেলবেন?')) {
           db.reset();
           renderAll();
-          showToast('ডেটা রিসেট হয়েছে।', 'warning');
+          showToast('সব ডেটা মুছে ফেলা হয়েছে।', 'warning');
         }
       });
 
       /* ------------------------------------------------------------ */
-      /* ---- Notification bell: unread admin alerts (spec 43) ---- */
-      const SEEN_KEY = 'activeplus_activity_seen';
+      /* ---- Notification bell: নোটিফিকেশন the admin has not seen ---- */
+      /*      (spec 43). Tapping it opens the নোটিফিকেশন panel. The      */
+      /*      "seen" mark is kept in this device's localStorage, so     */
+      /*      clearing the badge here never flips the shared `read`     */
+      /*      flag that the teacher's and the student's badges depend    */
+      /*      on.                                                         */
+      /* ------------------------------------------------------------ */
+      const SEEN_KEY = 'activeplus_notifs_seen';
+      const markNotificationsSeen = () => {
+        const now = Date.now();
+        try { localStorage.setItem(SEEN_KEY, String(now)); } catch { /* full */ }
+        return now;
+      };
+      const seenSince = () => {
+        const stored = Number(localStorage.getItem(SEEN_KEY));
+        // A first visit has nothing "new" — the counter starts right here.
+        return stored > 0 ? stored : markNotificationsSeen();
+      };
       function refreshAdminBell() {
         const badge = document.getElementById('admin-bell-count');
         const bell = document.getElementById('admin-bell');
         if (!badge || !bell) return;
-        const fresh = adminAlerts(Number(localStorage.getItem(SEEN_KEY) || 0)).length;
+        const fresh = adminAlerts(seenSince()).length;
         badge.textContent = bn(fresh);
         badge.hidden = fresh === 0;
         bell.setAttribute('aria-label', fresh ? `${bn(fresh)}টি নতুন নোটিফিকেশন` : 'নোটিফিকেশন');
       }
       document.getElementById('admin-bell')?.addEventListener('click', () => {
-        localStorage.setItem(SEEN_KEY, String(Date.now()));
-        activeTabs()?.activate?.('activity');
+        markNotificationsSeen();
+        activeTabs()?.activate?.('notifications');
         refreshAdminBell();
       });
 
@@ -1294,15 +1306,9 @@ export async function bootAdminPanel() {
         renderSettings();
       };
 
+      // Local-mode accounts must exist before the panel paints its user lists
+      // (mountUsers() renders them, and it is a few lines below).
       await seedUsers();
-      document.getElementById('account-list').innerHTML = listUsers().map((user) => `
-        <div class="list-item">
-          <div class="li-main">
-            <div class="li-title">${escapeHtml(user.name)}</div>
-            <div class="li-sub">${escapeHtml(user.username)}</div>
-          </div>
-          <span class="badge accent">${escapeHtml(user.role)}</span>
-        </div>`).join('') || '<div class="empty-state">কোনো অ্যাকাউন্ট নেই।</div>';
 
       renderAll();
       mountExtraAdmin(session);
@@ -1329,8 +1335,7 @@ export async function bootAdminPanel() {
           { name: 'status', label: 'অবস্থা', type: 'select', options: ['সক্রিয়', 'বন্ধ'] }
         ],
         searchKeys: ['name', 'className', 'teacher'],
-        idPrefix: 'batch',
-        session
+        idPrefix: 'batch'
       });
 
       /* ================= App-style admin home ================= */
@@ -1361,10 +1366,12 @@ export async function bootAdminPanel() {
       };
       window.addEventListener('tabchange', (event) => {
         syncAdminNav(event.detail?.tab);
+        // Looking at the panel itself counts as reading it — including for a
+        // notification the admin has just sent from this very screen.
+        if (event.detail?.tab === 'notifications') markNotificationsSeen();
         refreshAdminBell();
       });
-      // Initial highlight only. The bell is already correct from renderOverview();
-      // re-checking it here would surface the just-logged "viewed dashboard".
+      // Initial highlight only; renderOverview() already counted the bell.
       syncAdminNav(tabs?.current);
 
       /* -------- Admin Panel v2 components --------
@@ -1373,8 +1380,8 @@ export async function bootAdminPanel() {
          same tab router, so phone and desktop stay perfectly in sync. */
       mountAdminSidebar({ session, tabs });
       mountGlobalSearch({ session, tabs });
-      mountAutoBackup(session);
-      mountAdminExports(session);
+      mountAutoBackup();
+      mountAdminExports();
       /* Student App Control: the live mirror of the student portal. A publish
          there also moves the counts on the dashboard and the students list, so
          both are repainted instead of going stale behind the preview. */
@@ -1491,7 +1498,6 @@ export async function bootAdminPanel() {
         const existing = attQuickFor(student.id);
         if (existing) db.attendance.update((a) => a === existing, { status });
         else db.attendance.add({ id: newId('att'), studentId: student.id, date: todayBn(), status });
-        logActivity({ user: session.name, role: session.role, action: present ? 'marked present' : 'marked absent', target: student.id });
         renderAttendanceQuick();
         showToast(`${student.name} — ${status}`, present ? 'success' : 'warning');
       });

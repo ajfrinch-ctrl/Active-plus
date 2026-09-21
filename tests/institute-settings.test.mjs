@@ -128,7 +128,7 @@ test('mobile numbers are accepted in Bengali digits and validated as BD numbers'
   assert.equal(isValidEmail(''), false, 'empty is not an address');
 });
 
-test('saving the institute profile persists it and logs the change', async () => {
+test('saving the institute profile persists it', async () => {
   makeDom();
   (await import('../js/store.js'))._clearMemoryStore();
   const { saveOrgInfo, orgInfo, db } = await import('../js/data.js');
@@ -139,7 +139,7 @@ test('saving the institute profile persists it and logs the change', async () =>
     address: 'কলেজ রোড, যশোর',
     mobile: '০১৮১১-২২২৩৩৩',
     email: 'office@nobodigonto.edu'
-  }, { user: 'অ্যাডমিন', role: 'admin' });
+  });
 
   assert.equal(res.ok, true, 'a complete profile saves');
   assert.deepEqual(res.errors, []);
@@ -149,10 +149,6 @@ test('saving the institute profile persists it and logs the change', async () =>
   assert.equal(org.mobile, '০১৮১১-২২২৩৩৩');
   assert.equal(org.email, 'office@nobodigonto.edu');
   assert.equal(db.settings.get().orgName, 'নবদিগন্ত কোচিং সেন্টার', 'written to the store');
-  assert.equal(
-    db.activityLogs.list().some((l) => l.action === 'updated institute profile'), true,
-    'the edit appears in the activity log'
-  );
 });
 
 test('an incomplete or wrong profile is refused and nothing is written', async () => {

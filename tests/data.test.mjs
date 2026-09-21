@@ -1,6 +1,14 @@
-/** CRUD + persistence for the admin data layer (js/data.js). */
+/**
+ * CRUD + persistence for the admin data layer (js/data.js).
+ *
+ * `js/data.js` seeds an EMPTY store — settings, the class list and the subject
+ * list, nothing else — so a test that wants "a centre with people in it" calls
+ * `loadDemoData()` (js/demo-data.js) right after clearing the store. The test
+ * further down pins the empty start itself, before any fixture is loaded.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { loadDemoData } from '../js/demo-data.js';
 
 function makeLocalStorage() {
   const store = new Map();
@@ -36,11 +44,12 @@ test('students: add with school/college, edit, delete — persisted across page 
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
 
   const { db } = await import('../js/data.js?page=1');
   const before = db.students.list().length;
-  assert.ok(before >= 1, 'seeded students exist');
-  assert.ok(db.students.list().every((s) => 'school' in s), 'seed rows carry the school/college field');
+  assert.ok(before >= 1, 'the centre has students on file');
+  assert.ok(db.students.list().every((s) => 'school' in s), 'every student row carries the school/college field');
 
   // Admission with school/college name.
   db.students.add({
@@ -71,6 +80,7 @@ test('teachers + notices CRUD and settings update', async () => {
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
 
   const { db } = await import('../js/data.js?page=3');
 
@@ -95,14 +105,42 @@ test('teachers + notices CRUD and settings update', async () => {
   assert.equal(settings.monthlyFee, 1500);
   assert.match(settings.orgName, /শাখা ২/);
 
+  // The danger zone is an empty slate, not a trip back to demo data: the
+  // records go, the institute keeps what IT configured.
   db.reset();
-  assert.equal(db.settings.get().monthlyFee, 1200, 'reset restores the seed');
+  assert.equal(db.students.list().length, 0, 'reset clears the student list');
+  assert.equal(db.teachers.list().length, 0, 'and the teachers');
+  assert.equal(db.notices.list().length, 0, 'and the notices');
+  assert.equal(db.settings.get().monthlyFee, 1500, 'the fee the centre set stays');
+  assert.match(db.settings.get().orgName, /শাখা ২/, 'as does its name');
+  assert.ok(db.classes.list().length > 0 && db.subjects.list().length > 0, 'the class and subject lists are structural, not data');
+});
+
+test('a brand-new store holds the institute only — no demo people, no demo anything', async () => {
+  const storage = makeLocalStorage();
+  installWindow(storage);
+  (await import('../js/store.js'))._clearMemoryStore();
+
+  const { db } = await import('../js/data.js?page=fresh');
+  assert.equal(db.settings.get().orgName, 'Active Plus Coaching', 'a new centre starts with its own identity');
+  assert.ok(db.classes.list().length >= 3, 'with the classes it teaches');
+  assert.ok(db.subjects.list().length >= 1, 'and the subjects on that syllabus');
+  for (const name of ['students', 'teachers', 'notices', 'banners', 'notifications', 'tips',
+    'exams', 'materials', 'assignments', 'fees', 'payments', 'routine', 'attendance',
+    'results', 'batches', 'submissions', 'suggestions', 'materialProgress']) {
+    assert.deepEqual(db[name].list(), [], `${name} starts empty`);
+  }
+  // and it really is empty on disk: no sample rows waiting to appear
+  const raw = JSON.parse(storage.getItem('activeplus_data'));
+  assert.equal(raw.collections.students.length, 0, 'nothing was written to storage either');
+  assert.equal(raw.collections.notices.length, 0);
 });
 
 test('class filtering + class-targeted notices reach the right students', async () => {
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const mod = await import('../js/data.js?page=4');
   const { db, studentsOfClass, noticesFor, ALL_CLASSES } = mod;
 
@@ -132,6 +170,7 @@ test('receivePayment clears due, records payment, notifies the student', async (
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const { db, dueFees, receivePayment } = await import('../js/data.js?page=5');
 
   const before = dueFees();
@@ -161,6 +200,7 @@ const bootDataFor = async (query) => {
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData(); // dueFees() has to point at real fee rows
   return import(`../js/data.js?${query}`);
 };
 
@@ -211,6 +251,7 @@ test('scoreExam grades answers correctly', async () => {
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const { db, scoreExam } = await import('../js/data.js?page=6');
   const exam = db.exams.list()[0];
   const perfect = {};
@@ -224,6 +265,7 @@ test('scoreExam grades answers correctly', async () => {
 test('parseMcqPaste parses blocks, drops invalid + duplicates', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const { parseMcqPaste } = await import('../js/data.js?page=7');
   const text = [
     '৫+৩=?\nA. ৮\nB. ১\nC. ১৬\nD. ১০\nসঠিক: B',
@@ -240,6 +282,7 @@ test('parseMcqPaste parses blocks, drops invalid + duplicates', async () => {
 test('backup export -> import round-trips collections', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const mod = await import('../js/data.js?page=8');
   const { db, exportBackup, importBackup } = mod;
   db.students.add({ id: '2026-09-999', name: 'ব্যাকআপ টেস্ট', className: 'নবম', roll: '৯', school: 'x', status: 'সক্রিয়' });
@@ -257,6 +300,7 @@ test('backup export -> import round-trips collections', async () => {
 test('study streak + weekly calendar come from recorded activity only', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h1');
 
   assert.equal(m.studyStreak().streak, 0, 'no activity yet means no streak');
@@ -276,6 +320,7 @@ test('study streak + weekly calendar come from recorded activity only', async ()
 test('today progress counts classes + assignments + challenge, capped at 100%', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h2');
   const student = m.db.students.find('2026-09-001');
   const p = m.todayProgress(student);
@@ -290,6 +335,7 @@ test('today progress counts classes + assignments + challenge, capped at 100%', 
 test('daily challenge caps at its target and is stored per date', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h3');
   const target = m.challengeState().target;
   assert.equal(target, 10);
@@ -303,6 +349,7 @@ test('daily challenge caps at its target and is stored per date', async () => {
 test('next class looks ahead to the next day that actually has classes', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h4');
   const next = m.nextClass();
   assert.ok(next && next.item, 'a next class exists while the routine has rows');
@@ -316,6 +363,7 @@ test('next class looks ahead to the next day that actually has classes', async (
 test('upcoming exam and materials are scoped to the student class', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h5');
   const nine = m.db.students.find('2026-09-001').className;
   const ten = m.db.students.find('2026-10-014').className;
@@ -327,6 +375,7 @@ test('upcoming exam and materials are scoped to the student class', async () => 
 test('performance summary is computed from this student results only', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h6');
   const student = m.db.students.find('2026-09-001');
   assert.equal(m.performanceFor(student), null, 'no results yet');
@@ -349,6 +398,7 @@ test('performance summary is computed from this student results only', async () 
 test('achievements are only granted when actually earned', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h7');
   const student = m.db.students.find('2026-09-001');
   assert.deepEqual(m.achievementsFor(student), [], 'nothing earned with no results');
@@ -365,6 +415,7 @@ test('achievements are only granted when actually earned', async () => {
 test('fee status shows only the own rows and reports dues', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h8');
   const paid = m.feeStatusFor(m.db.students.find('2026-09-001'));
   assert.equal(paid.due, 0, 'fully paid student has no due');
@@ -378,6 +429,7 @@ test('fee status shows only the own rows and reports dues', async () => {
 test('tips and banners are admin-controlled and filtered by active flag', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h9');
   assert.ok(m.latestTip(), 'seed tip is active');
   assert.equal(m.activeBanners().every((b) => b.active), true);
@@ -394,6 +446,7 @@ test('tips and banners are admin-controlled and filtered by active flag', async 
 test('unread notification count is zero when nothing is pending', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h10');
   const student = m.db.students.find('2026-09-001');
   const initial = m.unreadNotifications(student);
@@ -406,6 +459,7 @@ test('unread notification count is zero when nothing is pending', async () => {
 test('exam window decides View vs Start, and assignment status follows submissions', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h11');
   const student = m.db.students.find('2026-09-001');
   const exam = m.db.exams.list()[0];
@@ -429,6 +483,7 @@ test('exam window decides View vs Start, and assignment status follows submissio
 test('admin settings decide which profile fields a student may edit', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h12');
   assert.deepEqual(m.db.settings.get().studentEditableFields, ['phone'], 'phone editable by default');
   m.db.settings.update({ studentEditableFields: ['phone', 'guardianPhone'] });
@@ -440,6 +495,7 @@ test('admin settings decide which profile fields a student may edit', async () =
 test('the store mirrors to the remote backend when one is configured', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h13');
 
   const mirrored = [];
@@ -456,6 +512,7 @@ test('the store mirrors to the remote backend when one is configured', async () 
 test('assignment submission and checking move through real states', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h14');
   const student = { id: '2026-09-002', name: 'Sumaiya' };
   const asg = m.db.assignments.list()[0];
@@ -476,6 +533,7 @@ test('assignment submission and checking move through real states', async () => 
 test('the 10-materials badge is earned from real activity', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h15');
   const student = m.db.students.find('2026-09-001');
   assert.equal(m.achievementsFor(student).some((b) => b.name.includes('ম্যাটেরিয়াল')), false, 'not earned yet');
@@ -490,6 +548,7 @@ test('the 10-materials badge is earned from real activity', async () => {
 test('admin can configure the daily challenge target', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h16');
   assert.equal(m.challengeState().target, 10, 'default target');
   m.db.settings.update({ dailyChallengeTarget: 5 });
@@ -503,6 +562,7 @@ test('admin can configure the daily challenge target', async () => {
 test('continue-learning progress counts completed materials for the own class', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h17');
   const student = m.db.students.find('2026-09-001');
   const cls = student.className;
@@ -526,6 +586,7 @@ test('continue-learning progress counts completed materials for the own class', 
 test('notification previews show honest relative time', async () => {
   installWindow(makeLocalStorage());
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const m = await import('../js/data.js?page=h18');
   const now = Date.now();
   assert.equal(m.timeAgo(new Date(now - 20000).toISOString(), now), 'এইমাত্র');
@@ -595,6 +656,7 @@ async function teacherModule(page) {
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   return import(`../js/data.js?page=${page}`);
 }
 
@@ -731,6 +793,7 @@ test('nextReceiptNo is a unique, sequential YYYYMMDDXXX number per day', async (
   const storage = makeLocalStorage();
   installWindow(storage);
   (await import('../js/store.js'))._clearMemoryStore();
+  loadDemoData();
   const { db, nextReceiptNo } = await import('../js/data.js?page=receipt');
 
   const fixed = new Date(2026, 8, 5); // 2026-09-05
